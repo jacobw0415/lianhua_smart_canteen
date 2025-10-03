@@ -30,7 +30,7 @@ public class Order {
     private LocalDateTime updatedAt;
 
     @ManyToOne
-    @JoinColumn(name = "customer_id")
+    @JoinColumn(name = "customer_id", nullable = false)
     private OrderCustomer customer;
 
     @OneToMany(mappedBy = "order")
