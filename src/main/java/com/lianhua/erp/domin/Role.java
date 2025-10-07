@@ -1,5 +1,7 @@
 package com.lianhua.erp.domin;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.HashSet;
@@ -19,7 +21,8 @@ public class Role {
     
     @Column(nullable = false, unique = true, length = 50)
     private String name;
-    
+
     @ManyToMany(mappedBy = "roles")
+    @JsonIgnore
     private Set<User> users = new HashSet<>();
 }

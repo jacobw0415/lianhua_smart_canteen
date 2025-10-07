@@ -10,13 +10,24 @@ import java.util.stream.Collectors;
 
 @Component
 public class UserMapper {
-    
     public UserDto toDto(User user) {
         if (user == null) return null;
-        Set<RoleDto> roleDtos = user.getRoles().stream()
-                .map(role -> new RoleDto(role.getId(), role.getName()))
-                .collect(Collectors.toSet());
-        
+
+        System.out.println("🧭 UserMapper converting user: " + user.getUsername());
+
+        Set<RoleDto> roleDtos = Set.of(); // 預設空集合
+        if (user.getRoles() != null) {
+            System.out.println("🔍 roles count: " + user.getRoles().size());
+            user.getRoles().forEach(r -> System.out.println("➡ role: " + r.getId() + " - " + r.getName()));
+            roleDtos = user.getRoles().stream()
+                    .map(role -> new RoleDto(role.getId(), role.getName()))
+                    .collect(Collectors.toSet());
+        } else {
+            System.out.println("⚠️ user.getRoles() is null");
+        }
+
+        System.out.println("🧭 Mapping roles: " + roleDtos.size());
+
         return UserDto.builder()
                 .id(user.getId())
                 .username(user.getUsername())

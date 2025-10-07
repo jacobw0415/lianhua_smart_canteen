@@ -1,7 +1,11 @@
 package com.lianhua.erp.domin;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -31,11 +35,13 @@ public class User {
     private Boolean enabled = true;
     
     @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
     private LocalDateTime createdAt = LocalDateTime.now();
     
     @Column(name = "updated_at")
+    @UpdateTimestamp
     private LocalDateTime updatedAt = LocalDateTime.now();
-    
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "user_roles",
