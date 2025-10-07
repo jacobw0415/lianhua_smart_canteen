@@ -1,5 +1,6 @@
-package com.lianhua.erp.dto;
+package com.lianhua.erp.dto.user;
 
+import com.lianhua.erp.dto.RoleDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 

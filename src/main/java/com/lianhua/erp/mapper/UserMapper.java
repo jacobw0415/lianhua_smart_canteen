@@ -1,9 +1,8 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.domin.Role;
 import com.lianhua.erp.domin.User;
 import com.lianhua.erp.dto.RoleDto;
-import com.lianhua.erp.dto.UserDto;
+import com.lianhua.erp.dto.user.UserDto;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
