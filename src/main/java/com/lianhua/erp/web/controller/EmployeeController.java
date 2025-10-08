@@ -1,6 +1,6 @@
 package com.lianhua.erp.web.controller;
 
-import com.lianhua.erp.dto.EmployeeDto;
+import com.lianhua.erp.dto.employee.EmployeeDto;
 import com.lianhua.erp.service.EmployeeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

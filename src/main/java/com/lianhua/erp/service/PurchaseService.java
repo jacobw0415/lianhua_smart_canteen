@@ -1,7 +1,7 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.PurchaseDto;
-import com.lianhua.erp.dto.PaymentDto;
+import com.lianhua.erp.dto.purchase.PurchaseDto;
+
 import java.util.List;
 
 public interface PurchaseService {

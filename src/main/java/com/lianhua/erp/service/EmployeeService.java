@@ -1,6 +1,6 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.EmployeeDto;
+import com.lianhua.erp.dto.employee.EmployeeDto;
 import java.util.List;
 
 public interface EmployeeService {

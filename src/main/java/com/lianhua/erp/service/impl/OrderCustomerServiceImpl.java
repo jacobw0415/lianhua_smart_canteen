@@ -1,9 +1,9 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domin.Order;
-import com.lianhua.erp.dto.OrderCustomerDto;
+import com.lianhua.erp.dto.order.OrderCustomerDto;
 import com.lianhua.erp.domin.OrderCustomer;
-import com.lianhua.erp.dto.OrderResponseDto;
+import com.lianhua.erp.dto.order.OrderResponseDto;
 import com.lianhua.erp.mapper.OrderCustomerMapper;
 import com.lianhua.erp.mapper.OrderMapper;
 import com.lianhua.erp.repository.OrderCustomerRepository;

@@ -1,6 +1,6 @@
 package com.lianhua.erp.web.controller;
 
-import com.lianhua.erp.dto.PurchaseDto;
+import com.lianhua.erp.dto.purchase.PurchaseDto;
 import com.lianhua.erp.service.PurchaseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

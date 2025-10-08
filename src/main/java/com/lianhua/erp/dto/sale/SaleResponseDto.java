@@ -1,5 +1,6 @@
-package com.lianhua.erp.dto;
+package com.lianhua.erp.dto.sale;
 
+import com.lianhua.erp.dto.product.ProductDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -7,14 +8,14 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Schema(description = "銷售請求 DTO")
-public class SaleRequestDto {
+@Schema(description = "銷售回應 DTO")
+public class SaleResponseDto {
+
+    @Schema(description = "銷售 ID", example = "101")
+    private Long id;
 
     @Schema(description = "日期", example = "2025-10-03")
     private String saleDate;
-
-    @Schema(description = "商品 ID", example = "3")
-    private Long productId;
 
     @Schema(description = "數量", example = "2")
     private Integer qty;
@@ -24,4 +25,7 @@ public class SaleRequestDto {
 
     @Schema(description = "付款方式", example = "CASH")
     private String payMethod;
+
+    @Schema(description = "產品資訊")
+    private ProductDto product; // 🔑 直接嵌入完整產品
 }

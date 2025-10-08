@@ -1,7 +1,7 @@
 package com.lianhua.erp.web.controller;
 
-import com.lianhua.erp.dto.OrderDto;
-import com.lianhua.erp.dto.OrderResponseDto;
+import com.lianhua.erp.dto.order.OrderDto;
+import com.lianhua.erp.dto.order.OrderResponseDto;
 import com.lianhua.erp.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

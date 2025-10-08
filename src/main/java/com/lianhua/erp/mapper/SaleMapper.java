@@ -1,8 +1,8 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.dto.ProductDto;
-import com.lianhua.erp.dto.SaleRequestDto;
-import com.lianhua.erp.dto.SaleResponseDto;
+import com.lianhua.erp.dto.product.ProductDto;
+import com.lianhua.erp.dto.sale.SaleRequestDto;
+import com.lianhua.erp.dto.sale.SaleResponseDto;
 import com.lianhua.erp.domin.Product;
 import com.lianhua.erp.domin.Sale;
 import com.lianhua.erp.repository.ProductRepository;

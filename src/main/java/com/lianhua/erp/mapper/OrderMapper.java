@@ -1,7 +1,8 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.dto.*;
 import com.lianhua.erp.domin.*;
+import com.lianhua.erp.dto.order.*;
+import com.lianhua.erp.dto.product.ProductDto;
 import com.lianhua.erp.repository.OrderCustomerRepository;
 import com.lianhua.erp.repository.ProductRepository;
 import org.springframework.stereotype.Component;

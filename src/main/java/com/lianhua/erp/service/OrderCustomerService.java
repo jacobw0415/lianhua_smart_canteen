@@ -1,7 +1,7 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.OrderCustomerDto;
-import com.lianhua.erp.dto.OrderResponseDto;
+import com.lianhua.erp.dto.order.OrderCustomerDto;
+import com.lianhua.erp.dto.order.OrderResponseDto;
 
 import java.util.List;
 

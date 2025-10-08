@@ -1,7 +1,7 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.SaleRequestDto;
-import com.lianhua.erp.dto.SaleResponseDto;
+import com.lianhua.erp.dto.sale.SaleRequestDto;
+import com.lianhua.erp.dto.sale.SaleResponseDto;
 
 import java.util.List;
 

@@ -1,6 +1,6 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.dto.SupplierDto;
+import com.lianhua.erp.dto.supplier.SupplierDto;
 import com.lianhua.erp.domin.Supplier;
 import com.lianhua.erp.mapper.SupplierMapper;
 import com.lianhua.erp.repository.SupplierRepository;

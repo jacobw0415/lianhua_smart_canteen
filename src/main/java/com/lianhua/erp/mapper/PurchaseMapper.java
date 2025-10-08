@@ -1,7 +1,7 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.dto.PurchaseDto;
-import com.lianhua.erp.dto.PaymentDto;
+import com.lianhua.erp.dto.purchase.PurchaseDto;
+import com.lianhua.erp.dto.payment.PaymentDto;
 import com.lianhua.erp.domin.Purchase;
 import com.lianhua.erp.domin.Payment;
 import com.lianhua.erp.domin.Supplier;

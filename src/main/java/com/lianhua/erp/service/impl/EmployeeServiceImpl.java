@@ -1,6 +1,6 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.dto.EmployeeDto;
+import com.lianhua.erp.dto.employee.EmployeeDto;
 import com.lianhua.erp.domin.Employee;
 import com.lianhua.erp.mapper.EmployeeMapper;
 import com.lianhua.erp.repository.EmployeeRepository;

@@ -1,9 +1,9 @@
 package com.lianhua.erp.dto.user;
 
-import com.lianhua.erp.dto.RoleDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -25,5 +25,5 @@ public class UserDto {
     private Boolean enabled;
     
     @Schema(description = "角色清單")
-    private Set<RoleDto> roles;
+    private List<String> roles;
 }

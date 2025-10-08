@@ -1,6 +1,6 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.dto.ExpenseDto;
+import com.lianhua.erp.dto.expense.ExpenseDto;
 import com.lianhua.erp.domin.Expense;
 import com.lianhua.erp.mapper.ExpenseMapper;
 import com.lianhua.erp.repository.ExpenseRepository;

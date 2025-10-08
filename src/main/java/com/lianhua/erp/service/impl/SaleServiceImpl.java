@@ -1,8 +1,8 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domin.Sale;
-import com.lianhua.erp.dto.SaleRequestDto;
-import com.lianhua.erp.dto.SaleResponseDto;
+import com.lianhua.erp.dto.sale.SaleRequestDto;
+import com.lianhua.erp.dto.sale.SaleResponseDto;
 import com.lianhua.erp.mapper.SaleMapper;
 import com.lianhua.erp.repository.SaleRepository;
 import com.lianhua.erp.service.SaleService;

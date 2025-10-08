@@ -1,6 +1,6 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.ProductDto;
+import com.lianhua.erp.dto.product.ProductDto;
 import java.util.List;
 
 public interface ProductService {

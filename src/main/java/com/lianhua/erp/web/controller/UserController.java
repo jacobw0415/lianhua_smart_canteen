@@ -6,6 +6,7 @@ import com.lianhua.erp.dto.user.UserRegisterDto;
 import com.lianhua.erp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -28,7 +29,7 @@ public class UserController {
     // =====================================================================
     @PostMapping("/register")
     @Operation(summary = "使用者註冊（自動套用 USER 角色）")
-    public ResponseEntity<UserDto> registerUser(@RequestBody UserRegisterDto dto) {
+    public ResponseEntity<UserDto> registerUser(@Valid @RequestBody UserRegisterDto dto) {
         return ResponseEntity.ok(userService.registerUser(dto));
     }
 

@@ -1,5 +1,6 @@
-package com.lianhua.erp.dto;
+package com.lianhua.erp.dto.order;
 
+import com.lianhua.erp.dto.product.ProductDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -7,16 +8,10 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Schema(description = "訂單明細 DTO")
-public class OrderItemDto {
+@Schema(description = "訂單明細回應 DTO（含產品資訊）")
+public class OrderItemDetailDto {
     @Schema(description = "明細 ID", example = "1")
     private Long id;
-
-    @Schema(description = "訂單 ID", example = "1001")
-    private Long orderId;
-
-    @Schema(description = "商品 ID", example = "501")
-    private Long productId;
 
     @Schema(description = "數量", example = "100")
     private Integer qty;
@@ -35,4 +30,7 @@ public class OrderItemDto {
 
     @Schema(description = "備註", example = "加飯")
     private String note;
+
+    @Schema(description = "產品資訊")
+    private ProductDto product;
 }

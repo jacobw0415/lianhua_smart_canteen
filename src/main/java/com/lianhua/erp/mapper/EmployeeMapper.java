@@ -1,6 +1,6 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.dto.EmployeeDto;
+import com.lianhua.erp.dto.employee.EmployeeDto;
 import com.lianhua.erp.domin.Employee;
 import org.springframework.stereotype.Component;
 

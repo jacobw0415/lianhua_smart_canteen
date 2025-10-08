@@ -1,6 +1,6 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.SupplierDto;
+import com.lianhua.erp.dto.supplier.SupplierDto;
 import java.util.List;
 
 public interface SupplierService {

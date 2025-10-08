@@ -1,6 +1,6 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.ExpenseDto;
+import com.lianhua.erp.dto.expense.ExpenseDto;
 import java.util.List;
 
 public interface ExpenseService {

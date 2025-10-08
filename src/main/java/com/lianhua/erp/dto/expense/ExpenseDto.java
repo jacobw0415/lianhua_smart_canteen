@@ -1,4 +1,4 @@
-package com.lianhua.erp.dto;
+package com.lianhua.erp.dto.expense;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;

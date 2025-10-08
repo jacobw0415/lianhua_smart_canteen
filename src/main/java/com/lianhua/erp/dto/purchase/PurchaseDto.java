@@ -1,5 +1,6 @@
-package com.lianhua.erp.dto;
+package com.lianhua.erp.dto.purchase;
 
+import com.lianhua.erp.dto.payment.PaymentDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
