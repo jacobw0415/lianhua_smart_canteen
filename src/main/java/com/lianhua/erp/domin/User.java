@@ -1,4 +1,5 @@
 package com.lianhua.erp.domin;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
@@ -17,44 +18,49 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class User {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
-    
+
     @Column(nullable = false, unique = true, length = 60)
     private String username;
-    
+
     @Column(nullable = false)
     private String password;
-    
+
     private String fullName;
     private Boolean enabled = true;
-    
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-    
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-    
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonIgnoreProperties("user")
+
+    @OneToMany(
+            mappedBy = "user",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    @JsonIgnoreProperties({"user", "hibernateLazyInitializer", "handler"})
     private Set<UserRole> userRoles = new HashSet<>();
-    
-    // --- equals & hashCode 僅根據 id ---
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof User user)) return false;
-        return id != null && id.equals(user.getId());
+
+    // ✅ 輔助方法（維護雙向關聯一致性）
+    public void addRole(UserRole userRole) {
+        userRoles.add(userRole);
+        userRole.setUser(this);
     }
-    
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(id);
+
+    public void removeRole(UserRole userRole) {
+        userRoles.remove(userRole);
+        userRole.setUser(null);
     }
 }
-

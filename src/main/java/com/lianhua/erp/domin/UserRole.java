@@ -13,23 +13,26 @@ import java.util.Objects;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class UserRole {
-    
+
     @EmbeddedId
+    @EqualsAndHashCode.Include
     private UserRoleId id = new UserRoleId();
-    
+
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("userId")
     @JoinColumn(name = "user_id")
-    @JsonIgnoreProperties("userRoles")
+    @JsonIgnoreProperties("userRoles")  // 避免循環
     private User user;
-    
+
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("roleId")
     @JoinColumn(name = "role_id")
-    @JsonIgnoreProperties("userRoles")
+    @JsonIgnoreProperties("userRoles")  // 避免循環
     private Role role;
-    
+
     public UserRole(User user, Role role) {
         this.user = user;
         this.role = role;
@@ -38,16 +41,10 @@ public class UserRole {
                 role != null ? role.getId() : null
         );
     }
-    
+
     @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof UserRole that)) return false;
-        return id != null && id.equals(that.getId());
-    }
-    
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(id);
+    public String toString() {
+        return "UserRole(userId=" + (user != null ? user.getId() : "null") +
+                ", roleId=" + (role != null ? role.getId() : "null") + ")";
     }
 }

@@ -99,31 +99,38 @@ public class UserServiceImpl implements UserService {
     public UserDto updateUser(Long id, UserRequestDto dto) {
         User user = userRepository.findByIdWithRoles(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
-        
-        user.setFullName(dto.getFullName());
-        user.setEnabled(dto.getEnabled());
-        
+
+        if (dto.getUsername() != null && !dto.getUsername().isBlank()) {
+            user.setUsername(dto.getUsername().trim());
+        }
+        if (dto.getFullName() != null && !dto.getFullName().isBlank()) {
+            user.setFullName(dto.getFullName().trim());
+        }
+        if (dto.getEnabled() != null) {
+            user.setEnabled(dto.getEnabled());
+        }
         if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(dto.getPassword()));
         }
-        
-        // 更新角色
+
+        // ✅ 改成 clear + addAll
         if (dto.getRoleNames() != null && !dto.getRoleNames().isEmpty()) {
-            Set<UserRole> updatedUserRoles = dto.getRoleNames().stream()
-                    .map(name -> {
-                        Role role = roleRepository.findByName(name)
-                                .orElseThrow(() -> new EntityNotFoundException("Role not found: " + name));
+            Set<UserRole> newRoles = dto.getRoleNames().stream()
+                    .map(roleName -> {
+                        Role role = roleRepository.findByName(roleName)
+                                .orElseThrow(() -> new EntityNotFoundException("Role not found: " + roleName));
                         return new UserRole(user, role);
                     })
                     .collect(Collectors.toSet());
-            
+
             user.getUserRoles().clear();
-            user.getUserRoles().addAll(updatedUserRoles);
+            user.getUserRoles().addAll(newRoles);
         }
-        
-        return userMapper.toDto(userRepository.save(user));
+
+        User updated = userRepository.save(user);
+        return userMapper.toDto(updated);
     }
-    
+
     /** 刪除使用者 */
     @Override
     public void deleteUser(Long id) {
