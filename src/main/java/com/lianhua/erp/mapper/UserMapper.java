@@ -2,43 +2,18 @@ package com.lianhua.erp.mapper;
 
 import com.lianhua.erp.domin.User;
 import com.lianhua.erp.dto.user.UserDto;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-import java.util.List;
+// ✅ 關鍵：手動 import Collectors
 import java.util.stream.Collectors;
 
-@Component
-public class UserMapper {
+@Mapper(componentModel = "spring", imports = {Collectors.class})
+public interface UserMapper {
 
-    public UserDto toDto(User user) {
-        if (user == null) return null;
-
-        System.out.println("🧭 UserMapper converting user: " + user.getUsername());
-
-        List<String> roleNames = List.of(); // 預設空清單
-
-        if (user.getUserRoles() != null && !user.getUserRoles().isEmpty()) {
-            System.out.println("🔍 userRoles count: " + user.getUserRoles().size());
-            roleNames = user.getUserRoles().stream()
-                    .map(userRole -> {
-                        String roleName = userRole.getRole().getName();
-                        System.out.println("➡ role: " + roleName);
-                        return roleName;
-                    })
-                    .distinct() // 避免重複角色
-                    .collect(Collectors.toList());
-        } else {
-            System.out.println("⚠️ user.getUserRoles() is null or empty");
-        }
-
-        System.out.println("🧭 Mapped role names: " + roleNames);
-
-        return UserDto.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .fullName(user.getFullName())
-                .enabled(user.getEnabled())
-                .roles(roleNames) // ✅ 改為 List<String>
-                .build();
-    }
+    @Mapping(
+            target = "roles",
+            expression = "java(user.getUserRoles() == null || user.getUserRoles().isEmpty() ? java.util.List.of() : user.getUserRoles().stream().map(ur -> ur.getRole().getName()).distinct().collect(Collectors.toList()))"
+    )
+    UserDto toDto(User user);
 }

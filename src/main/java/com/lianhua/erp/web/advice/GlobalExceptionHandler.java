@@ -1,6 +1,6 @@
 package com.lianhua.erp.web.advice;
 
-import com.lianhua.erp.dto.error.ErrorResponse;
+import com.lianhua.erp.dto.error.*;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
@@ -14,71 +14,73 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.Instant;
 import java.util.stream.Collectors;
 
-@Hidden // 避免 Swagger 掃描導致 /v3/api-docs 500
+/**
+ * 全域例外處理器，統一封裝所有錯誤。
+ * 對應各種 HTTP 狀態碼：400, 403, 404, 409, 500。
+ */
+@Hidden // 避免 Swagger 掃描 /v3/api-docs 時報錯
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /** 統一錯誤回傳格式 */
-    private ResponseEntity<ErrorResponse> build(HttpStatus status, String message) {
-        ErrorResponse body = new ErrorResponse(
-                status.value(),
-                status.getReasonPhrase(),
-                message,
-                Instant.now().toString()
-        );
-        return ResponseEntity.status(status).body(body);
-    }
-
     // ===============================
-    // 🌐 一般錯誤處理區
+    // 🔹 400：請求參數或驗證錯誤
     // ===============================
-
-    @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleEntityNotFound(EntityNotFoundException ex) {
-        return build(HttpStatus.NOT_FOUND, ex.getMessage());
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
-        String errors = ex.getBindingResult().getFieldErrors().stream()
+    @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
+    public ResponseEntity<BadRequestResponse> handleBadRequest(Exception ex) {
+        String msg = (ex instanceof MethodArgumentNotValidException e)
+                ? e.getBindingResult().getFieldErrors().stream()
                 .map(err -> err.getField() + " " + err.getDefaultMessage())
-                .collect(Collectors.joining(", "));
-        return build(HttpStatus.BAD_REQUEST, "驗證失敗: " + errors);
-    }
-
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage());
-    }
-
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex) {
-        return build(HttpStatus.CONFLICT, "資料重複或違反約束：" + ex.getMostSpecificCause().getMessage());
+                .collect(Collectors.joining(", "))
+                : ex.getMessage();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new BadRequestResponse(msg));
     }
 
     // ===============================
-    // 🔐 安全相關錯誤處理
+    // 🔹 403：禁止存取（權限不足）
     // ===============================
-
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
-        return build(HttpStatus.FORBIDDEN, "無權限存取此資源");
+    public ResponseEntity<ForbiddenResponse> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ForbiddenResponse("無權限存取此資源"));
     }
 
+    // ===============================
+    // 🔹 404：找不到資源
+    // ===============================
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<NotFoundResponse> handleNotFound(EntityNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new NotFoundResponse(ex.getMessage()));
+    }
+
+    // ===============================
+    // 🔹 409：資料衝突
+    // ===============================
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<BadRequestResponse> handleDataConflict(DataIntegrityViolationException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new BadRequestResponse("資料違反約束：" + ex.getMostSpecificCause().getMessage()));
+    }
+
+    // ===============================
+    // 🔹 401：登入認證錯誤
+    // ===============================
     @ExceptionHandler({AuthenticationException.class, BadCredentialsException.class})
-    public ResponseEntity<ErrorResponse> handleAuth(AuthenticationException ex) {
-        return build(HttpStatus.UNAUTHORIZED, "認證失敗：" + ex.getMessage());
+    public ResponseEntity<ForbiddenResponse> handleAuthError(AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ForbiddenResponse("認證失敗：" + ex.getMessage()));
     }
 
     // ===============================
-    // 🧩 其他未知錯誤
+    // 🔹 500：伺服器內部錯誤（兜底）
     // ===============================
-
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, ex.getClass().getSimpleName() + ": " + ex.getMessage());
+    public ResponseEntity<InternalServerErrorResponse> handleServerError(Exception ex) {
+        String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new InternalServerErrorResponse(msg));
     }
 }
