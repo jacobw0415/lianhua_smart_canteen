@@ -64,8 +64,10 @@ public class GlobalExceptionHandler {
     // 500：伺服器內部錯誤
     @ExceptionHandler(Exception.class)
     public ResponseEntity<InternalServerErrorResponse> handleServerError(Exception ex) {
+        ex.printStackTrace(); // ✅ 印出完整堆疊
         String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new InternalServerErrorResponse(msg));
     }
+  
 }
