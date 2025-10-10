@@ -90,7 +90,7 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "參數錯誤",
                     content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
             @ApiResponse(responseCode = "409", description = "使用者已存在",
-                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class)))
+                    content = @Content(schema = @Schema(implementation = ConflictResponse.class)))
     })
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")

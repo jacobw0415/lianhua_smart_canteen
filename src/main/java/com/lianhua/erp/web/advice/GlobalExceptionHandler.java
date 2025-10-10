@@ -16,17 +16,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.stream.Collectors;
 
-/**
- * 全域例外處理器，統一封裝所有錯誤。
- * 對應各種 HTTP 狀態碼：400, 403, 404, 409, 500。
- */
-@Hidden // 避免 Swagger 掃描 /v3/api-docs 時報錯
+@Hidden
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
-    // ===============================
-    // 🔹 400：請求參數或驗證錯誤
-    // ===============================
+    
+    // 400：參數或驗證錯誤
     @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
     public ResponseEntity<BadRequestResponse> handleBadRequest(Exception ex) {
         String msg = (ex instanceof MethodArgumentNotValidException e)
@@ -37,46 +31,37 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new BadRequestResponse(msg));
     }
-
-    // ===============================
-    // 🔹 403：禁止存取（權限不足）
-    // ===============================
+    
+    // 401：認證失敗
+    @ExceptionHandler({AuthenticationException.class, BadCredentialsException.class})
+    public ResponseEntity<UnauthorizedResponse> handleAuthError(AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new UnauthorizedResponse("認證失敗：" + ex.getMessage()));
+    }
+    
+    // 403：權限不足
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ForbiddenResponse> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new ForbiddenResponse("無權限存取此資源"));
     }
-
-    // ===============================
-    // 🔹 404：找不到資源
-    // ===============================
+    
+    // 404：找不到資源
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<NotFoundResponse> handleNotFound(EntityNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new NotFoundResponse(ex.getMessage()));
     }
-
-    // ===============================
-    // 🔹 409：資料衝突
-    // ===============================
+    
+    // 409：資料衝突或違反約束
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<BadRequestResponse> handleDataConflict(DataIntegrityViolationException ex) {
+    public ResponseEntity<ConflictResponse> handleConflict(DataIntegrityViolationException ex) {
+        String rootCauseMsg = ex.getMostSpecificCause().getMessage();
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new BadRequestResponse("資料違反約束：" + ex.getMostSpecificCause().getMessage()));
+                .body(new ConflictResponse("⚠️ 資料衝突：" + rootCauseMsg));
     }
-
-    // ===============================
-    // 🔹 401：登入認證錯誤
-    // ===============================
-    @ExceptionHandler({AuthenticationException.class, BadCredentialsException.class})
-    public ResponseEntity<ForbiddenResponse> handleAuthError(AuthenticationException ex) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new ForbiddenResponse("認證失敗：" + ex.getMessage()));
-    }
-
-    // ===============================
-    // 🔹 500：伺服器內部錯誤（兜底）
-    // ===============================
+    
+    // 500：伺服器內部錯誤
     @ExceptionHandler(Exception.class)
     public ResponseEntity<InternalServerErrorResponse> handleServerError(Exception ex) {
         String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage();

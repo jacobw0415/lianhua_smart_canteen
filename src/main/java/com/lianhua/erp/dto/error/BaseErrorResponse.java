@@ -1,34 +1,40 @@
 package com.lianhua.erp.dto.error;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-import java.time.Instant;
-
 /**
- * 所有錯誤回應 DTO 的基底類別。
- * 統一結構：status、error、message、timestamp。
+ * 🔹 通用錯誤回應基底類別
+ * 所有錯誤與成功回應（如 400、401、403、404、409、500、204）皆繼承此類。
+ *
+ * 提供統一的錯誤結構：
+ * {
+ *   "status": 409,
+ *   "error": "Conflict",
+ *   "message": "使用者帳號已存在"
+ * }
  */
 @Getter
-@Schema(description = "基底錯誤格式")
+@AllArgsConstructor
+@Schema(description = "通用錯誤回應基底類別，提供狀態碼、錯誤描述與訊息內容")
 public class BaseErrorResponse {
-
-    @Schema(description = "HTTP 狀態碼")  // 🚫 不設定 example
-    protected int status;
-
-    @Schema(description = "錯誤類型（對應 HTTP 狀態名稱")
-    protected String error;
-
-    @Schema(description = "錯誤訊息詳細內容")
-    protected String message;
-
-    @Schema(description = "錯誤發生時間", example = "2025-10-09T10:00:00Z")
-    protected String timestamp = Instant.now().toString();
-
-    public BaseErrorResponse(int status, String error, String message) {
-        this.status = status;
-        this.error = error;
-        this.message = message;
+    
+    @Schema(description = "HTTP 狀態碼", example = "400")
+    private final int status;
+    
+    @Schema(description = "錯誤類型或狀態描述", example = "Bad Request")
+    private final String error;
+    
+    @Schema(description = "詳細錯誤訊息", example = "請求參數驗證失敗")
+    private final String message;
+    
+    @Override
+    public String toString() {
+        return "BaseErrorResponse{" +
+                "status=" + status +
+                ", error='" + error + '\'' +
+                ", message='" + message + '\'' +
+                '}';
     }
-
 }
