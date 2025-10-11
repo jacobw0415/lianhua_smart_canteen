@@ -17,7 +17,7 @@ public class NotFoundResponse extends BaseErrorResponse {
     @Schema(description = "錯誤類型", example = "Not Found")
     private final String error = "Not Found";
     
-    @Schema(description = "錯誤訊息", example = "找不到指定的使用者資料")
+    @Schema(description = "錯誤訊息", example = "找不到指定的資料")
     private final String message;
     
     public NotFoundResponse(String message) {

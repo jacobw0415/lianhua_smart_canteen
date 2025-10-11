@@ -17,7 +17,7 @@ public class ConflictResponse extends BaseErrorResponse {
     @Schema(description = "錯誤類型", example = "Conflict")
     private final String error = "Conflict";
     
-    @Schema(description = "錯誤訊息", example = "使用者帳號已存在，請嘗試其他名稱")
+    @Schema(description = "錯誤訊息", example = "資料已存在，請嘗試其他名稱")
     private final String message;
     
     public ConflictResponse(String message) {

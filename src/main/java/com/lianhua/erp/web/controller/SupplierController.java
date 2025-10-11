@@ -1,51 +1,123 @@
 package com.lianhua.erp.web.controller;
 
-import com.lianhua.erp.dto.supplier.SupplierDto;
+import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
+import com.lianhua.erp.dto.error.*;
+import com.lianhua.erp.dto.supplier.*;
 import com.lianhua.erp.service.SupplierService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * 供應商管理 API
+ * 包含：查詢、建立、更新、刪除。
+ */
 @RestController
 @RequestMapping("/api/suppliers")
-@Tag(name = "供應商管理", description = "管理供應商的 CRUD API")
+@Tag(name = "供應商管理", description = "供應商 CRUD API")
+@RequiredArgsConstructor
 public class SupplierController {
-
+    
     private final SupplierService supplierService;
-
-    public SupplierController(SupplierService supplierService) {
-        this.supplierService = supplierService;
-    }
-
+    
+    // ============================================================
+    // 取得所有供應商
+    // ============================================================
+    @Operation(summary = "取得所有供應商")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功取得供應商列表",
+                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
     @GetMapping
-    @Operation(summary = "取得所有供應商", description = "回傳所有供應商清單")
-    public List<SupplierDto> getAllSuppliers() {
-        return supplierService.getAllSuppliers();
+    public ResponseEntity<ApiResponseDto<List<SupplierDto>>> getAllSuppliers() {
+        return ResponseEntity.ok(ApiResponseDto.ok(supplierService.getAllSuppliers()));
     }
-
+    
+    // ============================================================
+    // 取得單一供應商
+    // ============================================================
+    @Operation(summary = "取得指定供應商資料")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功取得供應商資料",
+                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+            @ApiResponse(responseCode = "404", description = "找不到供應商",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
     @GetMapping("/{id}")
-    @Operation(summary = "取得單筆供應商", description = "根據 ID 取得供應商")
-    public SupplierDto getSupplierById(@PathVariable Long id) {
-        return supplierService.getSupplierById(id);
+    public ResponseEntity<ApiResponseDto<SupplierDto>> getSupplierById(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponseDto.ok(supplierService.getSupplierById(id)));
     }
-
+    
+    // ============================================================
+    // 建立供應商
+    // ============================================================
+    @Operation(summary = "建立新供應商")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "成功建立供應商",
+                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+            @ApiResponse(responseCode = "400", description = "參數錯誤",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "409", description = "資料重複或供應商已存在",
+                    content = @Content(schema = @Schema(implementation = ConflictResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
     @PostMapping
-    @Operation(summary = "新增供應商", description = "建立一位新的供應商")
-    public SupplierDto createSupplier(@RequestBody SupplierDto dto) {
-        return supplierService.createSupplier(dto);
+    public ResponseEntity<ApiResponseDto<SupplierDto>> createSupplier(
+            @Valid @RequestBody SupplierRequestDto dto) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponseDto.created(supplierService.createSupplier(dto)));
     }
-
+    
+    // ============================================================
+    // 更新供應商
+    // ============================================================
+    @Operation(summary = "更新供應商資料")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功更新供應商",
+                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+            @ApiResponse(responseCode = "400", description = "更新參數錯誤",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "404", description = "找不到供應商",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
     @PutMapping("/{id}")
-    @Operation(summary = "更新供應商", description = "更新一筆現有的供應商資料")
-    public SupplierDto updateSupplier(@PathVariable Long id, @RequestBody SupplierDto dto) {
-        return supplierService.updateSupplier(id, dto);
+    public ResponseEntity<ApiResponseDto<SupplierDto>> updateSupplier(
+            @PathVariable Long id, @Valid @RequestBody SupplierRequestDto dto) {
+        return ResponseEntity.ok(ApiResponseDto.ok(supplierService.updateSupplier(id, dto)));
     }
-
+    
+    // ============================================================
+    // 刪除供應商
+    // ============================================================
+    @Operation(summary = "刪除指定供應商")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "成功刪除供應商",
+                    content = @Content(schema = @Schema(implementation = NoContentResponse.class))),
+            @ApiResponse(responseCode = "404", description = "找不到供應商",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
     @DeleteMapping("/{id}")
-    @Operation(summary = "刪除供應商", description = "刪除指定 ID 的供應商")
-    public void deleteSupplier(@PathVariable Long id) {
+    public ResponseEntity<ApiResponseDto<Void>> deleteSupplier(@PathVariable Long id) {
         supplierService.deleteSupplier(id);
+        return ResponseEntity.ok(ApiResponseDto.deleted());
     }
 }

@@ -41,6 +41,8 @@ public class UserController {
                     content = @Content(schema = @Schema(implementation = UserDto.class))),
             @ApiResponse(responseCode = "400", description = "參數錯誤",
                     content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "409", description = "使用者已存在",
+                    content = @Content(schema = @Schema(implementation = ConflictResponse.class))),
             @ApiResponse(responseCode = "500", description = "伺服器錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })

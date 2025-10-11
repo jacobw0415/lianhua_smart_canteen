@@ -18,7 +18,7 @@ public class UserDto {
     @Schema(description = "帳號", example = "admin")
     private String username;
 
-    @Schema(description = "全名", example = "系統管理員")
+    @Schema(description = "全名", example = "Jacob Huang")
     private String fullName;
 
     @Schema(description = "是否啟用", example = "true")

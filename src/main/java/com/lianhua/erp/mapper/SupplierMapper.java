@@ -1,40 +1,17 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.dto.supplier.SupplierDto;
 import com.lianhua.erp.domin.Supplier;
-import org.springframework.stereotype.Component;
+import com.lianhua.erp.dto.supplier.SupplierDto;
+import com.lianhua.erp.dto.supplier.SupplierRequestDto;
+import org.mapstruct.Mapper;
+import org.mapstruct.MappingTarget;
 
-@Component
-public class SupplierMapper {
-
-    public SupplierDto toDto(Supplier supplier) {
-        if (supplier == null) return null;
-
-        return SupplierDto.builder()
-                .id(supplier.getId())
-                .name(supplier.getName())
-                .contact(supplier.getContact())
-                .phone(supplier.getPhone())
-                .billingCycle(supplier.getBillingCycle() != null ? supplier.getBillingCycle().name() : null)
-                .note(supplier.getNote())
-                .build();
-    }
-
-    public Supplier toEntity(SupplierDto dto) {
-        if (dto == null) return null;
-
-        Supplier supplier = new Supplier();
-        supplier.setId(dto.getId());
-        supplier.setName(dto.getName());
-        supplier.setContact(dto.getContact());
-        supplier.setPhone(dto.getPhone());
-
-        if (dto.getBillingCycle() != null) {
-            supplier.setBillingCycle(Supplier.BillingCycle.valueOf(dto.getBillingCycle()));
-        }
-
-        supplier.setNote(dto.getNote());
-        return supplier;
-    }
+@Mapper(componentModel = "spring")
+public interface SupplierMapper {
+    
+    SupplierDto toDto(Supplier supplier);
+    
+    Supplier toEntity(SupplierRequestDto dto);
+    
+    void updateEntityFromDto(SupplierRequestDto dto, @MappingTarget Supplier supplier);
 }
-
