@@ -1,57 +1,33 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.dto.payment.PaymentDto;
 import com.lianhua.erp.domin.Payment;
-import com.lianhua.erp.domin.Purchase;
-import com.lianhua.erp.repository.PurchaseRepository;
-import org.springframework.stereotype.Component;
+import com.lianhua.erp.dto.payment.PaymentDto;
+import org.mapstruct.*;
 
-@Component
-public class PaymentMapper {
+import java.util.List;
 
-    private final PurchaseRepository purchaseRepository;
-
-    public PaymentMapper(PurchaseRepository purchaseRepository) {
-        this.purchaseRepository = purchaseRepository;
-    }
-
-    public PaymentDto toDto(Payment payment) {
-        if (payment == null) return null;
-
-        return PaymentDto.builder()
-                .id(payment.getId())
-                .purchaseId(payment.getPurchase() != null ? payment.getPurchase().getId() : null)
-                .amount(payment.getAmount())
-                .payDate(payment.getPayDate() != null ? payment.getPayDate().toString() : null)
-                .method(payment.getMethod() != null ? payment.getMethod().name() : null)
-                .note(payment.getNote())
-                .build();
-    }
-
-    public Payment toEntity(PaymentDto dto) {
-        if (dto == null) return null;
-
-        Payment payment = new Payment();
-        payment.setId(dto.getId());
-        payment.setAmount(dto.getAmount());
-
-        if (dto.getPayDate() != null) {
-            payment.setPayDate(java.time.LocalDate.parse(dto.getPayDate()));
+@Mapper(componentModel = "spring")
+public interface PaymentMapper {
+    
+    // === Entity → DTO ===
+    @Mapping(target = "method", expression = "java(payment.getMethod().name())")
+    PaymentDto toDto(Payment payment);
+    
+    // === DTO → Entity ===
+    @Mapping(target = "id", ignore = true) // ✅ 永遠忽略 ID，防止 detached entity
+    @Mapping(target = "method", expression = "java(mapMethod(dto.getMethod()))")
+    @Mapping(target = "purchase", ignore = true) // 由 Service 層設定
+    Payment toEntity(PaymentDto dto);
+    
+    List<PaymentDto> toDtoList(List<Payment> payments);
+    List<Payment> toEntityList(List<PaymentDto> dtos);
+    
+    default Payment.Method mapMethod(String method) {
+        if (method == null) return Payment.Method.CASH;
+        try {
+            return Payment.Method.valueOf(method.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return Payment.Method.CASH;
         }
-
-        if (dto.getMethod() != null) {
-            payment.setMethod(Payment.Method.valueOf(dto.getMethod()));
-        }
-
-        payment.setNote(dto.getNote());
-
-        if (dto.getPurchaseId() != null) {
-            Purchase purchase = purchaseRepository.findById(dto.getPurchaseId())
-                    .orElseThrow(() -> new RuntimeException("Purchase not found: " + dto.getPurchaseId()));
-            payment.setPurchase(purchase);
-        }
-
-        return payment;
     }
 }
-

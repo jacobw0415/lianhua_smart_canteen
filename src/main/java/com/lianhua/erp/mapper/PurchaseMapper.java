@@ -1,86 +1,57 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.dto.purchase.PurchaseDto;
-import com.lianhua.erp.dto.payment.PaymentDto;
-import com.lianhua.erp.domin.Purchase;
-import com.lianhua.erp.domin.Payment;
-import com.lianhua.erp.domin.Supplier;
-import com.lianhua.erp.repository.SupplierRepository;
-import org.springframework.stereotype.Component;
-
+import com.lianhua.erp.domin.*;
+import com.lianhua.erp.dto.payment.*;
+import com.lianhua.erp.dto.purchase.*;
+import org.mapstruct.*;
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.stream.Collectors;
 
-@Component
-public class PurchaseMapper {
-
-    private final SupplierRepository supplierRepository;
-    private final PaymentMapper paymentMapper;
-
-    public PurchaseMapper(SupplierRepository supplierRepository, PaymentMapper paymentMapper) {
-        this.supplierRepository = supplierRepository;
-        this.paymentMapper = paymentMapper;
+@Mapper(componentModel = "spring", uses = {PaymentMapper.class})
+public interface PurchaseMapper {
+    
+    // === Entity → DTO ===
+    @Mapping(target = "supplierId", source = "supplier.id")
+    @Mapping(target = "supplierName", source = "supplier.name")
+    @Mapping(target = "status", expression = "java(purchase.getStatus().name())")
+    @Mapping(target = "totalAmount", expression = "java(calcTotal(purchase))")
+    @Mapping(target = "paidAmount", expression = "java(calcPaid(purchase))")
+    @Mapping(target = "balance", expression = "java(calcBalance(purchase))")
+    PurchaseDto toDto(Purchase purchase);
+    
+    // === Request → Entity ===
+    @Mapping(target = "supplier", ignore = true)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "payments", ignore = true)
+    @Mapping(target = "status", expression = "java(mapStatus(dto.getStatus()))")
+    Purchase toEntity(PurchaseRequestDto dto);
+    
+    // === ENUM 轉換 ===
+    default Purchase.Status mapStatus(String status) {
+        if (status == null) return Purchase.Status.PENDING;
+        try {
+            return Purchase.Status.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return Purchase.Status.PENDING;
+        }
     }
-
-    public PurchaseDto toDto(Purchase purchase) {
-        if (purchase == null) return null;
-
-        List<PaymentDto> paymentDtos = purchase.getPayments() != null
-                ? purchase.getPayments().stream().map(paymentMapper::toDto).collect(Collectors.toList())
-                : null;
-
-        return PurchaseDto.builder()
-                .id(purchase.getId())
-                .supplierId(purchase.getSupplier() != null ? purchase.getSupplier().getId() : null)
-                .purchaseDate(purchase.getPurchaseDate() != null ? purchase.getPurchaseDate().toString() : null)
-                .item(purchase.getItem())
-                .qty(purchase.getQty())
-                .unitPrice(purchase.getUnitPrice())
-                .tax(purchase.getTax())
-                .status(purchase.getStatus() != null ? purchase.getStatus().name() : null)
-                .payments(paymentDtos)
-                .build();
+    
+    // === 計算輔助 ===
+    default BigDecimal calcTotal(Purchase p) {
+        if (p == null || p.getUnitPrice() == null || p.getQty() == null) return BigDecimal.ZERO;
+        BigDecimal total = p.getUnitPrice().multiply(BigDecimal.valueOf(p.getQty()));
+        if (p.getTax() != null) total = total.add(p.getTax());
+        return total;
     }
-
-    public Purchase toEntity(PurchaseDto dto) {
-        if (dto == null) return null;
-
-        Purchase purchase = new Purchase();
-        updateEntityFromDto(dto, purchase);
-        return purchase;
+    
+    default BigDecimal calcPaid(Purchase p) {
+        if (p == null || p.getPayments() == null) return BigDecimal.ZERO;
+        return p.getPayments().stream()
+                .map(Payment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
-
-    public void updateEntityFromDto(PurchaseDto dto, Purchase purchase) {
-        if (dto == null || purchase == null) return;
-
-        purchase.setId(dto.getId());
-
-        if (dto.getSupplierId() != null) {
-            Supplier supplier = supplierRepository.findById(dto.getSupplierId())
-                    .orElseThrow(() -> new RuntimeException("Supplier not found: " + dto.getSupplierId()));
-            purchase.setSupplier(supplier);
-        }
-
-        if (dto.getPurchaseDate() != null) {
-            purchase.setPurchaseDate(java.time.LocalDate.parse(dto.getPurchaseDate()));
-        }
-
-        purchase.setItem(dto.getItem());
-        purchase.setQty(dto.getQty());
-        purchase.setUnitPrice(dto.getUnitPrice());
-        purchase.setTax(dto.getTax());
-
-        if (dto.getStatus() != null) {
-            purchase.setStatus(Purchase.Status.valueOf(dto.getStatus()));
-        }
-
-        // payments 如果有帶進來，就一起處理（可選）
-        if (dto.getPayments() != null) {
-            List<Payment> payments = dto.getPayments().stream()
-                    .map(paymentMapper::toEntity)
-                    .peek(p -> p.setPurchase(purchase))
-                    .collect(Collectors.toList());
-            purchase.setPayments(payments);
-        }
+    
+    default BigDecimal calcBalance(Purchase p) {
+        return calcTotal(p).subtract(calcPaid(p));
     }
 }

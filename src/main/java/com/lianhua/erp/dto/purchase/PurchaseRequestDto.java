@@ -14,17 +14,11 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Schema(description = "進貨單回應 DTO（含付款資料與自動計算）")
-public class PurchaseDto {
-    
-    @Schema(description = "進貨單 ID", example = "1")
-    private Long id;
+@Schema(description = "建立或更新進貨單請求 DTO")
+public class PurchaseRequestDto {
     
     @Schema(description = "供應商 ID", example = "4")
     private Long supplierId;
-    
-    @Schema(description = "供應商名稱", example = "大福蔬菜有限公司")
-    private String supplierName;
     
     @Schema(description = "進貨日期", example = "2025-10-11")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
@@ -36,24 +30,15 @@ public class PurchaseDto {
     @Schema(description = "數量", example = "100")
     private Integer qty;
     
-    @Schema(description = "單價", example = "15.50")
+    @Schema(description = "單價", example = "15.5")
     private BigDecimal unitPrice;
     
     @Schema(description = "稅金", example = "50")
     private BigDecimal tax;
     
-    @Schema(description = "狀態", example = "PARTIAL")
+    @Schema(description = "狀態", example = "PENDING")
     private String status;
     
-    @Schema(description = "付款總額（單價×數量+稅）", example = "1600")
-    private BigDecimal totalAmount;
-    
-    @Schema(description = "已付款金額", example = "500")
-    private BigDecimal paidAmount;
-    
-    @Schema(description = "未付款金額", example = "1100")
-    private BigDecimal balance;
-    
-    @Schema(description = "付款紀錄清單")
+    @Schema(description = "付款紀錄清單（可選）")
     private List<PaymentDto> payments;
 }
