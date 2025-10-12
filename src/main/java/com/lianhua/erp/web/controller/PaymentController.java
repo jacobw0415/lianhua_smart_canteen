@@ -1,4 +1,4 @@
-package com.lianhua.erp.controller;
+package com.lianhua.erp.web.controller;
 
 import com.lianhua.erp.dto.payment.PaymentResponseDto;
 import com.lianhua.erp.service.PaymentService;
