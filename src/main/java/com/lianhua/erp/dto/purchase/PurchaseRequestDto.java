@@ -1,44 +1,40 @@
 package com.lianhua.erp.dto.purchase;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.lianhua.erp.dto.payment.PaymentDto;
+import com.lianhua.erp.dto.payment.PaymentRequestDto;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.*;
-
+import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-@Schema(description = "建立或更新進貨單請求 DTO")
+@Data
+@Schema(description = "進貨單建立或修改請求資料")
 public class PurchaseRequestDto {
     
-    @Schema(description = "供應商 ID", example = "4")
+    @Schema(description = "供應商 ID", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long supplierId;
     
-    @Schema(description = "進貨日期", example = "2025-10-11")
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
-    private LocalDate purchaseDate;
-    
-    @Schema(description = "進貨品項", example = "高麗菜")
+    @Schema(description = "品名", example = "有機豆腐")
     private String item;
     
     @Schema(description = "數量", example = "100")
     private Integer qty;
     
-    @Schema(description = "單價", example = "15.5")
+    @Schema(description = "單價", example = "25.50")
     private BigDecimal unitPrice;
     
-    @Schema(description = "稅金", example = "50")
-    private BigDecimal tax;
+    @Schema(description = "稅率（百分比）", example = "5.00")
+    private BigDecimal taxRate;
     
-    @Schema(description = "狀態", example = "PENDING")
+    @Schema(description = "進貨日期", example = "2025-10-12")
+    private LocalDate purchaseDate;
+    
+    @Schema(description = "備註", example = "10月第一批原料")
+    private String note;
+    
+    @Schema(description = "付款明細列表")
+    private List<PaymentRequestDto> payments;
+    
+    @Schema(description = "付款狀態", example = "PENDING", allowableValues = {"PENDING", "PARTIAL", "PAID"})
     private String status;
-    
-    @Schema(description = "付款紀錄清單（可選）")
-    private List<PaymentDto> payments;
 }

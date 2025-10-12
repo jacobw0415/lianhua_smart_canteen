@@ -1,26 +1,19 @@
 package com.lianhua.erp.mapper;
 
 import com.lianhua.erp.domin.Payment;
-import com.lianhua.erp.dto.payment.PaymentDto;
+import com.lianhua.erp.dto.payment.PaymentRequestDto;
+import com.lianhua.erp.dto.payment.PaymentResponseDto;
 import org.mapstruct.*;
-
-import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface PaymentMapper {
     
-    // === Entity → DTO ===
-    @Mapping(target = "method", expression = "java(payment.getMethod().name())")
-    PaymentDto toDto(Payment payment);
+    @Mapping(source = "purchase.id", target = "purchaseId")
+    PaymentResponseDto toDto(Payment entity);
     
-    // === DTO → Entity ===
-    @Mapping(target = "id", ignore = true) // ✅ 永遠忽略 ID，防止 detached entity
-    @Mapping(target = "method", expression = "java(mapMethod(dto.getMethod()))")
-    @Mapping(target = "purchase", ignore = true) // 由 Service 層設定
-    Payment toEntity(PaymentDto dto);
-    
-    List<PaymentDto> toDtoList(List<Payment> payments);
-    List<Payment> toEntityList(List<PaymentDto> dtos);
+    @Mapping(target = "id", ignore = true)  // Ignore ID as it will be generated
+    @Mapping(target = "purchase", ignore = true)  // Will be set manually
+    Payment toEntity(PaymentRequestDto dto);
     
     default Payment.Method mapMethod(String method) {
         if (method == null) return Payment.Method.CASH;
@@ -31,3 +24,4 @@ public interface PaymentMapper {
         }
     }
 }
+

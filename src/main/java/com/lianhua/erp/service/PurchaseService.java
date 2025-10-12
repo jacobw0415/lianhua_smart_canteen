@@ -4,9 +4,11 @@ import com.lianhua.erp.dto.purchase.*;
 import java.util.List;
 
 public interface PurchaseService {
-    List<PurchaseDto> getAllPurchases();
-    PurchaseDto getPurchaseById(Long id);
-    PurchaseDto createPurchase(PurchaseRequestDto dto);
-    PurchaseDto updatePurchase(Long id, PurchaseRequestDto dto);
+    List<PurchaseResponseDto> getAllPurchases();
+    PurchaseResponseDto getPurchaseById(Long id);
+    PurchaseResponseDto createPurchase(PurchaseRequestDto dto);
+    PurchaseResponseDto updatePurchase(Long id, PurchaseRequestDto dto);
+    PurchaseResponseDto updateStatus(Long id, String status);
     void deletePurchase(Long id);
+    List<PurchaseResponseDto> findAll();
 }

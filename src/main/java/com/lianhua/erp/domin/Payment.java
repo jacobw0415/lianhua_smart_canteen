@@ -2,6 +2,7 @@ package com.lianhua.erp.domin;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -14,7 +15,6 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class Payment {
-    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -24,22 +24,20 @@ public class Payment {
     private Purchase purchase;
     
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal amount;
+    private BigDecimal amount = BigDecimal.ZERO;
     
-    @Column(name = "pay_date", nullable = false)
-    private LocalDate payDate;
+    @Column(name = "pay_date")
+    private LocalDate payDate = LocalDate.now();
     
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private Method method;
+    private Method method = Method.CASH;
     
-    @Column(length = 255)
+    private String referenceNo;
     private String note;
     
-    @Column(name = "created_at", insertable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
     
-    public enum Method {
-        CASH, TRANSFER, CARD, CHECK
-    }
+    
+    public enum Method { CASH, TRANSFER, CARD, CHECK }
 }
