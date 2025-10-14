@@ -23,9 +23,6 @@ public class PurchaseRequestDto {
     @Schema(description = "單價", example = "25.50")
     private BigDecimal unitPrice;
     
-    @Schema(description = "稅率（百分比）", example = "5.00")
-    private BigDecimal taxRate;
-    
     @Schema(description = "進貨日期", example = "2025-10-12")
     private LocalDate purchaseDate;
     

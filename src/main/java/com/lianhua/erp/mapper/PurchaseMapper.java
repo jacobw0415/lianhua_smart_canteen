@@ -20,7 +20,6 @@ public interface PurchaseMapper {
     @Mapping(source = "supplier.name", target = "supplierName")
     @Mapping(source = "payments", target = "payments")
     @Mapping(target = "totalAmount", expression = "java(calcTotal(entity))")
-    @Mapping(target = "taxAmount", expression = "java(calcTaxAmount(entity))")
     PurchaseResponseDto toDto(Purchase entity);
     
     // 更新現有 entity（用於 PUT / PATCH）

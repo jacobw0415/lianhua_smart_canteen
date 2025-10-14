@@ -111,11 +111,6 @@ public class PurchaseServiceImpl implements PurchaseService {
             amountChanged = true;
         }
 
-        if (dto.getTaxRate() != null && !dto.getTaxRate().equals(purchase.getTaxRate())) {
-            purchase.setTaxRate(dto.getTaxRate());
-            amountChanged = true;
-        }
-
         // === 2️⃣ 更新付款資料 ===
         if (dto.getPayments() != null) {
             if (purchase.getPayments() != null) {

@@ -27,9 +27,6 @@ public class PurchaseResponseDto {
     @Schema(description = "單價", example = "25.50")
     private BigDecimal unitPrice;
     
-    @Schema(description = "稅額", example = "127.50")
-    private BigDecimal taxAmount;
-    
     @Schema(description = "總金額（含稅）", example = "2677.50")
     private BigDecimal totalAmount;
     
