@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.purchase;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.lianhua.erp.dto.payment.PaymentResponseDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -36,6 +37,7 @@ public class PurchaseResponseDto {
     private String status;
     
     @Schema(description = "進貨日期", example = "2025-10-12")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate purchaseDate;
     
     @Schema(description = "備註", example = "10月第一批原料")

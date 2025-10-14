@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.payment;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ public class PaymentResponseDto {
     private BigDecimal amount;
     
     @Schema(description = "付款日期", example = "2025-10-12")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate payDate;
     
     @Schema(description = "付款方式", example = "TRANSFER")
