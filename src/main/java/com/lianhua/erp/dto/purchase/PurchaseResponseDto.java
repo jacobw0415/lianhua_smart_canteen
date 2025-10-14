@@ -30,6 +30,12 @@ public class PurchaseResponseDto {
     @Schema(description = "總金額（含稅）", example = "2677.50")
     private BigDecimal totalAmount;
     
+    @Schema(description = "已付款金額", example = "1200.00")
+    private BigDecimal paidAmount;
+    
+    @Schema(description = "未付款餘額（totalAmount - paidAmount）", example = "1188.75")
+    private BigDecimal balance;
+    
     @Schema(description = "付款狀態", example = "PARTIAL")
     private String status;
     

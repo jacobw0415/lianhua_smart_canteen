@@ -7,50 +7,51 @@ import com.lianhua.erp.dto.purchase.PurchaseResponseDto;
 import org.mapstruct.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.Collections;
+import java.util.Objects;
+import java.util.Optional;
 
 @Mapper(componentModel = "spring", uses = {PaymentMapper.class})
 public interface PurchaseMapper {
     
-    // DTO → Entity
     @Mapping(source = "supplierId", target = "supplier.id")
     @Mapping(target = "payments", ignore = true)
     Purchase toEntity(PurchaseRequestDto dto);
     
-    // Entity → DTO（包含 supplierName + payments）
     @Mapping(source = "supplier.name", target = "supplierName")
     @Mapping(source = "payments", target = "payments")
     @Mapping(target = "totalAmount", expression = "java(calcTotal(entity))")
+    @Mapping(target = "paidAmount", expression = "java(calcPaid(entity))")
+    @Mapping(target = "balance", expression = "java(calcTotal(entity).subtract(calcPaid(entity)).setScale(2, java.math.RoundingMode.HALF_UP))")
     PurchaseResponseDto toDto(Purchase entity);
     
-    // 更新現有 entity（用於 PUT / PATCH）
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateEntityFromDto(PurchaseRequestDto dto, @MappingTarget Purchase entity);
     
-    // 計算總金額（含稅）
+    // === 金額運算 ===
     default BigDecimal calcTotal(Purchase p) {
-        if (p == null || p.getUnitPrice() == null || p.getQty() == null) {
-            return BigDecimal.ZERO;
-        }
+        if (p == null || p.getUnitPrice() == null || p.getQty() == null) return BigDecimal.ZERO;
         BigDecimal subtotal = p.getUnitPrice().multiply(BigDecimal.valueOf(p.getQty()));
-        return subtotal.add(calcTaxAmount(p));
+        return subtotal.add(calcTaxAmount(p)).setScale(2, RoundingMode.HALF_UP);
     }
     
-    // 計算稅額
     default BigDecimal calcTaxAmount(Purchase p) {
-        if (p == null || p.getUnitPrice() == null || p.getQty() == null || p.getTaxRate() == null) {
+        if (p == null || p.getTaxRate() == null || p.getQty() == null || p.getUnitPrice() == null)
             return BigDecimal.ZERO;
-        }
         BigDecimal subtotal = p.getUnitPrice().multiply(BigDecimal.valueOf(p.getQty()));
-        return subtotal.multiply(p.getTaxRate().divide(BigDecimal.valueOf(100)));
+        return subtotal.multiply(p.getTaxRate()
+                        .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP))
+                .setScale(2, RoundingMode.HALF_UP);
     }
     
-    // 計算已付金額
     default BigDecimal calcPaid(Purchase p) {
-        if (p == null || p.getPayments() == null) {
-            return BigDecimal.ZERO;
-        }
-        return p.getPayments().stream()
+        return Optional.ofNullable(p.getPayments())
+                .orElse(Collections.emptySet())
+                .stream()
                 .map(Payment::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 }

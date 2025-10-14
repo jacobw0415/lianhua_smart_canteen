@@ -35,9 +35,13 @@ public class Payment {
     private String referenceNo;
     private String note;
     
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "created_at", updatable = false, insertable = false,
+            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    private java.sql.Timestamp createdAt;
     
+    @Column(name = "updated_at", updatable = false, insertable = false,
+            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+    private java.sql.Timestamp updatedAt;
     
     public enum Method { CASH, TRANSFER, CARD, CHECK }
 }
