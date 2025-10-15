@@ -56,16 +56,16 @@ public class Purchase {
     @Column(name = "total_amount", precision = 10, scale = 2)
     @Schema(description = "總金額（含稅）")
     private BigDecimal totalAmount;
-    
+
     // ✅ 新增欄位：已付款金額
-    @Column(name = "paid_amount", precision = 10, scale = 2)
+    @Column(name = "paid_amount", precision = 10, scale = 2, nullable = false)
     @Schema(description = "已付款金額")
     private BigDecimal paidAmount = BigDecimal.ZERO;
-    
-    // ✅ 新增欄位：餘額
-    @Column(name = "balance", precision = 10, scale = 2)
-    @Schema(description = "尚未付款餘額")
-    private BigDecimal balance = BigDecimal.ZERO;
+
+    // ✅ 新增欄位：餘額 (由資料庫計算，不直接寫入)
+    @Column(name = "balance", precision = 10, scale = 2, insertable = false, updatable = false)
+    @Schema(description = "尚未付款餘額 (自動計算: 總金額 - 已付款)")
+    private BigDecimal balance;
     
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
@@ -78,6 +78,7 @@ public class Purchase {
     
     @OneToMany(mappedBy = "purchase", cascade = CascadeType.ALL, orphanRemoval = true)
     @Schema(description = "付款紀錄清單")
+    @OrderBy("id ASC")
     private Set<Payment> payments = new HashSet<>();
     
     @Column(name = "created_at", updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")

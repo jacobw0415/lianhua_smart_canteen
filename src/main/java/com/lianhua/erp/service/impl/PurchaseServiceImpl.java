@@ -31,6 +31,7 @@ public class PurchaseServiceImpl implements PurchaseService {
     
     // === 取得所有進貨單 ===
     @Override
+    @Transactional(readOnly = true)
     public List<PurchaseResponseDto> getAllPurchases() {
         return purchaseRepository.findAll()
                 .stream()
@@ -40,6 +41,7 @@ public class PurchaseServiceImpl implements PurchaseService {
     
     // === 查詢單筆 ===
     @Override
+    @Transactional(readOnly = true)
     public PurchaseResponseDto getPurchaseById(Long id) {
         Purchase purchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到指定的進貨單 (ID: " + id + ")"));

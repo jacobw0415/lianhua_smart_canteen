@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.apiResponse;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.ZonedDateTime;
@@ -11,6 +12,7 @@ import java.time.ZoneId;
  * 所有時間自動以台北時區（+08:00）輸出
  */
 @Schema(description = "統一 API 回應格式（支援成功與錯誤）")
+@JsonPropertyOrder({"status", "message", "data", "timestamp"})
 public record ApiResponseDto<T>(
         @Schema(description = "HTTP 狀態碼", example = "200") int status,
         @Schema(description = "訊息說明", example = "成功") String message,
