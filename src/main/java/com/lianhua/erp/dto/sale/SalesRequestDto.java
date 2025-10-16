@@ -19,7 +19,11 @@ public class SalesRequestDto {
     @Schema(description = "銷售數量", example = "10")
     private Integer qty;
     
-    @Schema(description = "總金額", example = "750.00")
+    @Schema(
+            description = "銷售總金額（可省略，系統會依照商品單價 × 數量自動計算）",
+            example = "750.00",
+            nullable = true
+    )
     private BigDecimal amount;
     
     @Schema(description = "付款方式", example = "CASH")
