@@ -1,5 +1,6 @@
 package com.lianhua.erp.web.advice;
 
+import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
 import com.lianhua.erp.dto.error.*;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.persistence.EntityNotFoundException;
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
 @Hidden
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    
+
     // ============================================================
     // 400：參數或驗證錯誤
     // ============================================================
@@ -33,7 +34,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new BadRequestResponse(msg));
     }
-    
+
     // ============================================================
     // 401：認證錯誤
     // ============================================================
@@ -42,7 +43,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new UnauthorizedResponse("認證失敗：" + ex.getMessage()));
     }
-    
+
     // ============================================================
     // 403：權限不足
     // ============================================================
@@ -51,7 +52,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new ForbiddenResponse("無權限存取此資源"));
     }
-    
+
     // ============================================================
     // 404：找不到資源
     // ============================================================
@@ -60,38 +61,38 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new NotFoundResponse(ex.getMessage()));
     }
-    
+
     // ============================================================
-    // 409：資料衝突（IllegalArgument 或 DB Constraint）
+    // 409：資料衝突（名稱重複 / 外鍵約束 / 唯一鍵違反）
     // ============================================================
-    
-    /**
-     * 業務層邏輯衝突（例如名稱重複）
-     */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ConflictResponse> handleConflict(IllegalArgumentException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ConflictResponse(ex.getMessage()));
-    }
-    
-    /**
-     * 資料庫層唯一鍵或外鍵約束錯誤
-     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ConflictResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         String message = "資料重複或違反唯一約束條件";
-        
-        if (ex.getRootCause() != null && ex.getRootCause().getMessage() != null) {
-            String dbMessage = ex.getRootCause().getMessage();
-            if (dbMessage.contains("Duplicate entry")) {
-                message = extractDuplicateMessage(dbMessage);
-            }
+
+        String exceptionMsg = ex.getMessage() != null ? ex.getMessage() : "";
+        String rootMsg = (ex.getRootCause() != null && ex.getRootCause().getMessage() != null)
+                ? ex.getRootCause().getMessage()
+                : "";
+
+        // 1️⃣ 自定義唯一鍵：商品名稱
+        if (exceptionMsg.contains("uq_product_name")) {
+            message = "商品名稱重複，請重新輸入不同名稱。";
         }
-        
+
+        // 2️⃣ 自定義唯一鍵：供應商名稱
+        else if (exceptionMsg.contains("uk_supplier_name")) {
+            message = "供應商名稱重複，請重新輸入不同名稱。";
+        }
+
+        // 3️⃣ 其他 Duplicate entry 一般情況（MySQL 原生訊息）
+        else if (rootMsg.contains("Duplicate entry")) {
+            message = extractDuplicateMessage(rootMsg);
+        }
+
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ConflictResponse(message));
     }
-    
+
     /**
      * 🔧 解析 MySQL Duplicate entry 錯誤訊息
      * 例如：
@@ -102,23 +103,32 @@ public class GlobalExceptionHandler {
             int entryStart = dbMessage.indexOf("Duplicate entry '") + 17;
             int entryEnd = dbMessage.indexOf("'", entryStart);
             String duplicateValue = dbMessage.substring(entryStart, entryEnd);
-            
+
             int keyStart = dbMessage.indexOf("for key '") + 9;
             int keyEnd = dbMessage.indexOf("'", keyStart);
             String keyName = dbMessage.substring(keyStart, keyEnd);
-            
+
             return "欄位 " + keyName + " 的值已存在：" + duplicateValue;
         } catch (Exception e) {
             return "資料重複或違反唯一約束條件";
         }
     }
-    
+
+    // ============================================================
+    // 409：一般業務邏輯衝突（IllegalArgument）
+    // ============================================================
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ConflictResponse> handleConflict(IllegalArgumentException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ConflictResponse(ex.getMessage()));
+    }
+
     // ============================================================
     // 500：伺服器內部錯誤（未捕捉）
     // ============================================================
     @ExceptionHandler(Exception.class)
     public ResponseEntity<InternalServerErrorResponse> handleServerError(Exception ex) {
-        ex.printStackTrace(); // ✅ 在開發階段印出堆疊方便除錯
+        ex.printStackTrace(); // ✅ 開發階段方便除錯
         String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new InternalServerErrorResponse(msg));

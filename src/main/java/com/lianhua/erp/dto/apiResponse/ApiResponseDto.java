@@ -24,24 +24,20 @@ public record ApiResponseDto<T>(
         return ZonedDateTime.now(ZoneId.of("Asia/Taipei"))
                 .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
-    
     // ✅ 成功（200 OK）
     public static <T> ApiResponseDto<T> ok(T data) {
         return new ApiResponseDto<>(200, "成功", data, now());
     }
-    
     // ✅ 建立成功（201 Created）
     public static <T> ApiResponseDto<T> created(T data) {
         return new ApiResponseDto<>(201, "建立成功", data, now());
     }
-    
     // ✅ 刪除成功（204 No Content）
     public static <T> ApiResponseDto<T> deleted() {
         return new ApiResponseDto<>(204, "刪除成功", null, now());
     }
-    
     // ✅ 錯誤（通用）
-    public static <T> ApiResponseDto<T> error(int status, String message) {
+    public static <T> ApiResponseDto<T> error(int status,String message) {
         return new ApiResponseDto<>(status, message, null, now());
     }
 }

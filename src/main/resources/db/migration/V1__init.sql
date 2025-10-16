@@ -1,3 +1,9 @@
+-- ============================================================
+--  🌿 Lianhua ERP Schema (正式修正版)
+--  作者: Jacob Huang
+--  說明: 強化唯一約束與外鍵一致性
+-- ============================================================
+
 -- 建立資料庫
 CREATE DATABASE IF NOT EXISTS lianhua
   DEFAULT CHARACTER SET utf8mb4
@@ -5,7 +11,9 @@ CREATE DATABASE IF NOT EXISTS lianhua
 
 USE lianhua;
 
+-- ------------------------------------------------------------
 -- 1. 員工表
+-- ------------------------------------------------------------
 CREATE TABLE employees (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   full_name VARCHAR(100) NOT NULL,
@@ -17,10 +25,12 @@ CREATE TABLE employees (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ------------------------------------------------------------
 -- 2. 供應商表
+-- ------------------------------------------------------------
 CREATE TABLE suppliers (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(100) NOT NULL,
+  name VARCHAR(100) NOT NULL UNIQUE,
   contact VARCHAR(100),
   phone VARCHAR(50),
   billing_cycle ENUM('WEEKLY','BIWEEKLY','MONTHLY') DEFAULT 'MONTHLY',
@@ -29,7 +39,9 @@ CREATE TABLE suppliers (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ------------------------------------------------------------
 -- 3. 採購表
+-- ------------------------------------------------------------
 CREATE TABLE purchases (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   supplier_id BIGINT NOT NULL,
@@ -47,10 +59,15 @@ CREATE TABLE purchases (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-    ON DELETE CASCADE ON UPDATE CASCADE
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE (supplier_id, purchase_date, item)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE INDEX idx_purchases_supplier_id ON purchases(supplier_id);
+
+-- ------------------------------------------------------------
 -- 4. 付款表
+-- ------------------------------------------------------------
 CREATE TABLE payments (
    id BIGINT PRIMARY KEY AUTO_INCREMENT,
    purchase_id BIGINT NOT NULL,
@@ -62,13 +79,18 @@ CREATE TABLE payments (
    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
    FOREIGN KEY (purchase_id) REFERENCES purchases(id)
-     ON DELETE CASCADE ON UPDATE CASCADE
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+     ON DELETE CASCADE ON UPDATE CASCADE,
+   UNIQUE (reference_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE INDEX idx_payments_purchase_id ON payments(purchase_id);
+
+-- ------------------------------------------------------------
 -- 5. 商品表
+-- ------------------------------------------------------------
 CREATE TABLE products (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(100) NOT NULL,
+  name VARCHAR(100) NOT NULL UNIQUE,
   category ENUM('VEG_LUNCHBOX','SPECIAL','ADD_ON') NOT NULL,
   unit_price DECIMAL(10,2) UNSIGNED NOT NULL,
   active BOOLEAN DEFAULT TRUE,
@@ -76,7 +98,9 @@ CREATE TABLE products (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ------------------------------------------------------------
 -- 6. 銷售表 (零售)
+-- ------------------------------------------------------------
 CREATE TABLE sales (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   sale_date DATE NOT NULL,
@@ -87,9 +111,15 @@ CREATE TABLE sales (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY(product_id) REFERENCES products(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE (sale_date, product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE INDEX idx_sales_product_id ON sales(product_id);
+
+-- ------------------------------------------------------------
 -- 7. 開支表
+-- ------------------------------------------------------------
 CREATE TABLE expenses (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   expense_date DATE NOT NULL,
@@ -100,9 +130,15 @@ CREATE TABLE expenses (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY(employee_id) REFERENCES employees(id)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+  UNIQUE (employee_id, expense_date, category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE INDEX idx_expenses_employee_id ON expenses(employee_id);
+
+-- ------------------------------------------------------------
 -- 8. 使用者表
+-- ------------------------------------------------------------
 CREATE TABLE users (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   username VARCHAR(60) UNIQUE NOT NULL,
@@ -113,25 +149,36 @@ CREATE TABLE users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ------------------------------------------------------------
 -- 9. 角色表
+-- ------------------------------------------------------------
 CREATE TABLE roles (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(50) UNIQUE NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ------------------------------------------------------------
 -- 10. 使用者角色關聯表
+-- ------------------------------------------------------------
 CREATE TABLE user_roles (
   user_id BIGINT NOT NULL,
   role_id BIGINT NOT NULL,
   PRIMARY KEY(user_id, role_id),
-  FOREIGN KEY(user_id) REFERENCES users(id),
+  FOREIGN KEY(user_id) REFERENCES users(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   FOREIGN KEY(role_id) REFERENCES roles(id)
+    ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 11. 訂單商家表 (合作單位: 學校/企業)
+CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
+
+-- ------------------------------------------------------------
+-- 11. 訂單商家表 (合作單位)
+-- ------------------------------------------------------------
 CREATE TABLE order_customers (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(120) NOT NULL,
+  name VARCHAR(120) NOT NULL UNIQUE,
   contact_person VARCHAR(100),
   phone VARCHAR(50),
   address VARCHAR(255),
@@ -141,7 +188,9 @@ CREATE TABLE order_customers (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ------------------------------------------------------------
 -- 12. 訂單表
+-- ------------------------------------------------------------
 CREATE TABLE orders (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   customer_id BIGINT NOT NULL,
@@ -153,9 +202,15 @@ CREATE TABLE orders (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY(customer_id) REFERENCES order_customers(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE (customer_id, order_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE INDEX idx_orders_customer_id ON orders(customer_id);
+
+-- ------------------------------------------------------------
 -- 13. 訂單明細表
+-- ------------------------------------------------------------
 CREATE TABLE order_items (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   order_id BIGINT NOT NULL,
@@ -168,6 +223,16 @@ CREATE TABLE order_items (
   note VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY(order_id) REFERENCES orders(id),
+  FOREIGN KEY(order_id) REFERENCES orders(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
   FOREIGN KEY(product_id) REFERENCES products(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE (order_id, product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX idx_order_items_product_id ON order_items(product_id);
+
+-- ============================================================
+-- ✅ Schema 完成
+-- ============================================================

@@ -1,6 +1,6 @@
 package com.lianhua.erp.dto.order;
 
-import com.lianhua.erp.dto.product.ProductDto;
+import com.lianhua.erp.dto.product.ProductResponseDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -32,5 +32,5 @@ public class OrderItemDetailDto {
     private String note;
 
     @Schema(description = "產品資訊")
-    private ProductDto product;
+    private ProductResponseDto product;
 }

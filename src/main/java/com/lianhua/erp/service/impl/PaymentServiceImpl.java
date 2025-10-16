@@ -5,6 +5,7 @@ import com.lianhua.erp.dto.payment.PaymentResponseDto;
 import com.lianhua.erp.mapper.PaymentMapper;
 import com.lianhua.erp.repository.PaymentRepository;
 import com.lianhua.erp.service.PaymentService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +33,7 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentResponseDto findByPurchaseId(Long purchaseId) {
         List<Payment> payments = paymentRepository.findByPurchaseId(purchaseId);
         if (payments.isEmpty()) {
-            throw new RuntimeException("No payment found for purchase id: " + purchaseId);
+            throw new EntityNotFoundException("找不到指定進貨單的付款紀錄，purchaseId=" + purchaseId);
         }
         // Assuming you want to return the first payment for the purchase
         return paymentMapper.toDto(payments.get(0));

@@ -1,42 +1,41 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.dto.product.ProductDto;
 import com.lianhua.erp.domin.Product;
-import org.springframework.stereotype.Component;
+import com.lianhua.erp.dto.product.ProductRequestDto;
+import com.lianhua.erp.dto.product.ProductResponseDto;
+import org.mapstruct.*;
 
-@Component
-public class ProductMapper {
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
-    public ProductDto toDto(Product product) {
-        if (product == null) return null;
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+public interface ProductMapper {
 
-        return ProductDto.builder()
-                .id(product.getId())
-                .name(product.getName())
-                .category(String.valueOf(product.getCategory()))
-                .unitPrice(product.getUnitPrice())   // 對應 entity 的 unitPrice
-                .active(product.getActive())         // 對應 entity 的 active
-                .build();
+    @Mapping(target = "category", expression = "java(mapCategory(dto.getCategory()))")
+    Product toEntity(ProductRequestDto dto);
+
+    @Mapping(target = "category", expression = "java(entity.getCategory().name())")
+    @Mapping(target = "saleIds", expression = "java(mapSaleIds(entity))")
+    @Mapping(target = "orderItemIds", expression = "java(mapOrderItemIds(entity))")
+    ProductResponseDto toDto(Product entity);
+
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "category", expression = "java(mapCategory(dto.getCategory()))")
+    void updateEntityFromDto(ProductRequestDto dto, @MappingTarget Product entity);
+
+    default Product.Category mapCategory(String category) {
+        if (category == null) return null;
+        return Product.Category.valueOf(category.toUpperCase());
     }
 
-    public Product toEntity(ProductDto dto) {
-        if (dto == null) return null;
-
-        return Product.builder()
-                .id(dto.getId())
-                .name(dto.getName())
-                .category(Product.Category.valueOf(dto.getCategory()))
-                .unitPrice(dto.getUnitPrice())       // 對應 dto 的 unitPrice
-                .active(dto.getActive())             // 對應 dto 的 active
-                .build();
+    default List<Long> mapSaleIds(Product entity) {
+        if (entity.getSales() == null) return Collections.emptyList();
+        return entity.getSales().stream().map(s -> s.getId()).collect(Collectors.toList());
     }
 
-    public void updateEntityFromDto(ProductDto dto, Product product) {
-        if (dto == null || product == null) return;
-
-        product.setName(dto.getName());
-        product.setCategory(Product.Category.valueOf(dto.getCategory()));
-        product.setUnitPrice(dto.getUnitPrice());
-        product.setActive(dto.getActive());
+    default List<Long> mapOrderItemIds(Product entity) {
+        if (entity.getOrderItems() == null) return Collections.emptyList();
+        return entity.getOrderItems().stream().map(o -> o.getId()).collect(Collectors.toList());
     }
 }

@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -52,47 +53,51 @@ public class PurchaseServiceImpl implements PurchaseService {
     @Override
     @Transactional
     public PurchaseResponseDto createPurchase(PurchaseRequestDto dto) {
+        Supplier supplier = supplierRepository.findById(dto.getSupplierId())
+                .orElseThrow(() -> new EntityNotFoundException("找不到供應商 ID：" + dto.getSupplierId()));
+
+        if (purchaseRepository.existsBySupplierIdAndPurchaseDateAndItem(
+                dto.getSupplierId(), dto.getPurchaseDate(), dto.getItem())) {
+            throw new IllegalArgumentException("該供應商於此日期的相同品項已存在，請勿重複建立。");
+        }
+
+        Purchase purchase = purchaseMapper.toEntity(dto);
+        purchase.setSupplier(supplier);
+
+        // 1️⃣ 計算金額（稅額 + 總額）
+        computeAmounts(purchase);
+
+        // 2️⃣ 若有付款資料 → 處理付款金額加總
+        BigDecimal paidTotal = BigDecimal.ZERO;
+        if (dto.getPayments() != null && !dto.getPayments().isEmpty()) {
+            Set<Payment> payments = dto.getPayments().stream()
+                    .map(paymentMapper::toEntity)
+                    .peek(p -> p.setPurchase(purchase))
+                    .collect(Collectors.toSet());
+            paidTotal = payments.stream()
+                    .map(Payment::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            purchase.setPayments(payments);
+        }
+
+        // 3️⃣ 更新 paid_amount / balance / status
+        purchase.setPaidAmount(paidTotal);
+        BigDecimal balance = purchase.getTotalAmount().subtract(paidTotal).setScale(2, RoundingMode.HALF_UP);
+        purchase.setBalance(balance);
+        updatePurchaseStatus(purchase);
+
+        // 4️⃣ 儲存
         try {
-            Supplier supplier = supplierRepository.findById(dto.getSupplierId())
-                    .orElseThrow(() -> new EntityNotFoundException("找不到供應商 ID：" + dto.getSupplierId()));
-            
-            Purchase purchase = purchaseMapper.toEntity(dto);
-            purchase.setSupplier(supplier);
-            
-            // 1️⃣ 計算金額（稅額 + 總額）
-            computeAmounts(purchase);
-            
-            // 2️⃣ 若有付款資料 → 處理付款金額加總
-            BigDecimal paidTotal = BigDecimal.ZERO;
-            if (dto.getPayments() != null && !dto.getPayments().isEmpty()) {
-                Set<Payment> payments = dto.getPayments().stream()
-                        .map(paymentMapper::toEntity)
-                        .peek(p -> p.setPurchase(purchase))
-                        .collect(Collectors.toSet());
-                paidTotal = payments.stream()
-                        .map(Payment::getAmount)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                purchase.setPayments(payments);
-            }
-            
-            // 3️⃣ 更新 paid_amount / balance / status
-            purchase.setPaidAmount(paidTotal);
-            BigDecimal balance = purchase.getTotalAmount().subtract(paidTotal).setScale(2, RoundingMode.HALF_UP);
-            purchase.setBalance(balance);
-            updatePurchaseStatus(purchase);
-            
-            // 4️⃣ 儲存
             Purchase saved = purchaseRepository.save(purchase);
             if (purchase.getPayments() != null && !purchase.getPayments().isEmpty()) {
                 paymentRepository.saveAll(purchase.getPayments());
             }
-            
             return purchaseMapper.toDto(saved);
-            
         } catch (DataIntegrityViolationException e) {
-            throw new IllegalArgumentException("資料衝突或供應商錯誤。", e);
+            throw new IllegalArgumentException("資料重複：該供應商於此日期的相同品項已存在。", e);
         }
     }
+
     
     // === 更新進貨單（含金額修改限制）===
     @Override
@@ -100,6 +105,16 @@ public class PurchaseServiceImpl implements PurchaseService {
     public PurchaseResponseDto updatePurchase(Long id, PurchaseRequestDto dto) {
         Purchase purchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 (ID: " + id + ")"));
+
+        Long supplierId = dto.getSupplierId() != null ? dto.getSupplierId() : purchase.getSupplier().getId();
+        LocalDate newDate = dto.getPurchaseDate() != null ? dto.getPurchaseDate() : purchase.getPurchaseDate();
+        String newItem = dto.getItem() != null ? dto.getItem() : purchase.getItem();
+
+        boolean conflict = purchaseRepository.existsBySupplierIdAndPurchaseDateAndItemAndIdNot(
+                supplierId, newDate, newItem, id);
+        if (conflict) {
+            throw new IllegalArgumentException("該供應商於此日期的相同品項已存在，請重新輸入。");
+        }
         
         purchase.setPurchaseDate(dto.getPurchaseDate());
         purchase.setItem(dto.getItem());
@@ -173,12 +188,14 @@ public class PurchaseServiceImpl implements PurchaseService {
         updatePurchaseStatus(purchase);
         
         // === 儲存所有異動 ===
-        purchaseRepository.save(purchase);
-        
+        try {
+            purchaseRepository.save(purchase);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException("更新失敗：該供應商於此日期的相同品項已存在。", e);
+        }
+
         return purchaseMapper.toDto(purchase);
     }
-    
-    
     // === 狀態更新（不變）===
     @Override
     @Transactional

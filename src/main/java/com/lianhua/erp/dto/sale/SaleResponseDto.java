@@ -1,6 +1,6 @@
 package com.lianhua.erp.dto.sale;
 
-import com.lianhua.erp.dto.product.ProductDto;
+import com.lianhua.erp.dto.product.ProductResponseDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -27,5 +27,5 @@ public class SaleResponseDto {
     private String payMethod;
 
     @Schema(description = "產品資訊")
-    private ProductDto product; // 🔑 直接嵌入完整產品
+    private ProductResponseDto product; // 🔑 直接嵌入完整產品
 }

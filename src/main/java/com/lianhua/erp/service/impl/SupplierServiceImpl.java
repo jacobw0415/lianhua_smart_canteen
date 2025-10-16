@@ -8,6 +8,7 @@ import com.lianhua.erp.repository.SupplierRepository;
 import com.lianhua.erp.service.SupplierService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,13 +48,26 @@ public class SupplierServiceImpl implements SupplierService {
         Supplier supplier = supplierMapper.toEntity(dto);
         return supplierMapper.toDto(supplierRepository.save(supplier));
     }
-    
+
     @Override
     public SupplierDto updateSupplier(Long id, SupplierRequestDto dto) {
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到供應商 ID：" + id));
+
+        if (!supplier.getName().equals(dto.getName())
+                && supplierRepository.existsByName(dto.getName())) {
+            throw new IllegalArgumentException("供應商名稱已存在：" + dto.getName());
+        }
+
         supplierMapper.updateEntityFromDto(dto, supplier);
-        return supplierMapper.toDto(supplierRepository.save(supplier));
+
+        try {
+            supplier = supplierRepository.save(supplier);
+        } catch (DataIntegrityViolationException ex) {
+            throw new IllegalArgumentException("更新供應商失敗，名稱可能已存在：" + dto.getName(), ex);
+        }
+
+        return supplierMapper.toDto(supplier);
     }
     
     @Override

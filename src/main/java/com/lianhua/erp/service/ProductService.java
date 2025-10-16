@@ -1,12 +1,15 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.product.ProductDto;
+import com.lianhua.erp.dto.product.*;
 import java.util.List;
 
 public interface ProductService {
-    List<ProductDto> getAllProducts();
-    ProductDto getProductById(Long id);
-    ProductDto createProduct(ProductDto dto);
-    ProductDto updateProduct(Long id, ProductDto dto);
-    void deleteProduct(Long id);
+
+    ProductResponseDto create(ProductRequestDto dto);
+    ProductResponseDto update(Long id, ProductRequestDto dto);
+    ProductResponseDto getById(Long id);
+    List<ProductResponseDto> getAll();
+    List<ProductResponseDto> getActiveProducts();
+    ProductResponseDto getWithRelations(Long id);
+    void delete(Long id);
 }

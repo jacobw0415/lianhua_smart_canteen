@@ -2,7 +2,7 @@ package com.lianhua.erp.mapper;
 
 import com.lianhua.erp.domin.*;
 import com.lianhua.erp.dto.order.*;
-import com.lianhua.erp.dto.product.ProductDto;
+import com.lianhua.erp.dto.product.ProductResponseDto;
 import com.lianhua.erp.repository.OrderCustomerRepository;
 import com.lianhua.erp.repository.ProductRepository;
 import org.springframework.stereotype.Component;
@@ -136,7 +136,7 @@ public class OrderMapper {
                 .discount(item.getDiscount())
                 .tax(item.getTax())
                 .note(item.getNote())
-                .product(item.getProduct() != null ? ProductDto.builder()
+                .product(item.getProduct() != null ? ProductResponseDto.builder()
                         .id(item.getProduct().getId())
                         .name(item.getProduct().getName())
                         .category(String.valueOf(item.getProduct().getCategory()))

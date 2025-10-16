@@ -94,6 +94,8 @@ public class SupplierController {
                     content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
             @ApiResponse(responseCode = "404", description = "找不到供應商",
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "409", description = "供應商名稱已存在，違反唯一約束",
+                    content = @Content(schema = @Schema(implementation = ConflictResponse.class))),
             @ApiResponse(responseCode = "500", description = "伺服器錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })

@@ -1,6 +1,6 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.dto.product.ProductDto;
+import com.lianhua.erp.dto.product.ProductResponseDto;
 import com.lianhua.erp.dto.sale.SaleRequestDto;
 import com.lianhua.erp.dto.sale.SaleResponseDto;
 import com.lianhua.erp.domin.Product;
@@ -29,7 +29,7 @@ public class SaleMapper {
                 .amount(sale.getAmount())
                 .payMethod(sale.getPayMethod() != null ? sale.getPayMethod().name() : null)
                 .product(product != null
-                        ? ProductDto.builder()
+                        ? ProductResponseDto.builder()
                         .id(product.getId())
                         .name(product.getName())
                         .category(String.valueOf(product.getCategory()))
