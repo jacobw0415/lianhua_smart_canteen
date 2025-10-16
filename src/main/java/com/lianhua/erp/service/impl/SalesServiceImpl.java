@@ -13,6 +13,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,6 +38,11 @@ public class SalesServiceImpl implements SalesService {
         
         Sale sale = mapper.toEntity(dto);
         sale.setProduct(product);
+        
+        BigDecimal unitPrice = product.getUnitPrice();
+        BigDecimal total = unitPrice.multiply(BigDecimal.valueOf(dto.getQty()));
+        sale.setAmount(total);
+        
         return mapper.toDto(repository.save(sale));
     }
     
@@ -45,9 +51,24 @@ public class SalesServiceImpl implements SalesService {
         Sale existing = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到銷售紀錄 ID: " + id));
         
+        // 先更新基本屬性
         mapper.updateEntityFromDto(dto, existing);
+        
+        // 若商品 ID 被更新，需重新查詢商品資料
+        if (dto.getProductId() != null && !dto.getProductId().equals(existing.getProduct().getId())) {
+            Product newProduct = productRepository.findById(dto.getProductId())
+                    .orElseThrow(() -> new EntityNotFoundException("找不到商品 ID: " + dto.getProductId()));
+            existing.setProduct(newProduct);
+        }
+        
+        // ✅ 若數量或商品有變動，自動重新計算金額
+        BigDecimal unitPrice = existing.getProduct().getUnitPrice();
+        BigDecimal total = unitPrice.multiply(BigDecimal.valueOf(existing.getQty()));
+        existing.setAmount(total);
+        
         return mapper.toDto(repository.save(existing));
     }
+    
     
     @Override
     public void delete(Long id) {
