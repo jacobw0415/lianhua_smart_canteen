@@ -2,5 +2,9 @@ package com.lianhua.erp.repository;
 
 import com.lianhua.erp.domin.Expense;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-public interface ExpenseRepository extends JpaRepository<Expense, Long> {}
+@Repository
+public interface ExpenseRepository extends JpaRepository<Expense, Long> {
+    boolean existsByEmployeeIdAndExpenseDateAndCategoryId(Long employeeId, java.time.LocalDate date, Long categoryId);
+}

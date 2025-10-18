@@ -1,10 +1,8 @@
 -- ============================================================
---  🌿 Lianhua ERP Schema (正式修正版)
+--  🌿 Lianhua ERP Schema (v2.1 財務報表導向版)
 --  作者: Jacob Huang
---  說明: 強化唯一約束與外鍵一致性
 -- ============================================================
 
--- 建立資料庫
 CREATE DATABASE IF NOT EXISTS lianhua
   DEFAULT CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
@@ -118,23 +116,48 @@ CREATE TABLE sales (
 CREATE INDEX idx_sales_product_id ON sales(product_id);
 
 -- ------------------------------------------------------------
--- 7. 開支表
+-- 7A. 費用類別主檔 (expense_categories)
+-- ------------------------------------------------------------
+CREATE TABLE expense_categories (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100) NOT NULL UNIQUE,                 -- 類別名稱（食材費、水電費、薪資等）
+  account_code VARCHAR(20) NOT NULL,                 -- 對應會計科目
+  parent_id BIGINT NULL,                             -- 階層分類（如行銷費 → 廣告費）
+  description VARCHAR(255),
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (parent_id) REFERENCES expense_categories(id)
+    ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ✅ 建立常用索引
+CREATE INDEX idx_expense_categories_account_code ON expense_categories(account_code);
+CREATE INDEX idx_expense_categories_parent_id ON expense_categories(parent_id);
+
+-- ------------------------------------------------------------
+-- 7B. 開支表 (expenses)
 -- ------------------------------------------------------------
 CREATE TABLE expenses (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   expense_date DATE NOT NULL,
-  category VARCHAR(80) NOT NULL,
+  category_id BIGINT NOT NULL,                       -- 對應 expense_categories.id
   amount DECIMAL(10,2) UNSIGNED NOT NULL,
   note VARCHAR(255),
-  employee_id BIGINT NULL,
+  employee_id BIGINT NULL,                           -- 若為薪資支出則關聯員工
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY(employee_id) REFERENCES employees(id)
+  FOREIGN KEY (category_id) REFERENCES expense_categories(id)
+    ON DELETE RESTRICT ON UPDATE CASCADE,
+  FOREIGN KEY (employee_id) REFERENCES employees(id)
     ON DELETE SET NULL ON UPDATE CASCADE,
-  UNIQUE (employee_id, expense_date, category)
+  UNIQUE (employee_id, expense_date, category_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ✅ 索引強化（報表導向）
+CREATE INDEX idx_expenses_category_id ON expenses(category_id);
 CREATE INDEX idx_expenses_employee_id ON expenses(employee_id);
+CREATE INDEX idx_expenses_date ON expenses(expense_date);
 
 -- ------------------------------------------------------------
 -- 8. 使用者表
@@ -234,5 +257,5 @@ CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_order_items_product_id ON order_items(product_id);
 
 -- ============================================================
--- ✅ Schema 完成
+-- ✅ Schema v2.1 完成
 -- ============================================================

@@ -1,13 +1,15 @@
 package com.lianhua.erp.service;
 
 import com.lianhua.erp.dto.expense.ExpenseDto;
+import com.lianhua.erp.dto.expense.ExpenseRequestDto;
+
 import java.util.List;
 
 public interface ExpenseService {
-    List<ExpenseDto> getAllExpenses();
-    ExpenseDto getExpenseById(Long id);
-    ExpenseDto createExpense(ExpenseDto dto);
-    ExpenseDto updateExpense(Long id, ExpenseDto dto);
-    void deleteExpense(Long id);
+    ExpenseDto create(ExpenseRequestDto dto);
+    ExpenseDto update(Long id, ExpenseRequestDto dto);
+    List<ExpenseDto> findAll();
+    ExpenseDto findById(Long id);
+    void delete(Long id);
 }
 
