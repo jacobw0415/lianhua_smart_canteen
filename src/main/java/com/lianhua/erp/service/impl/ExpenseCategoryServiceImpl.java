@@ -111,18 +111,48 @@ public class ExpenseCategoryServiceImpl implements ExpenseCategoryService {
     // 更新類別
     // ============================================
     @Override
+    @Transactional
     public ExpenseCategoryDto update(Long id, ExpenseCategoryRequestDto dto) {
         ExpenseCategory existing = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到費用類別 ID：" + id));
         
-        // 🔹 名稱重複檢查（忽略大小寫）
+        // 1️⃣ 根節點（費用類別總帳）不可修改
+        if ("EXP-000".equals(existing.getAccountCode())) {
+            throw new IllegalStateException("根節點「費用類別總帳」不可修改。");
+        }
+        
+        //  2️⃣ 禁止修改 accountCode（系統生成）
+        if (dto.getAccountCode() != null && !dto.getAccountCode().isBlank()) {
+            throw new IllegalStateException("會計科目代碼不可修改，該欄位由系統自動生成。");
+        }
+        
+        //  3️⃣ 名稱重複檢查（忽略大小寫）
         if (!existing.getName().equalsIgnoreCase(dto.getName())
                 && repository.existsByNameIgnoreCase(dto.getName())) {
             throw new DataIntegrityViolationException("費用類別名稱已存在：" + dto.getName());
         }
         
-        mapper.updateEntityFromDto(dto, existing);
+        //  4️⃣ 若修改 parentId → 防止循環或錯誤層級
+        if (dto.getParentId() != null && (existing.getParent() == null
+                || !existing.getParent().getId().equals(dto.getParentId()))) {
+            
+            ExpenseCategory newParent = repository.findById(dto.getParentId())
+                    .orElseThrow(() -> new EntityNotFoundException("找不到上層費用類別 ID：" + dto.getParentId()));
+            
+            // 防止自己成為自己的上層
+            if (newParent.getId().equals(existing.getId())) {
+                throw new IllegalStateException("費用類別不可指定自己為上層。");
+            }
+            
+            existing.setParent(newParent);
+        }
         
+        // ⚙️ 5️⃣ 更新允許欄位（描述、啟用狀態、名稱）
+        existing.setDescription(dto.getDescription());
+        existing.setActive(dto.getActive() != null ? dto.getActive() : existing.getActive());
+        existing.setName(dto.getName());
+        
+        // ✅ 6️⃣ 若 accountCode 為空（防呆補碼）
         if (existing.getAccountCode() == null || existing.getAccountCode().isBlank()) {
             existing.setAccountCode(generateNextAccountCode(existing.getParent()));
         }

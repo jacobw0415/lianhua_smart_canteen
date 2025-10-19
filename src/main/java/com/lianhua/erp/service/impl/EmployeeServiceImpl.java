@@ -1,69 +1,65 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.dto.employee.EmployeeDto;
 import com.lianhua.erp.domin.Employee;
+import com.lianhua.erp.dto.employee.*;
 import com.lianhua.erp.mapper.EmployeeMapper;
 import com.lianhua.erp.repository.EmployeeRepository;
 import com.lianhua.erp.service.EmployeeService;
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
+@Transactional
 public class EmployeeServiceImpl implements EmployeeService {
-
-    private final EmployeeRepository employeeRepository;
-    private final EmployeeMapper employeeMapper;
-
-    public EmployeeServiceImpl(EmployeeRepository employeeRepository,
-                               EmployeeMapper employeeMapper) {
-        this.employeeRepository = employeeRepository;
-        this.employeeMapper = employeeMapper;
-    }
-
+    
+    private final EmployeeRepository repository;
+    private final EmployeeMapper mapper;
+    
     @Override
-    public List<EmployeeDto> getAllEmployees() {
-        return employeeRepository.findAll()
-                .stream()
-                .map(employeeMapper::toDto)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public List<EmployeeResponseDto> findAll() {
+        return repository.findAll().stream()
+                .map(mapper::toDto)
+                .toList();
     }
-
+    
     @Override
-    public EmployeeDto getEmployeeById(Long id) {
-        Employee employee = employeeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Employee not found: " + id));
-        return employeeMapper.toDto(employee);
+    @Transactional(readOnly = true)
+    public EmployeeResponseDto findById(Long id) {
+        Employee employee = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("找不到員工 ID：" + id));
+        return mapper.toDto(employee);
     }
-
+    
     @Override
-    public EmployeeDto createEmployee(EmployeeDto dto) {
-        Employee employee = employeeMapper.toEntity(dto);
-        return employeeMapper.toDto(employeeRepository.save(employee));
-    }
-
-    @Override
-    public EmployeeDto updateEmployee(Long id, EmployeeDto dto) {
-        Employee existing = employeeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Employee not found: " + id));
-
-        // 更新欄位
-        existing.setFullName(dto.getFullName());
-        existing.setPosition(dto.getPosition());
-        existing.setSalary(dto.getSalary());
-        if (dto.getHireDate() != null) {
-            existing.setHireDate(java.time.LocalDate.parse(dto.getHireDate()));
+    public EmployeeResponseDto create(EmployeeRequestDto dto) {
+        if (repository.existsByFullName(dto.getFullName())) {
+            throw new DataIntegrityViolationException("員工名稱已存在：" + dto.getFullName());
         }
-        if (dto.getStatus() != null) {
-            existing.setStatus(Employee.Status.valueOf(dto.getStatus()));
-        }
-
-        return employeeMapper.toDto(employeeRepository.save(existing));
+        
+        Employee employee = mapper.toEntity(dto);
+        return mapper.toDto(repository.save(employee));
     }
-
+    
     @Override
-    public void deleteEmployee(Long id) {
-        employeeRepository.deleteById(id);
+    public EmployeeResponseDto update(Long id, EmployeeRequestDto dto) {
+        Employee existing = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("找不到員工 ID：" + id));
+        mapper.updateFromDto(dto, existing);
+        return mapper.toDto(repository.save(existing));
+    }
+    
+    @Override
+    public void delete(Long id) {
+        if (!repository.existsById(id)) {
+            throw new EntityNotFoundException("員工不存在：" + id);
+        }
+        repository.deleteById(id);
     }
 }

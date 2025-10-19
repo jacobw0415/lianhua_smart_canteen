@@ -1,15 +1,12 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.employee.EmployeeDto;
+import com.lianhua.erp.dto.employee.*;
 import java.util.List;
 
 public interface EmployeeService {
-    List<EmployeeDto> getAllEmployees();
-    EmployeeDto getEmployeeById(Long id);
-    EmployeeDto createEmployee(EmployeeDto dto);
-    EmployeeDto updateEmployee(Long id, EmployeeDto dto);
-    void deleteEmployee(Long id);
+    List<EmployeeResponseDto> findAll();
+    EmployeeResponseDto findById(Long id);
+    EmployeeResponseDto create(EmployeeRequestDto dto);
+    EmployeeResponseDto update(Long id, EmployeeRequestDto dto);
+    void delete(Long id);
 }
-
-
-
