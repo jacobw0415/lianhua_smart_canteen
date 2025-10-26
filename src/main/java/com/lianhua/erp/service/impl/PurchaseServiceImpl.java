@@ -158,6 +158,13 @@ public class PurchaseServiceImpl implements PurchaseService {
                 Payment newPayment = paymentMapper.toEntity(paymentDto);
                 newPayment.setPurchase(purchase);
                 
+                // ✅ 自動設定會計期間
+                if (newPayment.getPayDate() != null) {
+                    newPayment.setAccountingPeriod(newPayment.getPayDate().format(PERIOD_FORMAT));
+                } else {
+                    newPayment.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
+                }
+                
                 // ✅ 檢查付款日期是否早於進貨日期
                 if (newPayment.getPayDate() != null &&
                         newPayment.getPayDate().isBefore(purchase.getPurchaseDate())) {
@@ -218,10 +225,24 @@ public class PurchaseServiceImpl implements PurchaseService {
         
         // === 儲存異動 ===
         try {
+            // 明確更新付款記錄，避免 detached 狀態
+            for (Payment p : purchase.getPayments()) {
+                p.setPurchase(purchase);
+            }
             Purchase updated = purchaseRepository.save(purchase);
+            paymentRepository.saveAll(purchase.getPayments());
             return purchaseMapper.toDto(updated);
+            
         } catch (DataIntegrityViolationException e) {
-            throw new IllegalArgumentException("更新失敗：資料完整性錯誤。", e);
+            e.getMostSpecificCause();
+            String cause = e.getMostSpecificCause().getMessage();
+            if (cause.contains("Duplicate entry")) {
+                throw new IllegalArgumentException("資料重複：該供應商於此日期的相同品項已存在。", e);
+            }
+            if (cause.contains("foreign key constraint fails")) {
+                throw new IllegalArgumentException("外鍵關聯錯誤：請確認供應商與付款資料存在。", e);
+            }
+            throw new RuntimeException("更新時發生資料完整性例外，請聯絡系統管理員。", e);
         }
     }
     
