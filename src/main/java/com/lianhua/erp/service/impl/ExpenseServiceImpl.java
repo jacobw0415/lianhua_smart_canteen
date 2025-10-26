@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -25,6 +27,9 @@ public class ExpenseServiceImpl implements ExpenseService {
     private final ExpenseCategoryRepository categoryRepository;
     private final EmployeeRepository employeeRepository;
     private final ExpenseMapper mapper;
+    
+    // ✅ 統一格式化器（會計期間）
+    private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
     
     @Override
     @Transactional
@@ -61,6 +66,13 @@ public class ExpenseServiceImpl implements ExpenseService {
         if (dto.getEmployeeId() != null) {
             expense.setEmployee(employeeRepository.findById(dto.getEmployeeId())
                     .orElseThrow(() -> new EntityNotFoundException("找不到員工 ID: " + dto.getEmployeeId())));
+        }
+        
+        // ✅ 新增：自動設定會計期間（依 expenseDate 為準）
+        if (expense.getExpenseDate() != null) {
+            expense.setAccountingPeriod(expense.getExpenseDate().format(PERIOD_FORMAT));
+        } else {
+            expense.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
         }
         
         try {
@@ -116,10 +128,11 @@ public class ExpenseServiceImpl implements ExpenseService {
         entity.setAmount(dto.getAmount());
         entity.setNote(dto.getNote());
         
+        // ✅ accountingPeriod 不可修改，故此處不動
+        
         Expense updated = repository.save(entity);
         return mapper.toDto(updated);
     }
-    
     
     @Override
     @Transactional(readOnly = true)

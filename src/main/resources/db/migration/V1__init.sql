@@ -1,6 +1,5 @@
 -- ============================================================
---  🌿 Lianhua ERP Schema (v2.1 財務報表導向版)
---  作者: Jacob Huang
+-- 🌿 Lianhua ERP Schema v2.4
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS lianhua
@@ -38,12 +37,13 @@ CREATE TABLE suppliers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 3. 採購表
+-- 3. 採購表 (含會計期間)
 -- ------------------------------------------------------------
 CREATE TABLE purchases (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   supplier_id BIGINT NOT NULL,
   purchase_date DATE NOT NULL,
+  accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
   item VARCHAR(120) NOT NULL,
   qty INT UNSIGNED NOT NULL,
   unit_price DECIMAL(10,2) UNSIGNED NOT NULL,
@@ -62,26 +62,29 @@ CREATE TABLE purchases (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_purchases_supplier_id ON purchases(supplier_id);
+CREATE INDEX idx_purchases_accounting_period ON purchases(accounting_period);
 
 -- ------------------------------------------------------------
--- 4. 付款表
+-- 4. 付款表 (含會計期間)
 -- ------------------------------------------------------------
 CREATE TABLE payments (
-   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-   purchase_id BIGINT NOT NULL,
-   amount DECIMAL(10,2) UNSIGNED NOT NULL DEFAULT 0.00,
-   pay_date DATE DEFAULT (CURRENT_DATE),
-   method ENUM('CASH','TRANSFER','CARD','CHECK') DEFAULT 'CASH',
-   reference_no VARCHAR(100),
-   note VARCHAR(255),
-   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-   FOREIGN KEY (purchase_id) REFERENCES purchases(id)
-     ON DELETE CASCADE ON UPDATE CASCADE,
-   UNIQUE (reference_no)
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  purchase_id BIGINT NOT NULL,
+  amount DECIMAL(10,2) UNSIGNED NOT NULL DEFAULT 0.00,
+  pay_date DATE DEFAULT (CURRENT_DATE),
+  accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
+  method ENUM('CASH','TRANSFER','CARD','CHECK') DEFAULT 'CASH',
+  reference_no VARCHAR(100),
+  note VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (purchase_id) REFERENCES purchases(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE (reference_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_payments_purchase_id ON payments(purchase_id);
+CREATE INDEX idx_payments_accounting_period ON payments(accounting_period);
 
 -- ------------------------------------------------------------
 -- 5. 商品表
@@ -97,11 +100,12 @@ CREATE TABLE products (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 6. 銷售表 (零售)
+-- 6. 銷售表 (零售，含會計期間)
 -- ------------------------------------------------------------
 CREATE TABLE sales (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   sale_date DATE NOT NULL,
+  accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
   product_id BIGINT NOT NULL,
   qty INT UNSIGNED NOT NULL,
   amount DECIMAL(10,2) UNSIGNED NOT NULL,
@@ -114,15 +118,16 @@ CREATE TABLE sales (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_sales_product_id ON sales(product_id);
+CREATE INDEX idx_sales_accounting_period ON sales(accounting_period);
 
 -- ------------------------------------------------------------
--- 7A. 費用類別主檔 (expense_categories)
+-- 7A. 費用類別主檔
 -- ------------------------------------------------------------
 CREATE TABLE expense_categories (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(100) NOT NULL UNIQUE,                 -- 類別名稱（食材費、水電費、薪資等）
-  account_code VARCHAR(20) NOT NULL,                 -- 對應會計科目
-  parent_id BIGINT NULL,                             -- 階層分類（如行銷費 → 廣告費）
+  name VARCHAR(100) NOT NULL UNIQUE,
+  account_code VARCHAR(20) NOT NULL,
+  parent_id BIGINT NULL,
   description VARCHAR(255),
   active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -131,20 +136,20 @@ CREATE TABLE expense_categories (
     ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ✅ 建立常用索引
 CREATE INDEX idx_expense_categories_account_code ON expense_categories(account_code);
 CREATE INDEX idx_expense_categories_parent_id ON expense_categories(parent_id);
 
 -- ------------------------------------------------------------
--- 7B. 開支表 (expenses)
+-- 7B. 開支表 (含會計期間)
 -- ------------------------------------------------------------
 CREATE TABLE expenses (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   expense_date DATE NOT NULL,
-  category_id BIGINT NOT NULL,                       -- 對應 expense_categories.id
+  accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
+  category_id BIGINT NOT NULL,
   amount DECIMAL(10,2) UNSIGNED NOT NULL,
   note VARCHAR(255),
-  employee_id BIGINT NULL,                           -- 若為薪資支出則關聯員工
+  employee_id BIGINT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (category_id) REFERENCES expense_categories(id)
@@ -154,10 +159,10 @@ CREATE TABLE expenses (
   UNIQUE (employee_id, expense_date, category_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ✅ 索引強化（報表導向）
 CREATE INDEX idx_expenses_category_id ON expenses(category_id);
 CREATE INDEX idx_expenses_employee_id ON expenses(employee_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date);
+CREATE INDEX idx_expenses_accounting_period ON expenses(accounting_period);
 
 -- ------------------------------------------------------------
 -- 8. 使用者表
@@ -212,13 +217,14 @@ CREATE TABLE order_customers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 12. 訂單表
+-- 12. 訂單表 (含會計期間)
 -- ------------------------------------------------------------
 CREATE TABLE orders (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   customer_id BIGINT NOT NULL,
   order_date DATE NOT NULL,
   delivery_date DATE NOT NULL,
+  accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
   status ENUM('PENDING','CONFIRMED','DELIVERED','CANCELLED','PAID') DEFAULT 'PENDING',
   total_amount DECIMAL(10,2) UNSIGNED NOT NULL,
   note VARCHAR(255),
@@ -230,9 +236,10 @@ CREATE TABLE orders (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_orders_customer_id ON orders(customer_id);
+CREATE INDEX idx_orders_accounting_period ON orders(accounting_period);
 
 -- ------------------------------------------------------------
--- 13. 訂單明細表
+-- 13. 訂單明細表 (含會計期間)
 -- ------------------------------------------------------------
 CREATE TABLE order_items (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -243,6 +250,7 @@ CREATE TABLE order_items (
   subtotal DECIMAL(10,2) UNSIGNED NOT NULL,
   discount DECIMAL(10,2) UNSIGNED DEFAULT 0,
   tax DECIMAL(10,2) UNSIGNED DEFAULT 0,
+  accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
   note VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -255,7 +263,30 @@ CREATE TABLE order_items (
 
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_order_items_product_id ON order_items(product_id);
+CREATE INDEX idx_order_items_accounting_period ON order_items(accounting_period);
+
+-- ------------------------------------------------------------
+-- 14. 收款表 Receipts (新增)
+-- ------------------------------------------------------------
+CREATE TABLE receipts (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  order_id BIGINT NOT NULL,
+  received_date DATE DEFAULT (CURRENT_DATE),
+  accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
+  amount DECIMAL(10,2) UNSIGNED NOT NULL,
+  method ENUM('CASH','TRANSFER','CARD','CHECK') DEFAULT 'CASH',
+  reference_no VARCHAR(100),
+  note VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_receipts_order_id ON receipts(order_id);
+CREATE INDEX idx_receipts_accounting_period ON receipts(accounting_period);
 
 -- ============================================================
--- ✅ Schema v2.1 完成
+-- ✅ Schema v2.4 完成：
+--  進銷存、費用、收付款、收支流向 全面整合
 -- ============================================================

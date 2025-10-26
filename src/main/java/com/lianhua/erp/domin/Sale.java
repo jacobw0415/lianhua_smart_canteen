@@ -1,5 +1,6 @@
 package com.lianhua.erp.domin;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -24,6 +25,10 @@ public class Sale {
     
     @Column(name = "sale_date", nullable = false)
     private LocalDate saleDate;
+    
+    @Column(name = "accounting_period", length = 7, nullable = false)
+    @Schema(description = "會計期間（YYYY-MM）")
+    private String accountingPeriod = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
     
     @Column(nullable = false)
     private Integer qty;

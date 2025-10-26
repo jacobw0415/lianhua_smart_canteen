@@ -17,11 +17,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class PurchaseServiceImpl implements PurchaseService {
     
     private final PurchaseRepository purchaseRepository;
@@ -29,6 +31,8 @@ public class PurchaseServiceImpl implements PurchaseService {
     private final SupplierRepository supplierRepository;
     private final PurchaseMapper purchaseMapper;
     private final PaymentMapper paymentMapper;
+    
+    private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
     
     // === 取得所有進貨單 ===
     @Override
@@ -49,44 +53,62 @@ public class PurchaseServiceImpl implements PurchaseService {
         return purchaseMapper.toDto(purchase);
     }
     
-    // === 建立進貨單（含付款金額自動運算）===
+    // === 建立進貨單（含付款金額自動運算與會計期間）===
     @Override
     @Transactional
     public PurchaseResponseDto createPurchase(PurchaseRequestDto dto) {
         Supplier supplier = supplierRepository.findById(dto.getSupplierId())
                 .orElseThrow(() -> new EntityNotFoundException("找不到供應商 ID：" + dto.getSupplierId()));
-
+        
         if (purchaseRepository.existsBySupplierIdAndPurchaseDateAndItem(
                 dto.getSupplierId(), dto.getPurchaseDate(), dto.getItem())) {
             throw new IllegalArgumentException("該供應商於此日期的相同品項已存在，請勿重複建立。");
         }
-
+        
         Purchase purchase = purchaseMapper.toEntity(dto);
         purchase.setSupplier(supplier);
-
-        // 1️⃣ 計算金額（稅額 + 總額）
+        
+        // ✅ 1️⃣ 設定會計期間（依進貨日期）
+        if (purchase.getPurchaseDate() != null) {
+            purchase.setAccountingPeriod(purchase.getPurchaseDate().format(PERIOD_FORMAT));
+        } else {
+            purchase.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
+        }
+        
+        // 2️⃣ 計算金額
         computeAmounts(purchase);
-
-        // 2️⃣ 若有付款資料 → 處理付款金額加總
+        
+        // 3️⃣ 若有付款資料 → 處理付款金額加總與會計期間
         BigDecimal paidTotal = BigDecimal.ZERO;
         if (dto.getPayments() != null && !dto.getPayments().isEmpty()) {
             Set<Payment> payments = dto.getPayments().stream()
                     .map(paymentMapper::toEntity)
-                    .peek(p -> p.setPurchase(purchase))
+                    .peek(p -> {
+                        p.setPurchase(purchase);
+                        // ✅ 付款的會計期間依付款日期決定
+                        if (p.getPayDate() != null) {
+                            p.setAccountingPeriod(p.getPayDate().format(PERIOD_FORMAT));
+                        } else {
+                            p.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
+                        }
+                    })
                     .collect(Collectors.toSet());
+            
             paidTotal = payments.stream()
                     .map(Payment::getAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             purchase.setPayments(payments);
         }
-
-        // 3️⃣ 更新 paid_amount / balance / status
+        
+        // 4️⃣ 更新 paid_amount / balance / status
         purchase.setPaidAmount(paidTotal);
-        BigDecimal balance = purchase.getTotalAmount().subtract(paidTotal).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal balance = purchase.getTotalAmount()
+                .subtract(paidTotal)
+                .setScale(2, RoundingMode.HALF_UP);
         purchase.setBalance(balance);
         updatePurchaseStatus(purchase);
-
-        // 4️⃣ 儲存
+        
+        // 5️⃣ 儲存
         try {
             Purchase saved = purchaseRepository.save(purchase);
             if (purchase.getPayments() != null && !purchase.getPayments().isEmpty()) {
@@ -97,26 +119,30 @@ public class PurchaseServiceImpl implements PurchaseService {
             throw new IllegalArgumentException("資料重複：該供應商於此日期的相同品項已存在。", e);
         }
     }
-
     
-    // === 更新進貨單（含金額修改限制）===
+    // === 更新進貨單（含金額修改與會計期間重新判定）===
     @Override
     @Transactional
     public PurchaseResponseDto updatePurchase(Long id, PurchaseRequestDto dto) {
         Purchase purchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 (ID: " + id + ")"));
-
+        
         Long supplierId = dto.getSupplierId() != null ? dto.getSupplierId() : purchase.getSupplier().getId();
         LocalDate newDate = dto.getPurchaseDate() != null ? dto.getPurchaseDate() : purchase.getPurchaseDate();
         String newItem = dto.getItem() != null ? dto.getItem() : purchase.getItem();
-
+        
         boolean conflict = purchaseRepository.existsBySupplierIdAndPurchaseDateAndItemAndIdNot(
                 supplierId, newDate, newItem, id);
         if (conflict) {
             throw new IllegalArgumentException("該供應商於此日期的相同品項已存在，請重新輸入。");
         }
         
-        purchase.setPurchaseDate(dto.getPurchaseDate());
+        // === 更新基本欄位 ===
+        if (dto.getPurchaseDate() != null) {
+            purchase.setPurchaseDate(dto.getPurchaseDate());
+            // ✅ 同步更新會計期間
+            purchase.setAccountingPeriod(dto.getPurchaseDate().format(PERIOD_FORMAT));
+        }
         purchase.setItem(dto.getItem());
         purchase.setNote(dto.getNote());
         
@@ -130,45 +156,46 @@ public class PurchaseServiceImpl implements PurchaseService {
             amountChanged = true;
         }
         
-        // === 🔹 處理付款金額 ===
+        // === 處理付款紀錄 ===
         if (dto.getPayments() != null && !dto.getPayments().isEmpty()) {
             Set<Payment> existingPayments = purchase.getPayments() != null
                     ? purchase.getPayments()
                     : new HashSet<>();
             
-            BigDecimal newPaymentTotal = BigDecimal.ZERO;
-            
             for (var paymentDto : dto.getPayments()) {
                 Payment newPayment = paymentMapper.toEntity(paymentDto);
                 newPayment.setPurchase(purchase);
                 
-                // ✅ 若 reference_no 存在，代表更新既有付款紀錄
+                // ✅ 若付款日期更新 → 自動更新會計期間
+                if (newPayment.getPayDate() != null) {
+                    newPayment.setAccountingPeriod(newPayment.getPayDate().format(PERIOD_FORMAT));
+                } else {
+                    newPayment.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
+                }
+                
                 Optional<Payment> existing = existingPayments.stream()
                         .filter(p -> p.getReferenceNo() != null
                                 && p.getReferenceNo().equalsIgnoreCase(newPayment.getReferenceNo()))
                         .findFirst();
                 
                 if (existing.isPresent()) {
-                    // 更新舊紀錄（例如修正金額或備註）
-                    existing.get().setAmount(newPayment.getAmount());
-                    existing.get().setMethod(newPayment.getMethod());
-                    existing.get().setNote(newPayment.getNote());
-                    existing.get().setPayDate(newPayment.getPayDate());
+                    Payment old = existing.get();
+                    old.setAmount(newPayment.getAmount());
+                    old.setMethod(newPayment.getMethod());
+                    old.setNote(newPayment.getNote());
+                    old.setPayDate(newPayment.getPayDate());
+                    old.setAccountingPeriod(newPayment.getAccountingPeriod());
                 } else {
-                    // 新增新付款紀錄
                     existingPayments.add(newPayment);
                 }
-                
-                newPaymentTotal = newPaymentTotal.add(newPayment.getAmount());
             }
             
-            // ✅ 更新總付款金額（累加舊紀錄 + 新紀錄）
+            // ✅ 更新總付款金額
             BigDecimal totalPaid = existingPayments.stream()
                     .map(Payment::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             
-            // === 檢查不得超出應付款金額 ===
             if (totalPaid.compareTo(purchase.getTotalAmount()) > 0) {
                 throw new IllegalArgumentException("付款金額不可超過應付總額 (" + purchase.getTotalAmount() + ")");
             }
@@ -177,32 +204,33 @@ public class PurchaseServiceImpl implements PurchaseService {
             purchase.setPaidAmount(totalPaid);
         }
         
-        // === 若數量或單價有變更，重新計算總金額 ===
+        // === 若數量或單價有變更，重新計算金額 ===
         if (amountChanged) {
             computeAmounts(purchase);
         }
         
         // === 同步餘額與狀態 ===
-        BigDecimal balance = purchase.getTotalAmount().subtract(purchase.getPaidAmount()).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal balance = purchase.getTotalAmount()
+                .subtract(purchase.getPaidAmount())
+                .setScale(2, RoundingMode.HALF_UP);
         purchase.setBalance(balance);
         updatePurchaseStatus(purchase);
         
-        // === 儲存所有異動 ===
         try {
             purchaseRepository.save(purchase);
         } catch (DataIntegrityViolationException e) {
             throw new IllegalArgumentException("更新失敗：該供應商於此日期的相同品項已存在。", e);
         }
-
+        
         return purchaseMapper.toDto(purchase);
     }
-    // === 狀態更新（不變）===
+    
+    // === 狀態更新 ===
     @Override
     @Transactional
     public PurchaseResponseDto updateStatus(Long id, String status) {
         Purchase purchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 (ID: " + id + ")"));
-        
         try {
             Purchase.Status newStatus = Purchase.Status.valueOf(status.toUpperCase());
             purchase.setStatus(newStatus);
@@ -229,7 +257,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         return List.of();
     }
     
-    // === 共用稅額計算（不變）===
+    // === 稅額計算 ===
     private void computeAmounts(Purchase purchase) {
         if (purchase.getQty() == null || purchase.getUnitPrice() == null) {
             purchase.setTaxAmount(BigDecimal.ZERO);

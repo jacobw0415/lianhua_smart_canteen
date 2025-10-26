@@ -27,6 +27,10 @@ public class Expense {
     @Schema(description = "支出日期")
     private LocalDate expenseDate;
     
+    @Column(name = "accounting_period", length = 7, nullable = false)
+    @Schema(description = "會計期間（YYYY-MM）")
+    private String accountingPeriod = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     @Schema(description = "費用類別")

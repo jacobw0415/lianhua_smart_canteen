@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,6 +28,9 @@ public class SalesServiceImpl implements SalesService {
     private final ProductRepository productRepository;
     private final SalesMapper mapper;
     
+    private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
+    
+    // === 建立銷售紀錄 ===
     @Override
     public SalesResponseDto create(SalesRequestDto dto) {
         Product product = productRepository.findById(dto.getProductId())
@@ -39,6 +44,15 @@ public class SalesServiceImpl implements SalesService {
         Sale sale = mapper.toEntity(dto);
         sale.setProduct(product);
         
+        // ✅ 自動設定會計期間（依銷售日期）
+        if (sale.getSaleDate() != null) {
+            sale.setAccountingPeriod(sale.getSaleDate().format(PERIOD_FORMAT));
+        } else {
+            sale.setSaleDate(LocalDate.now());
+            sale.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
+        }
+        
+        // ✅ 自動計算金額（商品單價 × 數量）
         BigDecimal unitPrice = product.getUnitPrice();
         BigDecimal total = unitPrice.multiply(BigDecimal.valueOf(dto.getQty()));
         sale.setAmount(total);
@@ -46,13 +60,26 @@ public class SalesServiceImpl implements SalesService {
         return mapper.toDto(repository.save(sale));
     }
     
+    // === 更新銷售紀錄 ===
     @Override
     public SalesResponseDto update(Long id, SalesRequestDto dto) {
         Sale existing = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到銷售紀錄 ID: " + id));
         
-        // 先更新基本屬性
+        // 檢查是否違反唯一約束（若修改日期或商品）
+        if (dto.getSaleDate() != null && dto.getProductId() != null &&
+                repository.existsBySaleDateAndProductId(dto.getSaleDate(), dto.getProductId()) &&
+                !dto.getProductId().equals(existing.getProduct().getId())) {
+            throw new DataIntegrityViolationException("該商品於該日期已有銷售紀錄，請勿重複建立。");
+        }
+        
+        // 更新基本屬性
         mapper.updateEntityFromDto(dto, existing);
+        
+        // 若日期變更 → 同步更新會計期間
+        if (dto.getSaleDate() != null) {
+            existing.setAccountingPeriod(dto.getSaleDate().format(PERIOD_FORMAT));
+        }
         
         // 若商品 ID 被更新，需重新查詢商品資料
         if (dto.getProductId() != null && !dto.getProductId().equals(existing.getProduct().getId())) {
@@ -61,7 +88,7 @@ public class SalesServiceImpl implements SalesService {
             existing.setProduct(newProduct);
         }
         
-        // ✅ 若數量或商品有變動，自動重新計算金額
+        // ✅ 自動重新計算金額
         BigDecimal unitPrice = existing.getProduct().getUnitPrice();
         BigDecimal total = unitPrice.multiply(BigDecimal.valueOf(existing.getQty()));
         existing.setAmount(total);
@@ -69,7 +96,7 @@ public class SalesServiceImpl implements SalesService {
         return mapper.toDto(repository.save(existing));
     }
     
-    
+    // === 刪除銷售紀錄 ===
     @Override
     public void delete(Long id) {
         if (!repository.existsById(id)) {
@@ -78,6 +105,7 @@ public class SalesServiceImpl implements SalesService {
         repository.deleteById(id);
     }
     
+    // === 查詢單筆 ===
     @Override
     @Transactional(readOnly = true)
     public SalesResponseDto findById(Long id) {
@@ -86,12 +114,14 @@ public class SalesServiceImpl implements SalesService {
                 .orElseThrow(() -> new EntityNotFoundException("找不到銷售紀錄 ID: " + id));
     }
     
+    // === 查詢全部 ===
     @Override
     @Transactional(readOnly = true)
     public List<SalesResponseDto> findAll() {
         return repository.findAll().stream().map(mapper::toDto).collect(Collectors.toList());
     }
     
+    // === 查詢指定商品的銷售紀錄 ===
     @Override
     @Transactional(readOnly = true)
     public List<SalesResponseDto> findByProduct(Long productId) {

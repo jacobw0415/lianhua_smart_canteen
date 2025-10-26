@@ -43,7 +43,11 @@ public class Purchase {
     @Column(name = "purchase_date", nullable = false)
     @Schema(description = "進貨日期")
     private LocalDate purchaseDate;
-
+    
+    @Column(name = "accounting_period", length = 7, nullable = false)
+    @Schema(description = "會計期間（YYYY-MM）")
+    private String accountingPeriod = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
+    
     @Column(nullable = false, length = 120)
     @Schema(description = "進貨項目")
     private String item;
@@ -79,7 +83,7 @@ public class Purchase {
     private BigDecimal balance;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 10)
+    @Column(length = 10,nullable = false)
     @Schema(description = "狀態：PENDING, PARTIAL, PAID")
     private Status status = Status.PENDING;
 
