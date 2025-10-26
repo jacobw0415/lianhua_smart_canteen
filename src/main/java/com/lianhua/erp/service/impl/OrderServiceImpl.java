@@ -1,76 +1,92 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.dto.order.OrderDto;
-import com.lianhua.erp.domin.Order;
-import com.lianhua.erp.dto.order.OrderResponseDto;
+import com.lianhua.erp.domin.*;
+import com.lianhua.erp.dto.order.*;
 import com.lianhua.erp.mapper.OrderMapper;
-import com.lianhua.erp.repository.OrderRepository;
+import com.lianhua.erp.repository.*;
 import com.lianhua.erp.service.OrderService;
 import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class OrderServiceImpl implements OrderService {
-
+    
     private final OrderRepository orderRepository;
-    private final OrderMapper orderMapper;
-
-    public OrderServiceImpl(OrderRepository orderRepository, OrderMapper orderMapper) {
-        this.orderRepository = orderRepository;
-        this.orderMapper = orderMapper;
-    }
-
+    private final OrderCustomerRepository customerRepository;
+    private final OrderMapper mapper;
+    
     @Override
-    public List<OrderDto> getAllOrders() {
-        return orderRepository.findAll().stream()
-                .map(orderMapper::toDto)
-                .collect(Collectors.toList());
+    public OrderResponseDto create(OrderRequestDto dto) {
+        // 驗證客戶存在
+        OrderCustomer customer = customerRepository.findById(dto.getCustomerId())
+                .orElseThrow(() -> new EntityNotFoundException("找不到客戶 ID: " + dto.getCustomerId()));
+        
+        // 唯一約束檢查
+        if (orderRepository.existsByCustomer_IdAndOrderDate(dto.getCustomerId(), dto.getOrderDate())) {
+            throw new IllegalArgumentException("該客戶於 " + dto.getOrderDate() + " 已有訂單紀錄。");
+        }
+        
+        Order order = mapper.toEntity(dto);
+        order.setCustomer(customer);
+        
+        if (dto.getStatus() != null) {
+            order.setStatus(Order.Status.valueOf(dto.getStatus()));
+        }
+        
+        if (dto.getAccountingPeriod() == null) {
+            order.setAccountingPeriod(dto.getOrderDate().toString().substring(0, 7));
+        }
+        
+        orderRepository.save(order);
+        return mapper.toResponseDto(order);
     }
-
+    
     @Override
-    public OrderDto getOrderById(Long id) {
+    public OrderResponseDto update(Long id, OrderRequestDto dto) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Order not found: " + id));
-        return orderMapper.toDto(order);
+                .orElseThrow(() -> new EntityNotFoundException("找不到訂單 ID: " + id));
+        
+        mapper.updateEntityFromDto(dto, order);
+        
+        if (dto.getStatus() != null) {
+            order.setStatus(Order.Status.valueOf(dto.getStatus()));
+        }
+        
+        if (dto.getCustomerId() != null && !dto.getCustomerId().equals(order.getCustomer().getId())) {
+            OrderCustomer newCustomer = customerRepository.findById(dto.getCustomerId())
+                    .orElseThrow(() -> new EntityNotFoundException("找不到客戶 ID: " + dto.getCustomerId()));
+            order.setCustomer(newCustomer);
+        }
+        
+        return mapper.toResponseDto(orderRepository.save(order));
     }
-
+    
     @Override
-    public OrderDto createOrder(OrderDto dto) {
-        Order order = orderMapper.toEntity(dto);
-        return orderMapper.toDto(orderRepository.save(order));
-    }
-
-    @Override
-    public OrderDto updateOrder(Long id, OrderDto dto) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Order not found: " + id));
-
-        Order updated = orderMapper.toEntity(dto);
-        updated.setId(order.getId());
-
-        return orderMapper.toDto(orderRepository.save(updated));
-    }
-
-    @Override
-    public void deleteOrder(Long id) {
+    public void delete(Long id) {
+        if (!orderRepository.existsById(id)) {
+            throw new EntityNotFoundException("找不到要刪除的訂單 ID: " + id);
+        }
         orderRepository.deleteById(id);
     }
-
+    
     @Override
-    public OrderResponseDto getOrderWithDetails(Long id) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Order not found: " + id));
-        return orderMapper.toResponseDto(order);
+    public OrderResponseDto findById(Long id) {
+        return orderRepository.findById(id)
+                .map(mapper::toResponseDto)
+                .orElseThrow(() -> new EntityNotFoundException("找不到訂單 ID: " + id));
     }
-
+    
     @Override
-    public List<OrderResponseDto> getOrdersByCustomerId(Long customerId) {
-        return List.of();
+    public List<OrderResponseDto> findAll() {
+        return orderRepository.findAll().stream().map(mapper::toResponseDto).toList();
     }
-
 }

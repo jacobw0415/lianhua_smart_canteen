@@ -1,16 +1,12 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.order.OrderCustomerDto;
-import com.lianhua.erp.dto.order.OrderResponseDto;
-
+import com.lianhua.erp.dto.orderCustomer.*;
 import java.util.List;
 
 public interface OrderCustomerService {
-    List<OrderCustomerDto> getAllCustomers();
-    OrderCustomerDto getCustomerById(Long id);
-    OrderCustomerDto createCustomer(OrderCustomerDto dto);
-    OrderCustomerDto updateCustomer(Long id, OrderCustomerDto dto);
-    void deleteCustomer(Long id);
-
-    List<OrderResponseDto> getOrdersByCustomerId(Long customerId);
+    OrderCustomerResponseDto create(OrderCustomerRequestDto dto);
+    OrderCustomerResponseDto update(Long id, OrderCustomerRequestDto dto);
+    void delete(Long id);
+    List<OrderCustomerResponseDto> findAll();
+    OrderCustomerResponseDto findById(Long id);
 }

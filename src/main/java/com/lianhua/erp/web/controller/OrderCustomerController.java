@@ -1,10 +1,19 @@
 package com.lianhua.erp.web.controller;
 
-import com.lianhua.erp.dto.order.OrderCustomerDto;
-import com.lianhua.erp.dto.order.OrderResponseDto;
+import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
+import com.lianhua.erp.dto.error.*;
+import com.lianhua.erp.dto.orderCustomer.OrderCustomerRequestDto;
+import com.lianhua.erp.dto.orderCustomer.OrderCustomerResponseDto;
 import com.lianhua.erp.service.OrderCustomerService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,49 +21,101 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/order-customers")
-@Tag(name = "訂單客戶管理", description = "管理訂單客戶 (學校/公司/企業) 的 API")
+@RequiredArgsConstructor
+@Tag(name = "訂單客戶管理", description = "Order Customer Management API")
 public class OrderCustomerController {
-
-    private final OrderCustomerService customerService;
-
-    public OrderCustomerController(OrderCustomerService customerService) {
-        this.customerService = customerService;
-    }
-
+    
+    private final OrderCustomerService service;
+    
+    // ================================
+    // 取得所有客戶
+    // ================================
+    @Operation(summary = "取得所有訂單客戶")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功取得所有客戶紀錄",
+                    content = @Content(schema = @Schema(implementation = OrderCustomerResponseDto.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
     @GetMapping
-    @Operation(summary = "取得所有客戶")
-    public ResponseEntity<List<OrderCustomerDto>> getAllCustomers() {
-        return ResponseEntity.ok(customerService.getAllCustomers());
+    public ResponseEntity<ApiResponseDto<List<OrderCustomerResponseDto>>> getAll() {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.findAll()));
     }
-
+    
+    // ================================
+    // 取得單筆客戶
+    // ================================
+    @Operation(summary = "查詢單筆訂單客戶")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功取得客戶資料",
+                    content = @Content(schema = @Schema(implementation = OrderCustomerResponseDto.class))),
+            @ApiResponse(responseCode = "404", description = "找不到指定客戶紀錄",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
     @GetMapping("/{id}")
-    @Operation(summary = "依 ID 取得客戶")
-    public ResponseEntity<OrderCustomerDto> getCustomerById(@PathVariable Long id) {
-        return ResponseEntity.ok(customerService.getCustomerById(id));
+    public ResponseEntity<ApiResponseDto<OrderCustomerResponseDto>> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.findById(id)));
     }
-
+    
+    // ================================
+    // 新增客戶
+    // ================================
+    @Operation(summary = "新增訂單客戶")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "成功新增客戶",
+                    content = @Content(schema = @Schema(implementation = OrderCustomerResponseDto.class))),
+            @ApiResponse(responseCode = "400", description = "參數格式錯誤",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "409", description = "客戶名稱重複或違反唯一約束",
+                    content = @Content(schema = @Schema(implementation = ConflictResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
     @PostMapping
-    @Operation(summary = "新增客戶")
-    public ResponseEntity<OrderCustomerDto> createCustomer(@RequestBody OrderCustomerDto dto) {
-        return ResponseEntity.ok(customerService.createCustomer(dto));
+    public ResponseEntity<ApiResponseDto<OrderCustomerResponseDto>> create(
+            @Valid @RequestBody OrderCustomerRequestDto dto) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponseDto.ok(service.create(dto)));
     }
-
+    
+    // ================================
+    // 更新客戶
+    // ================================
+    @Operation(summary = "更新訂單客戶資料")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功更新客戶資料",
+                    content = @Content(schema = @Schema(implementation = OrderCustomerResponseDto.class))),
+            @ApiResponse(responseCode = "400", description = "輸入參數錯誤",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "404", description = "找不到客戶紀錄",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "409", description = "客戶名稱重複或違反唯一約束",
+                    content = @Content(schema = @Schema(implementation = ConflictResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
     @PutMapping("/{id}")
-    @Operation(summary = "更新客戶")
-    public ResponseEntity<OrderCustomerDto> updateCustomer(@PathVariable Long id, @RequestBody OrderCustomerDto dto) {
-        return ResponseEntity.ok(customerService.updateCustomer(id, dto));
+    public ResponseEntity<ApiResponseDto<OrderCustomerResponseDto>> update(
+            @PathVariable Long id, @Valid @RequestBody OrderCustomerRequestDto dto) {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.update(id, dto)));
     }
-
+    
+    // ================================
+    // 刪除客戶
+    // ================================
+    @Operation(summary = "刪除訂單客戶")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "成功刪除客戶紀錄"),
+            @ApiResponse(responseCode = "404", description = "找不到客戶紀錄",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
     @DeleteMapping("/{id}")
-    @Operation(summary = "刪除客戶")
-    public ResponseEntity<Void> deleteCustomer(@PathVariable Long id) {
-        customerService.deleteCustomer(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        service.delete(id);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/{id}/orders")
-    @Operation(summary = "查詢某客戶的所有訂單（含明細與產品資訊）")
-    public ResponseEntity<List<OrderResponseDto>> getOrdersByCustomer(@PathVariable Long id) {
-        return ResponseEntity.ok(customerService.getOrdersByCustomerId(id));
     }
 }

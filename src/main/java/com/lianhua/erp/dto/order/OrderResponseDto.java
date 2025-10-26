@@ -2,35 +2,47 @@ package com.lianhua.erp.dto.order;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
-import java.util.List;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Schema(description = "訂單回應 DTO（含客戶與產品資訊）")
+@Schema(description = "訂單回應 DTO")
 public class OrderResponseDto {
-    @Schema(description = "訂單 ID", example = "1001")
+    
+    @Schema(description = "訂單 ID")
     private Long id;
-
-    @Schema(description = "訂單日期", example = "2025-10-01")
-    private String orderDate;
-
-    @Schema(description = "送餐日期", example = "2025-10-02")
-    private String deliveryDate;
-
-    @Schema(description = "狀態", example = "CONFIRMED")
+    
+    @Schema(description = "客戶 ID")
+    private Long customerId;
+    
+    @Schema(description = "客戶名稱")
+    private String customerName;
+    
+    @Schema(description = "訂單日期")
+    private LocalDate orderDate;
+    
+    @Schema(description = "交貨日期")
+    private LocalDate deliveryDate;
+    
+    @Schema(description = "會計期間")
+    private String accountingPeriod;
+    
+    @Schema(description = "狀態")
     private String status;
-
-    @Schema(description = "總金額", example = "8500.00")
-    private Double totalAmount;
-
-    @Schema(description = "備註", example = "週會午餐訂單")
+    
+    @Schema(description = "總金額")
+    private BigDecimal totalAmount;
+    
+    @Schema(description = "備註")
     private String note;
-
-    @Schema(description = "客戶資訊")
-    private OrderCustomerDto customer;
-
-    @Schema(description = "訂單明細")
-    private List<OrderItemDetailDto> items;
+    
+    @Schema(description = "建立時間")
+    private LocalDateTime createdAt;
+    
+    @Schema(description = "更新時間")
+    private LocalDateTime updatedAt;
 }
