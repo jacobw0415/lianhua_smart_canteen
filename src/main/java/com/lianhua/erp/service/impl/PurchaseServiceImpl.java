@@ -127,6 +127,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         Purchase purchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 (ID: " + id + ")"));
         
+<<<<<<< HEAD
         Long supplierId = dto.getSupplierId() != null ? dto.getSupplierId() : purchase.getSupplier().getId();
         LocalDate newDate = dto.getPurchaseDate() != null ? dto.getPurchaseDate() : purchase.getPurchaseDate();
         String newItem = dto.getItem() != null ? dto.getItem() : purchase.getItem();
@@ -157,11 +158,29 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
         
         // === 處理付款紀錄 ===
+=======
+        // === ⚙️ 嚴格限制但允許相同值 ===
+        if (dto.getItem() != null && !dto.getItem().equals(purchase.getItem())) {
+            throw new IllegalArgumentException("不允許修改品名。");
+        }
+        if (dto.getQty() != null && dto.getQty().compareTo(purchase.getQty()) != 0) {
+            throw new IllegalArgumentException("不允許修改數量。");
+        }
+        if (dto.getUnitPrice() != null && dto.getUnitPrice().compareTo(purchase.getUnitPrice()) != 0) {
+            throw new IllegalArgumentException("不允許修改單價。");
+        }
+        if (dto.getPurchaseDate() != null && !dto.getPurchaseDate().equals(purchase.getPurchaseDate())) {
+            throw new IllegalArgumentException("不允許修改進貨日期。");
+        }
+        
+        // === ⚙️ 僅允許修改付款金額 ===
+>>>>>>> jacob
         if (dto.getPayments() != null && !dto.getPayments().isEmpty()) {
             Set<Payment> existingPayments = purchase.getPayments() != null
                     ? purchase.getPayments()
                     : new HashSet<>();
             
+<<<<<<< HEAD
             for (var paymentDto : dto.getPayments()) {
                 Payment newPayment = paymentMapper.toEntity(paymentDto);
                 newPayment.setPurchase(purchase);
@@ -191,19 +210,83 @@ public class PurchaseServiceImpl implements PurchaseService {
             }
             
             // ✅ 更新總付款金額
+=======
+>>>>>>> jacob
             BigDecimal totalPaid = existingPayments.stream()
                     .map(Payment::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             
+<<<<<<< HEAD
             if (totalPaid.compareTo(purchase.getTotalAmount()) > 0) {
                 throw new IllegalArgumentException("付款金額不可超過應付總額 (" + purchase.getTotalAmount() + ")");
+=======
+            BigDecimal unpaid = purchase.getTotalAmount().subtract(totalPaid);
+            
+            for (var paymentDto : dto.getPayments()) {
+                Payment newPayment = paymentMapper.toEntity(paymentDto);
+                newPayment.setPurchase(purchase);
+                
+                // ✅ 檢查付款日期是否早於進貨日期
+                if (newPayment.getPayDate() != null &&
+                        newPayment.getPayDate().isBefore(purchase.getPurchaseDate())) {
+                    throw new IllegalArgumentException(
+                            "付款日期不得早於進貨日期 (" + purchase.getPurchaseDate() + ")");
+                }
+                
+                Optional<Payment> existing = existingPayments.stream()
+                        .filter(p -> p.getReferenceNo() != null &&
+                                p.getReferenceNo().equalsIgnoreCase(newPayment.getReferenceNo()))
+                        .findFirst();
+                
+                if (existing.isPresent()) {
+                    Payment old = existing.get();
+                    
+                    // ✅ 僅允許修改金額
+                    if (newPayment.getAmount() != null &&
+                            newPayment.getAmount().compareTo(old.getAmount()) != 0) {
+                        
+                        BigDecimal diff = newPayment.getAmount().subtract(old.getAmount());
+                        if (diff.compareTo(BigDecimal.ZERO) > 0 && diff.compareTo(unpaid) > 0) {
+                            throw new IllegalArgumentException(
+                                    "付款金額不可超過尚未付款金額 (" + unpaid + ")");
+                        }
+                        old.setAmount(newPayment.getAmount());
+                        unpaid = unpaid.subtract(diff.max(BigDecimal.ZERO));
+                    }
+                } else {
+                    // ✅ 新增付款也要檢查金額與日期
+                    if (newPayment.getAmount().compareTo(unpaid) > 0) {
+                        throw new IllegalArgumentException(
+                                "新增付款金額不可超過尚未付款金額 (" + unpaid + ")");
+                    }
+                    existingPayments.add(newPayment);
+                    unpaid = unpaid.subtract(newPayment.getAmount());
+                }
+            }
+            
+            // ✅ 總額檢查
+            BigDecimal totalPaidAfter = existingPayments.stream()
+                    .map(Payment::getAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            
+            if (totalPaidAfter.compareTo(purchase.getTotalAmount()) > 0) {
+                throw new IllegalArgumentException(
+                        "總付款金額不可超過應付總額 (" + purchase.getTotalAmount() + ")");
+>>>>>>> jacob
             }
             
             purchase.setPayments(existingPayments);
-            purchase.setPaidAmount(totalPaid);
+            purchase.setPaidAmount(totalPaidAfter);
+            purchase.setBalance(
+                    purchase.getTotalAmount().subtract(totalPaidAfter).setScale(2, RoundingMode.HALF_UP));
+            updatePurchaseStatus(purchase);
+        } else {
+            throw new IllegalArgumentException("本操作僅允許修改付款金額，請提供付款資料。");
         }
         
+<<<<<<< HEAD
         // === 若數量或單價有變更，重新計算金額 ===
         if (amountChanged) {
             computeAmounts(purchase);
@@ -216,16 +299,27 @@ public class PurchaseServiceImpl implements PurchaseService {
         purchase.setBalance(balance);
         updatePurchaseStatus(purchase);
         
+=======
+        // === 儲存異動 ===
+>>>>>>> jacob
         try {
-            purchaseRepository.save(purchase);
+            Purchase updated = purchaseRepository.save(purchase);
+            return purchaseMapper.toDto(updated);
         } catch (DataIntegrityViolationException e) {
-            throw new IllegalArgumentException("更新失敗：該供應商於此日期的相同品項已存在。", e);
+            throw new IllegalArgumentException("更新失敗：資料完整性錯誤。", e);
         }
+<<<<<<< HEAD
         
         return purchaseMapper.toDto(purchase);
     }
     
     // === 狀態更新 ===
+=======
+    }
+    
+    
+    // === 狀態更新（不變）===
+>>>>>>> jacob
     @Override
     @Transactional
     public PurchaseResponseDto updateStatus(Long id, String status) {
