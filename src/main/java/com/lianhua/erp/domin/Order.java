@@ -6,6 +6,8 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(
@@ -52,7 +54,11 @@ public class Order {
     
     @Column(name = "updated_at", insertable = false)
     private LocalDateTime updatedAt;
-    
+
+    @Builder.Default
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> items = new ArrayList<>();
+
     public enum Status {
         PENDING,
         CONFIRMED,

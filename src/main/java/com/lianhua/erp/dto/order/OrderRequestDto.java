@@ -1,11 +1,12 @@
 package com.lianhua.erp.dto.order;
 
+import com.lianhua.erp.dto.orderItem.OrderItemRequestDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -13,30 +14,25 @@ import java.time.LocalDate;
 @Builder
 @Schema(description = "訂單建立／更新請求 DTO")
 public class OrderRequestDto {
-    
+
     @NotNull
     @Schema(description = "客戶 ID", example = "1")
     private Long customerId;
-    
+
     @NotNull
     @Schema(description = "訂單日期", example = "2025-10-26")
     private LocalDate orderDate;
-    
+
     @NotNull
     @Schema(description = "交貨日期", example = "2025-10-28")
     private LocalDate deliveryDate;
-    
-    @NotNull
-    @DecimalMin(value = "0.00", inclusive = false)
-    @Schema(description = "總金額", example = "15000.00")
-    private BigDecimal totalAmount;
-    
-    @Schema(description = "會計期間", example = "2025-10")
-    private String accountingPeriod;
-    
-    @Schema(description = "訂單狀態", example = "PENDING", allowableValues = {"PENDING", "CONFIRMED", "DELIVERED", "CANCELLED", "PAID"})
-    private String status;
-    
-    @Schema(description = "備註", example = "由王小姐訂購")
+
+    @Schema(description = "備註", example = "每日午餐配送")
     private String note;
+
+    @Schema(description = "訂單明細（建立時可同時傳入）")
+    private List<OrderItemRequestDto> items;
+
+    @Schema(description = "訂單總金額（系統自動計算）", accessMode = Schema.AccessMode.READ_ONLY)
+    private String totalAmount;
 }
