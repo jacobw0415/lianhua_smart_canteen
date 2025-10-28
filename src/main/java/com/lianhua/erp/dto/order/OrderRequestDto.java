@@ -29,10 +29,8 @@ public class OrderRequestDto {
 
     @Schema(description = "備註", example = "每日午餐配送")
     private String note;
-
-    @Schema(description = "訂單明細（建立時可同時傳入）")
+    
+    @NotEmpty
+    @Schema(description = "訂單明細清單")
     private List<OrderItemRequestDto> items;
-
-    @Schema(description = "訂單總金額（系統自動計算）", accessMode = Schema.AccessMode.READ_ONLY)
-    private String totalAmount;
 }
