@@ -2,6 +2,8 @@ package com.lianhua.erp.domin;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -48,12 +50,14 @@ public class Order {
     
     @Column(length = 255)
     private String note;
-    
-    @Column(name = "created_at", updatable = false, insertable = false)
-    private LocalDateTime createdAt;
-    
-    @Column(name = "updated_at", insertable = false)
-    private LocalDateTime updatedAt;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false, insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    private java.sql.Timestamp createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", insertable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+    private java.sql.Timestamp updatedAt;
 
     @Builder.Default
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
