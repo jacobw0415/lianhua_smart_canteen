@@ -120,6 +120,34 @@ public class ProductController {
     }
 
     @Operation(
+            summary = "依分類 ID 取得商品清單",
+            description = "傳入分類 ID，回傳該分類下的所有商品。"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "查詢成功",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ProductResponseDto.class)))),
+            @ApiResponse(responseCode = "204", description = "該分類下目前沒有商品"),
+            @ApiResponse(responseCode = "404", description = "找不到指定分類 ID",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
+    @GetMapping("/category/{categoryId}")
+    public ResponseEntity<ApiResponseDto<List<ProductResponseDto>>> getByCategory(
+            @PathVariable Long categoryId) {
+
+        List<ProductResponseDto> list = service.getByCategory(categoryId);
+
+        if (list.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NO_CONTENT)
+                    .body(ApiResponseDto.error(HttpStatus.NO_CONTENT.value(), "該分類下目前沒有商品"));
+        }
+
+        return ResponseEntity.ok(ApiResponseDto.ok(list));
+    }
+
+
+    @Operation(
             summary = "刪除商品",
             description = "根據商品 ID 刪除指定資料。若該商品有關聯銷售或訂單，將拒絕刪除。"
     )

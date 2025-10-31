@@ -12,4 +12,5 @@ public interface ProductService {
     List<ProductResponseDto> getActiveProducts();
     ProductResponseDto getWithRelations(Long id);
     void delete(Long id);
+    List<ProductResponseDto> getByCategory(Long categoryId);
 }

@@ -1,5 +1,5 @@
 -- ============================================================
--- 🌿 Lianhua ERP Schema v2.4
+-- 🌿 Lianhua ERP Schema v2.5
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS lianhua
@@ -87,17 +87,38 @@ CREATE INDEX idx_payments_purchase_id ON payments(purchase_id);
 CREATE INDEX idx_payments_accounting_period ON payments(accounting_period);
 
 -- ------------------------------------------------------------
--- 5. 商品表
+-- 5A. 商品分類表
 -- ------------------------------------------------------------
-CREATE TABLE products (
+CREATE TABLE product_categories (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(100) NOT NULL UNIQUE,
-  category ENUM('VEG_LUNCHBOX','SPECIAL','ADD_ON') NOT NULL,
-  unit_price DECIMAL(10,2) UNSIGNED NOT NULL,
+  code VARCHAR(20) UNIQUE,
+  description VARCHAR(255),
   active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_product_categories_code ON product_categories(code);
+CREATE INDEX idx_product_categories_active ON product_categories(active);
+
+-- ------------------------------------------------------------
+-- 5B. 商品表
+-- ------------------------------------------------------------
+CREATE TABLE products (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  category_id BIGINT NOT NULL,
+  unit_price DECIMAL(10,2) UNSIGNED NOT NULL,
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (category_id) REFERENCES product_categories(id)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_products_category_id ON products(category_id);
+CREATE INDEX idx_products_active ON products(active);
 
 -- ------------------------------------------------------------
 -- 6. 銷售表 (零售，含會計期間)
@@ -266,7 +287,7 @@ CREATE INDEX idx_order_items_product_id ON order_items(product_id);
 CREATE INDEX idx_order_items_accounting_period ON order_items(accounting_period);
 
 -- ------------------------------------------------------------
--- 14. 收款表 Receipts (新增)
+-- 14. 收款表 Receipts
 -- ------------------------------------------------------------
 CREATE TABLE receipts (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -288,6 +309,6 @@ CREATE INDEX idx_receipts_order_id ON receipts(order_id);
 CREATE INDEX idx_receipts_accounting_period ON receipts(accounting_period);
 
 -- ============================================================
--- ✅ Schema v2.4 完成：
---  進銷存、費用、收付款、收支流向 全面整合
+--    Schema v2.5 完成：
+--    加入 Product Categories 模組，強化分類與報表彈性
 -- ============================================================

@@ -19,8 +19,8 @@ public class ProductResponseDto {
     @Schema(description = "商品名稱", example = "香菇素便當")
     private String name;
 
-    @Schema(description = "商品類別", example = "VEG_LUNCHBOX")
-    private String category;
+    @Schema(description = "分類資訊")
+    private CategoryInfo category;;
 
     @Schema(description = "單價", example = "75.00")
     private BigDecimal unitPrice;
@@ -41,4 +41,18 @@ public class ProductResponseDto {
 
     @Schema(description = "訂單明細 ID 清單（僅在查詢含關聯時返回）")
     private List<Long> orderItemIds;
+
+    @Data
+    @Builder
+    @Schema(description = "商品分類資訊")
+    public static class CategoryInfo {
+        @Schema(description = "分類ID", example = "1")
+        private Long id;
+
+        @Schema(description = "分類名稱", example = "素食便當")
+        private String name;
+
+        @Schema(description = "分類代碼", example = "VEG")
+        private String code;
+    }
 }

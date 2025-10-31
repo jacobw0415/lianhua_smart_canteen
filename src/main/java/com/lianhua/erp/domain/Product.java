@@ -15,6 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString(exclude = {"sales", "orderItems"})
 public class Product {
 
     @Id
@@ -24,9 +25,9 @@ public class Product {
     @Column(nullable = false, length = 100, unique = true)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private Category category;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private ProductCategory category;
 
     @Column(name = "unit_price", precision = 10, scale = 2, nullable = false)
     private BigDecimal unitPrice;
@@ -60,9 +61,4 @@ public class Product {
     @JsonIgnore
     private List<OrderItem> orderItems;
 
-    public enum Category {
-        VEG_LUNCHBOX,
-        SPECIAL,
-        ADD_ON
-    }
 }

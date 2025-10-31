@@ -11,8 +11,8 @@ public class ProductRequestDto {
     @Schema(description = "商品名稱", example = "香菇素便當")
     private String name;
 
-    @Schema(description = "商品類別", example = "VEG_LUNCHBOX")
-    private String category;
+    @Schema(description = "商品分類 ID", example = "1")
+    private Long categoryId;
 
     @Schema(description = "單價", example = "75.00")
     private BigDecimal unitPrice;

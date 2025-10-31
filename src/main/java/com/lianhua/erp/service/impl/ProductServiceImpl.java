@@ -1,15 +1,18 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.Product;
+import com.lianhua.erp.domain.ProductCategory;
 import com.lianhua.erp.dto.product.*;
 import com.lianhua.erp.mapper.ProductMapper;
 import com.lianhua.erp.repository.ProductRepository;
+import com.lianhua.erp.repository.ProductCategoryRepository;
 import com.lianhua.erp.service.ProductService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -19,14 +22,25 @@ import java.util.stream.Collectors;
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository repository;
+    private final ProductCategoryRepository categoryRepository; // 🔹 新增：分類存取用
     private final ProductMapper mapper;
 
     @Override
     public ProductResponseDto create(ProductRequestDto dto) {
+        // ✅ 檢查商品名稱唯一性
         if (repository.existsByName(dto.getName())) {
             throw new DataIntegrityViolationException("相同商品名稱已存在，請重新輸入商品名稱。");
         }
+
+        // ✅ 檢查分類是否存在
+        ProductCategory category = categoryRepository.findById(dto.getCategoryId())
+                .orElseThrow(() -> new EntityNotFoundException("找不到分類 ID: " + dto.getCategoryId()));
+
+        // ✅ 轉換 DTO → Entity 並設定分類
         Product product = mapper.toEntity(dto);
+        product.setCategory(category);
+
+        // ✅ 儲存並轉換回 DTO
         return mapper.toDto(repository.save(product));
     }
 
@@ -35,9 +49,16 @@ public class ProductServiceImpl implements ProductService {
         Product existing = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到商品 ID: " + id));
 
-        // 若名稱改變，需檢查是否與他人重複
+        // 若名稱改變，需檢查是否重複
         if (!existing.getName().equalsIgnoreCase(dto.getName()) && repository.existsByName(dto.getName())) {
             throw new DataIntegrityViolationException("相同商品名稱已存在，請重新輸入商品名稱。");
+        }
+
+        // ✅ 檢查是否更新分類
+        if (dto.getCategoryId() != null) {
+            ProductCategory category = categoryRepository.findById(dto.getCategoryId())
+                    .orElseThrow(() -> new EntityNotFoundException("找不到分類 ID: " + dto.getCategoryId()));
+            existing.setCategory(category);
         }
 
         mapper.updateEntityFromDto(dto, existing);
@@ -69,8 +90,11 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponseDto getWithRelations(Long id) {
         Product product = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到商品 ID: " + id));
+
+        // 預先載入關聯資料
         product.getSales().size();
         product.getOrderItems().size();
+
         return mapper.toDto(product);
     }
 
@@ -81,4 +105,17 @@ public class ProductServiceImpl implements ProductService {
         }
         repository.deleteById(id);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductResponseDto> getByCategory(Long categoryId) {
+        if (!categoryRepository.existsById(categoryId)) {
+            throw new EntityNotFoundException("找不到分類 ID: " + categoryId);
+        }
+        return repository.findByCategoryId(categoryId)
+                .stream()
+                .map(mapper::toDto)
+                .collect(Collectors.toList());
+    }
+
 }
