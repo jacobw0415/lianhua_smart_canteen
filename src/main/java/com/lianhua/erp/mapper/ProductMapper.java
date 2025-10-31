@@ -1,6 +1,6 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.domin.Product;
+import com.lianhua.erp.domain.Product;
 import com.lianhua.erp.dto.product.ProductRequestDto;
 import com.lianhua.erp.dto.product.ProductResponseDto;
 import org.mapstruct.*;

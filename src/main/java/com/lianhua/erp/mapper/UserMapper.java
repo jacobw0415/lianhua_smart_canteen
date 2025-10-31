@@ -1,6 +1,6 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.domin.User;
+import com.lianhua.erp.domain.User;
 import com.lianhua.erp.dto.user.UserDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

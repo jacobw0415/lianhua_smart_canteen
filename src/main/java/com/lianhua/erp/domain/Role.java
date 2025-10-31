@@ -1,4 +1,4 @@
-package com.lianhua.erp.domin;
+package com.lianhua.erp.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;

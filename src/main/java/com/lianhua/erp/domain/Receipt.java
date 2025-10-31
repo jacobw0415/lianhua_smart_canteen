@@ -1,4 +1,4 @@
-package com.lianhua.erp.domin;
+package com.lianhua.erp.domain;
 
 import jakarta.persistence.*;
 import lombok.*;

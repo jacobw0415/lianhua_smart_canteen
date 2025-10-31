@@ -1,7 +1,7 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.domin.Order;
-import com.lianhua.erp.domin.OrderItem;
+import com.lianhua.erp.domain.Order;
+import com.lianhua.erp.domain.OrderItem;
 import com.lianhua.erp.dto.order.*;
 import com.lianhua.erp.dto.orderItem.OrderItemResponseDto;
 import org.mapstruct.*;

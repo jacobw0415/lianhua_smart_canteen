@@ -1,10 +1,12 @@
-package com.lianhua.erp.domin;
+package com.lianhua.erp.domain;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Entity
 @Table(
@@ -47,13 +49,28 @@ public class Payment {
     @Column(length = 255)
     private String note;
 
-    @Column(name = "created_at", updatable = false, insertable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    private java.sql.Timestamp createdAt;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", updatable = false, insertable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
-    private java.sql.Timestamp updatedAt;
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+
+        if (this.accountingPeriod == null && this.payDate != null) {
+            this.accountingPeriod = this.payDate.format(
+                    DateTimeFormatter.ofPattern("yyyy-MM")
+            );
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 
     public enum Method { CASH, TRANSFER, CARD, CHECK }
 }

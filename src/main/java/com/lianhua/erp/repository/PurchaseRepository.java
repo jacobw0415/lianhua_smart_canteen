@@ -1,6 +1,6 @@
 package com.lianhua.erp.repository;
 
-import com.lianhua.erp.domin.Purchase;
+import com.lianhua.erp.domain.Purchase;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 

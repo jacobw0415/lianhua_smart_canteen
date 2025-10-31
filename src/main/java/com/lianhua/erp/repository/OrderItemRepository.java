@@ -1,6 +1,6 @@
 package com.lianhua.erp.repository;
 
-import com.lianhua.erp.domin.OrderItem;
+import com.lianhua.erp.domain.OrderItem;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;

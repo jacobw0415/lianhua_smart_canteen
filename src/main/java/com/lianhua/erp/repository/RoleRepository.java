@@ -1,6 +1,6 @@
 package com.lianhua.erp.repository;
 
-import com.lianhua.erp.domin.Role;
+import com.lianhua.erp.domain.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

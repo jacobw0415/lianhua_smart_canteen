@@ -1,12 +1,10 @@
 package com.lianhua.erp.config;
 
-import com.lianhua.erp.domin.Role;
+import com.lianhua.erp.domain.Role;
 import com.lianhua.erp.repository.RoleRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.List;
 
 @Configuration
 public class DataInitializer {

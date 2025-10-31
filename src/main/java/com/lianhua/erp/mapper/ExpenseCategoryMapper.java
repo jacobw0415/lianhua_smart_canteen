@@ -1,6 +1,6 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.domin.ExpenseCategory;
+import com.lianhua.erp.domain.ExpenseCategory;
 import com.lianhua.erp.dto.expense.ExpenseCategoryDto;
 import com.lianhua.erp.dto.expense.ExpenseCategoryRequestDto;
 import org.mapstruct.*;

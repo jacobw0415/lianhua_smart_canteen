@@ -1,7 +1,7 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.domin.Payment;
-import com.lianhua.erp.domin.Purchase;
+import com.lianhua.erp.domain.Payment;
+import com.lianhua.erp.domain.Purchase;
 import com.lianhua.erp.dto.purchase.PurchaseRequestDto;
 import com.lianhua.erp.dto.purchase.PurchaseResponseDto;
 import org.mapstruct.*;

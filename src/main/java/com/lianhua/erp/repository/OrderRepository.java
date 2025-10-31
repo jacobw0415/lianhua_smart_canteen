@@ -1,6 +1,6 @@
 package com.lianhua.erp.repository;
 
-import com.lianhua.erp.domin.Order;
+import com.lianhua.erp.domain.Order;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.time.LocalDate;
 

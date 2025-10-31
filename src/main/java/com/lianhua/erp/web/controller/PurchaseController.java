@@ -1,6 +1,5 @@
 package com.lianhua.erp.web.controller;
 
-import com.lianhua.erp.domin.Purchase;
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
 import com.lianhua.erp.dto.error.*;
 import com.lianhua.erp.dto.purchase.*;

@@ -1,12 +1,11 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.domin.ExpenseCategory;
+import com.lianhua.erp.domain.ExpenseCategory;
 import com.lianhua.erp.dto.expense.ExpenseCategoryDto;
 import com.lianhua.erp.dto.expense.ExpenseCategoryRequestDto;
 import com.lianhua.erp.mapper.ExpenseCategoryMapper;
 import com.lianhua.erp.repository.ExpenseCategoryRepository;
 import com.lianhua.erp.service.ExpenseCategoryService;
-import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

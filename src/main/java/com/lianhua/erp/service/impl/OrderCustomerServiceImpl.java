@@ -1,6 +1,6 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.domin.OrderCustomer;
+import com.lianhua.erp.domain.OrderCustomer;
 import com.lianhua.erp.dto.orderCustomer.*;
 import com.lianhua.erp.mapper.OrderCustomerMapper;
 import com.lianhua.erp.repository.OrderCustomerRepository;

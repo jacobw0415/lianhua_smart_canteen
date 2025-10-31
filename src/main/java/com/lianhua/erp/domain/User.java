@@ -1,10 +1,8 @@
-package com.lianhua.erp.domin;
+package com.lianhua.erp.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -45,14 +43,23 @@ public class User {
     
     @Builder.Default
     private Boolean enabled = true;
-    
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-    
-    @UpdateTimestamp
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
     
     // ===============================
     // 🔹 關聯設定：User ↔ UserRole

@@ -1,6 +1,6 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.domin.Product;
+import com.lianhua.erp.domain.Product;
 import com.lianhua.erp.dto.product.*;
 import com.lianhua.erp.mapper.ProductMapper;
 import com.lianhua.erp.repository.ProductRepository;

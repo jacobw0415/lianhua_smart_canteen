@@ -1,10 +1,10 @@
-package com.lianhua.erp.domin;
+package com.lianhua.erp.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "expense_categories",
@@ -46,14 +46,18 @@ public class ExpenseCategory {
     @Builder.Default
     @Schema(description = "是否啟用", example = "true")
     private Boolean active = true;
-    
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    @Schema(description = "建立時間（系統自動生成）", example = "2025-10-16T10:30:00")
-    private java.sql.Timestamp createdAt;
-    
-    @UpdateTimestamp
-    @Column(name = "updated_at", columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
-    @Schema(description = "最後更新時間（系統自動更新）", example = "2025-10-16T11:05:00")
-    private java.sql.Timestamp updatedAt;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

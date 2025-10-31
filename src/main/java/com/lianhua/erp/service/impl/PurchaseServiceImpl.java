@@ -1,6 +1,6 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.domin.*;
+import com.lianhua.erp.domain.*;
 import com.lianhua.erp.dto.purchase.*;
 import com.lianhua.erp.mapper.PurchaseMapper;
 import com.lianhua.erp.mapper.PaymentMapper;

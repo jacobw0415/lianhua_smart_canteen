@@ -1,6 +1,6 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.domin.*;
+import com.lianhua.erp.domain.*;
 import com.lianhua.erp.dto.orderItem.OrderItemRequestDto;
 import com.lianhua.erp.dto.orderItem.OrderItemResponseDto;
 import com.lianhua.erp.mapper.OrderItemMapper;

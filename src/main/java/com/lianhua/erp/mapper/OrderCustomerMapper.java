@@ -1,6 +1,6 @@
 package com.lianhua.erp.mapper;
 
-import com.lianhua.erp.domin.OrderCustomer;
+import com.lianhua.erp.domain.OrderCustomer;
 import com.lianhua.erp.dto.orderCustomer.*;
 import org.mapstruct.*;
 

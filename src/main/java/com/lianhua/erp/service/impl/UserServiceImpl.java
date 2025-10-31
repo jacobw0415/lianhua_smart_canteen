@@ -1,8 +1,8 @@
 package com.lianhua.erp.service.impl;
 
-import com.lianhua.erp.domin.Role;
-import com.lianhua.erp.domin.User;
-import com.lianhua.erp.domin.UserRole;
+import com.lianhua.erp.domain.Role;
+import com.lianhua.erp.domain.User;
+import com.lianhua.erp.domain.UserRole;
 import com.lianhua.erp.dto.user.UserDto;
 import com.lianhua.erp.dto.user.UserRegisterDto;
 import com.lianhua.erp.dto.user.UserRequestDto;

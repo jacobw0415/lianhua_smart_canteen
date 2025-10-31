@@ -1,6 +1,6 @@
 package com.lianhua.erp.repository;
 
-import com.lianhua.erp.domin.OrderCustomer;
+import com.lianhua.erp.domain.OrderCustomer;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

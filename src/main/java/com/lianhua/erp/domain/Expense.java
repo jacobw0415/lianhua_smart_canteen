@@ -1,11 +1,13 @@
-package com.lianhua.erp.domin;
+package com.lianhua.erp.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
 import io.swagger.v3.oas.annotations.media.Schema;
-import com.lianhua.erp.domin.Employee;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Entity
 @Table(name = "expenses",
@@ -48,12 +50,27 @@ public class Expense {
     @JoinColumn(name = "employee_id")
     @Schema(description = "對應員工（如為薪資支出）")
     private Employee employee;
-    
-    @Column(name = "created_at", updatable = false, insertable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    private java.sql.Timestamp createdAt;
-    
-    @Column(name = "updated_at", updatable = false, insertable = false,
-            columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
-    private java.sql.Timestamp updatedAt;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+
+        if (this.accountingPeriod == null && this.expenseDate != null) {
+            this.accountingPeriod = this.expenseDate.format(
+                    DateTimeFormatter.ofPattern("yyyy-MM")
+            );
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

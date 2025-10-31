@@ -1,6 +1,6 @@
 package com.lianhua.erp.dto.supplier;
 
-import com.lianhua.erp.domin.Supplier.BillingCycle;
+import com.lianhua.erp.domain.Supplier.BillingCycle;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;

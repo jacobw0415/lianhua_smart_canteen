@@ -1,4 +1,4 @@
-package com.lianhua.erp.domin;
+package com.lianhua.erp.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -38,13 +38,22 @@ public class OrderCustomer {
     
     @Column(length = 255)
     private String note;
-    
-    @Column(name = "created_at", updatable = false, insertable = false)
+
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-    
-    @Column(name = "updated_at", insertable = false)
-    private LocalDateTime updatedAt;
-    
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;@PrePersist
+
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public enum BillingCycle {
         WEEKLY, BIWEEKLY, MONTHLY
     }
