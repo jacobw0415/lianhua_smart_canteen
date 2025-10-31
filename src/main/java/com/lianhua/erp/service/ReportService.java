@@ -1,28 +1,17 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.report.*;
-
+import com.lianhua.erp.dto.report.ProfitReportDto;
 import java.util.List;
 
+/**
+ * 報表服務介面
+ * 定義報表查詢的主要方法。
+ */
 public interface ReportService {
-    // 供應商相關
-    List<SupplierBalanceReportDto> getSupplierBalances();
-    List<SupplierMonthlyReportDto> getSupplierMonthlyReports();
-    List<PurchasePaymentStatusDto> getPurchasePaymentStatuses();
-    List<SupplierBalanceReportDto> getUnpaidSuppliers();
 
-    // 員工薪資相關
-    List<MonthlySalaryReportDto> getMonthlySalaryExpenses();
-    List<EmployeeYearlySalaryReportDto> getEmployeeYearlySalaries();
-    List<MonthlySalaryDetailDto> getMonthlySalaryDetails(String month);
-
-    // 营業支出相關
-    List<OperatingCostReportDto> getMonthlyOperatingCosts();
-    List<OperatingCostCategoryDto> getOperatingCostByCategory();
-    List<OperatingCostMonthlyCategoryDto> getMonthlyCategoryOperatingCosts();
-
-
-
-
-
+    /**
+     * 取得月損益報表
+     * @return 損益報表列表（依月份）
+     */
+    List<ProfitReportDto> getMonthlyProfitReport();
 }
