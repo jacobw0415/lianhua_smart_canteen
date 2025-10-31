@@ -133,17 +133,32 @@
 
     <build>
         <plugins>
+            <!-- Spring Boot 打包與執行 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.lianhua.erp.ErpApplication</mainClass>
+                </configuration>
             </plugin>
+
+            <!-- Java 編譯設定-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
-                    <compilerArgs>--enable-preview</compilerArgs>
+                    <release>21</release>
+                </configuration>
+            </plugin>
+
+            <!-- 自動格式化程式碼（選擇性） -->
+            <plugin>
+                <groupId>net.revelc.code.formatter</groupId>
+                <artifactId>formatter-maven-plugin</artifactId>
+                <version>2.23.0</version>
+                <configuration>
+                    <configFile>${project.basedir}/eclipse-java-style.xml</configFile>
                 </configuration>
             </plugin>
         </plugins>
