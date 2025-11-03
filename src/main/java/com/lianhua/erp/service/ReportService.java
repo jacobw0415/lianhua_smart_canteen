@@ -13,5 +13,5 @@ public interface ReportService {
      * 取得月損益報表
      * @return 損益報表列表（依月份）
      */
-    List<ProfitReportDto> getMonthlyProfitReport();
+    List<ProfitReportDto> getMonthlyProfitReport(String period, String startDate, String endDate);
 }

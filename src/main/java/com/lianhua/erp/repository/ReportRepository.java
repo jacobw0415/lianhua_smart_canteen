@@ -68,5 +68,5 @@ public interface ReportRepository extends JpaRepository<Sale, Long> {
     GROUP BY accounting_period
     ORDER BY accounting_period DESC
     """, nativeQuery = true)
-    List<Object[]> findMonthlyProfitReport();
+    List<Object[]> findMonthlyProfitReport(String period, String startDate, String endDate);
 }

@@ -21,13 +21,13 @@ import java.util.List;
 @Slf4j
 public class ReportServiceImpl implements ReportService {
 
-    private final ReportRepository reportRepository;
+    private final ReportRepository repository;
 
     @Override
-    public List<ProfitReportDto> getMonthlyProfitReport() {
-        List<Object[]> rows = reportRepository.findMonthlyProfitReport();
+    public List<ProfitReportDto> getMonthlyProfitReport(String period, String startDate, String endDate) {
+        List<Object[]> results = repository.findMonthlyProfitReport(period, startDate, endDate);
 
-        return rows.stream().map(r -> ProfitReportDto.builder()
+        return results.stream().map(r -> ProfitReportDto.builder()
                 .accountingPeriod((String) r[0])
                 .totalSales((BigDecimal) r[1])
                 .totalOrders((BigDecimal) r[2])
