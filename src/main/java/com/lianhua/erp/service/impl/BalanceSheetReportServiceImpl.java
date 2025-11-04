@@ -8,9 +8,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.YearMonth;
 import java.util.List;
+import java.util.Objects;
 
+/**
+ * 💼 資產負債表 Service 實作
+ * 對應新版 Repository，可同時支援月份與日期區間查詢。
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -20,37 +24,55 @@ public class BalanceSheetReportServiceImpl implements BalanceSheetReportService 
 
     @Override
     public List<BalanceSheetReportDto> generateBalanceSheet(String period) {
-        return List.of();
+        return generateBalanceSheet(period, null, null);
     }
 
     @Override
     public List<BalanceSheetReportDto> generateBalanceSheet(String period, String startDate, String endDate) {
 
-        if (period != null && (startDate == null || endDate == null)) {
-            YearMonth ym = YearMonth.parse(period);
-            startDate = ym.atDay(1).toString();
-            endDate = ym.atEndOfMonth().toString();
+        List<BalanceSheetReportDto> list = repository.getBalanceSheet(period, startDate, endDate);
+        if (list == null || list.isEmpty()) {
+            return list;
         }
 
-        BigDecimal ar = repository.getAccountsReceivable(period);
-        BigDecimal ap = repository.getAccountsPayable(period);
-        BigDecimal cashReceipts = repository.getCashReceipts(period);
-        BigDecimal cashSales = repository.getCashSales(period);
+        // 🧮 自動加上「合計」列（同 CashFlowReport 結構）
+        BalanceSheetReportDto total = new BalanceSheetReportDto();
+        String label = "合計";
 
-        BigDecimal cash = cashReceipts.add(cashSales);
-        BigDecimal totalAssets = ar.add(cash);
-        BigDecimal equity = totalAssets.subtract(ap);
+        if (startDate != null && endDate != null) {
+            label += STR." (\{startDate} ~ \{endDate})";
+        } else if (period != null && !period.isBlank()) {
+            label += STR." (\{period})";
+        }
 
-        BalanceSheetReportDto dto = BalanceSheetReportDto.builder()
-                .accountingPeriod(period != null ? period : "N/A")
-                .accountsReceivable(ar)
-                .accountsPayable(ap)
-                .cash(cash)
-                .totalAssets(totalAssets)
-                .totalLiabilities(ap)
-                .equity(equity)
-                .build();
+        total.setAccountingPeriod(label);
 
-        return List.of(dto);
+        // 累加各主要科目
+        total.setAccountsReceivable(sum(list, BalanceSheetReportDto::getAccountsReceivable));
+        total.setAccountsPayable(sum(list, BalanceSheetReportDto::getAccountsPayable));
+        total.setCash(sum(list, BalanceSheetReportDto::getCash));
+
+        // 計算總資產、總負債與權益
+        BigDecimal totalAssets = total.getAccountsReceivable()
+                .add(total.getCash());
+        BigDecimal totalLiabilities = total.getAccountsPayable();
+        BigDecimal equity = totalAssets.subtract(totalLiabilities);
+
+        total.setTotalAssets(totalAssets);
+        total.setTotalLiabilities(totalLiabilities);
+        total.setEquity(equity);
+
+        list.add(total);
+        return list;
+    }
+
+    /**
+     * 🔧 BigDecimal 累加工具
+     */
+    private BigDecimal sum(List<BalanceSheetReportDto> list, java.util.function.Function<BalanceSheetReportDto, BigDecimal> getter) {
+        return list.stream()
+                .map(getter)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }
