@@ -35,7 +35,7 @@ public class ReportController {
     private final BalanceSheetReportService balanceSheetReportService;
 
     // ============================================================
-    // ✅ 共用日期驗證工具（若格式錯誤將丟出 IllegalArgumentException）
+    //  共用日期驗證工具（若格式錯誤將丟出 IllegalArgumentException）
     // ============================================================
     private void validateDateRange(String startDate, String endDate) {
         if (startDate != null && endDate != null) {
@@ -70,9 +70,9 @@ public class ReportController {
     })
     @GetMapping("/monthly-profit")
     public ResponseEntity<ApiResponseDto<List<ProfitReportDto>>> getMonthlyProfitReport(
-            @Parameter(description = "會計期間（YYYY-MM）") @RequestParam(required = false) String period,
             @Parameter(description = "起始日期 (yyyy-MM-dd)") @RequestParam(required = false) String startDate,
-            @Parameter(description = "結束日期 (yyyy-MM-dd)") @RequestParam(required = false) String endDate
+            @Parameter(description = "結束日期 (yyyy-MM-dd)") @RequestParam(required = false) String endDate,
+            @Parameter(description = "會計期間（YYYY-MM）") @RequestParam(required = false) String period
     ) {
         validateDateRange(startDate, endDate);
 

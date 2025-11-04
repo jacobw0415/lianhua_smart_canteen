@@ -10,10 +10,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 
 /**
- * 報表服務實作
- * 統一封裝損益報表的查詢邏輯。
+ * 💰 損益報表 Service 實作
+ * 支援月份與日期區間查詢，結構統一與資產負債表。
  */
 @Service
 @RequiredArgsConstructor
@@ -25,17 +26,51 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     public List<ProfitReportDto> getMonthlyProfitReport(String period, String startDate, String endDate) {
-        List<Object[]> results = repository.findMonthlyProfitReport(period, startDate, endDate);
 
-        return results.stream().map(r -> ProfitReportDto.builder()
-                .accountingPeriod((String) r[0])
-                .totalSales((BigDecimal) r[1])
-                .totalOrders((BigDecimal) r[2])
-                .totalRevenue((BigDecimal) r[3])
-                .totalPurchase((BigDecimal) r[4])
-                .totalExpense((BigDecimal) r[5])
-                .netProfit((BigDecimal) r[6])
-                .build()
-        ).toList();
+        // 📊 從 Repository 查詢報表資料
+        List<ProfitReportDto> list = repository.getProfitReport(period, startDate, endDate);
+
+        if (list == null || list.isEmpty()) {
+            return list;
+        }
+
+        // 🧮 新增「合計」列
+        ProfitReportDto total = new ProfitReportDto();
+        String label = "合計";
+
+        if (startDate != null && endDate != null) {
+            label += STR." (\{startDate} ~ \{endDate})";
+        } else if (period != null && !period.isBlank()) {
+            label += STR." (\{period})";
+        }
+
+        total.setAccountingPeriod(label);
+
+        // 🔹 累計加總欄位
+        total.setTotalSales(sum(list, ProfitReportDto::getTotalSales));
+        total.setTotalOrders(sum(list, ProfitReportDto::getTotalOrders));
+        total.setTotalRevenue(sum(list, ProfitReportDto::getTotalRevenue));
+        total.setTotalPurchase(sum(list, ProfitReportDto::getTotalPurchase));
+        total.setTotalExpense(sum(list, ProfitReportDto::getTotalExpense));
+
+        // 🔹 計算本期淨利
+        total.setNetProfit(
+                total.getTotalRevenue()
+                        .subtract(total.getTotalPurchase())
+                        .subtract(total.getTotalExpense())
+        );
+
+        list.add(total);
+        return list;
+    }
+
+    /**
+     * BigDecimal 累加工具
+     */
+    private BigDecimal sum(List<ProfitReportDto> list, java.util.function.Function<ProfitReportDto, BigDecimal> getter) {
+        return list.stream()
+                .map(getter)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }
