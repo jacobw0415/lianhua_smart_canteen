@@ -19,7 +19,7 @@ public class APAgingReportDto {
     @Schema(description = "供應商名稱", example = "安興蔬果行")
     private String supplierName;
 
-    @Schema(description = "採購單編號", example = "102")
+    @Schema(description = "採購單 ID", example = "102")
     private Long purchaseId;
 
     @Schema(description = "採購日期", example = "2025-10-01")
