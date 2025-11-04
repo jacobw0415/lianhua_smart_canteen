@@ -42,7 +42,7 @@ public class BalanceSheetReportServiceImpl implements BalanceSheetReportService 
         BigDecimal equity = totalAssets.subtract(ap);
 
         BalanceSheetReportDto dto = BalanceSheetReportDto.builder()
-                .accountingPeriod(period)
+                .accountingPeriod(period != null ? period : "N/A")
                 .accountsReceivable(ar)
                 .accountsPayable(ap)
                 .cash(cash)

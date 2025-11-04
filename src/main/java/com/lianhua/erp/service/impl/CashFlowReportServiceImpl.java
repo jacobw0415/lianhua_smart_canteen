@@ -1,42 +1,72 @@
 package com.lianhua.erp.service.impl;
 
-
 import com.lianhua.erp.dto.report.CashFlowReportDto;
 import com.lianhua.erp.repository.CashFlowReportRepository;
 import com.lianhua.erp.service.CashFlowReportService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 
-/**
- * 現金流量報表服務實作
- */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-@Slf4j
 public class CashFlowReportServiceImpl implements CashFlowReportService {
 
     private final CashFlowReportRepository repository;
 
     @Override
-    public List<CashFlowReportDto> getCashFlowReport(String startDate, String endDate, String method, String period) {
-        List<Object[]> results = repository.findMonthlyCashFlowReport(startDate, endDate, method, period);
+    public List<CashFlowReportDto> generateCashFlow(String period, String startDate, String endDate) {
 
-        return results.stream().map(r -> CashFlowReportDto.builder()
-                .accountingPeriod((String) r[0])
-                .totalSales((BigDecimal) r[1])
-                .totalReceipts((BigDecimal) r[2])
-                .totalPayments((BigDecimal) r[3])
-                .totalExpenses((BigDecimal) r[4])
-                .totalInflow((BigDecimal) r[5])
-                .totalOutflow((BigDecimal) r[6])
-                .netCashFlow((BigDecimal) r[7])
-                .build()
-        ).toList();
+        List<CashFlowReportDto> list = repository.getCashFlow(period, startDate, endDate);
+
+        if (list == null || list.isEmpty()) {
+            return list;
+        }
+
+        // ✅ 生成合計 DTO
+        CashFlowReportDto total = new CashFlowReportDto();
+
+        // 📅 自動標籤邏輯
+        String label = "合計";
+        if (startDate != null && endDate != null) {
+            label += STR." (\{startDate} ~ \{endDate})";
+        } else if (period != null && !period.isBlank()) {
+            label += STR." (\{period})";
+        }
+        total.setAccountingPeriod(label);
+
+        // 💰 四大金額加總
+        total.setTotalSales(sum(list, CashFlowReportDto::getTotalSales));
+        total.setTotalReceipts(sum(list, CashFlowReportDto::getTotalReceipts));
+        total.setTotalPayments(sum(list, CashFlowReportDto::getTotalPayments));
+        total.setTotalExpenses(sum(list, CashFlowReportDto::getTotalExpenses));
+
+        // 💵 自動加總流入、流出與淨現金
+        total.setTotalInflow(total.getTotalSales().add(total.getTotalReceipts()));
+        total.setTotalOutflow(total.getTotalPayments().add(total.getTotalExpenses()));
+        total.setNetCashFlow(total.getTotalInflow().subtract(total.getTotalOutflow()));
+
+        // ✅ 避免重複加入
+        boolean hasTotal = list.stream()
+                .anyMatch(dto -> dto.getAccountingPeriod() != null && dto.getAccountingPeriod().startsWith("合計"));
+        if (!hasTotal) {
+            list.add(total);
+        }
+
+        return list;
+    }
+
+    /**
+     * 🧩 共用加總函式
+     */
+    private BigDecimal sum(List<CashFlowReportDto> list, java.util.function.Function<CashFlowReportDto, BigDecimal> getter) {
+        return list.stream()
+                .map(getter)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

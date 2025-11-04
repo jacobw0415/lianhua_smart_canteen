@@ -1,6 +1,5 @@
 package com.lianhua.erp.web.advice;
 
-import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
 import com.lianhua.erp.dto.error.*;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.persistence.EntityNotFoundException;
@@ -14,7 +13,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.time.format.DateTimeParseException;
 import java.util.stream.Collectors;
 
 @Hidden
@@ -22,15 +23,30 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     // ============================================================
-    // 400：參數或驗證錯誤
+    // 400：參數或格式錯誤（含日期/型別錯誤）
     // ============================================================
-    @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
+    @ExceptionHandler({
+            MethodArgumentNotValidException.class,
+            ConstraintViolationException.class,
+            MethodArgumentTypeMismatchException.class,
+            DateTimeParseException.class
+    })
     public ResponseEntity<BadRequestResponse> handleBadRequest(Exception ex) {
-        String msg = (ex instanceof MethodArgumentNotValidException e)
-                ? e.getBindingResult().getFieldErrors().stream()
-                .map(err -> err.getField() + " " + err.getDefaultMessage())
-                .collect(Collectors.joining(", "))
-                : ex.getMessage();
+        String msg;
+
+        if (ex instanceof MethodArgumentNotValidException e) {
+            msg = e.getBindingResult().getFieldErrors().stream()
+                    .map(err -> err.getField() + " " + err.getDefaultMessage())
+                    .collect(Collectors.joining(", "));
+        } else if (ex instanceof MethodArgumentTypeMismatchException e) {
+            msg = String.format("參數 %s 格式錯誤，期望型別為 %s",
+                    e.getName(), e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "未知");
+        } else if (ex instanceof DateTimeParseException) {
+            msg = "日期格式錯誤，請使用 yyyy-MM-dd 或 yyyy-MM 格式";
+        } else {
+            msg = ex.getMessage();
+        }
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new BadRequestResponse(msg));
     }
@@ -63,7 +79,7 @@ public class GlobalExceptionHandler {
     }
 
     // ============================================================
-    // 409：資料衝突（名稱重複 / 外鍵約束 / 唯一鍵違反）
+    // 409：資料衝突（唯一鍵 / 外鍵）
     // ============================================================
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ConflictResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
@@ -74,18 +90,11 @@ public class GlobalExceptionHandler {
                 ? ex.getRootCause().getMessage()
                 : "";
 
-        // 1️⃣ 自定義唯一鍵：商品名稱
         if (exceptionMsg.contains("uq_product_name")) {
             message = "商品名稱重複，請重新輸入不同名稱。";
-        }
-
-        // 2️⃣ 自定義唯一鍵：供應商名稱
-        else if (exceptionMsg.contains("uk_supplier_name")) {
+        } else if (exceptionMsg.contains("uk_supplier_name")) {
             message = "供應商名稱重複，請重新輸入不同名稱。";
-        }
-
-        // 3️⃣ 其他 Duplicate entry 一般情況（MySQL 原生訊息）
-        else if (rootMsg.contains("Duplicate entry")) {
+        } else if (rootMsg.contains("Duplicate entry")) {
             message = extractDuplicateMessage(rootMsg);
         }
 
@@ -93,11 +102,6 @@ public class GlobalExceptionHandler {
                 .body(new ConflictResponse(message));
     }
 
-    /**
-     * 🔧 解析 MySQL Duplicate entry 錯誤訊息
-     * 例如：
-     * Duplicate entry 'jacob' for key 'users.username'
-     */
     private String extractDuplicateMessage(String dbMessage) {
         try {
             int entryStart = dbMessage.indexOf("Duplicate entry '") + 17;
@@ -124,7 +128,7 @@ public class GlobalExceptionHandler {
     }
 
     // ============================================================
-    // 500：伺服器內部錯誤（未捕捉）
+    // 500：伺服器內部錯誤
     // ============================================================
     @ExceptionHandler(Exception.class)
     public ResponseEntity<InternalServerErrorResponse> handleServerError(Exception ex) {
