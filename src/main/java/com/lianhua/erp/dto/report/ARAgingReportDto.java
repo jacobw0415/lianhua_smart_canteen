@@ -19,7 +19,7 @@ public class ARAgingReportDto {
     @Schema(description = "客戶名稱", example = "立安餐飲")
     private String customerName;
 
-    @Schema(description = "訂單編號", example = "1024")
+    @Schema(description = "訂單 ID", example = "1024")
     private Long orderId;
 
     @Schema(description = "訂單日期", example = "2025-09-20")
