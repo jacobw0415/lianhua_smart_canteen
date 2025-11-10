@@ -97,6 +97,11 @@ public class PurchaseServiceImpl implements PurchaseService {
             paidTotal = payments.stream()
                     .map(Payment::getAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // ✅ 防呆：首筆付款金額不得超過應付總額
+            if (paidTotal.compareTo(purchase.getTotalAmount()) > 0) {
+                throw new IllegalArgumentException(
+                        STR."首筆付款金額不可超過進貨應付總額 (\{purchase.getTotalAmount()})");
+            }
             purchase.setPayments(payments);
         }
         
