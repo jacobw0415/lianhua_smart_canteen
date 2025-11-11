@@ -85,15 +85,20 @@ public class PurchaseServiceImpl implements PurchaseService {
                     .map(paymentMapper::toEntity)
                     .peek(p -> {
                         p.setPurchase(purchase);
-                        // ✅ 付款的會計期間依付款日期決定
                         if (p.getPayDate() != null) {
+                            // ✅ 檢查付款日期不得早於進貨日期
+                            if (purchase.getPurchaseDate() != null &&
+                                    p.getPayDate().isBefore(purchase.getPurchaseDate())) {
+                                throw new IllegalArgumentException(
+                                        STR."付款日期不得早於進貨日期 (\{purchase.getPurchaseDate()})");
+                            }
                             p.setAccountingPeriod(p.getPayDate().format(PERIOD_FORMAT));
                         } else {
                             p.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
                         }
                     })
                     .collect(Collectors.toSet());
-            
+
             paidTotal = payments.stream()
                     .map(Payment::getAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
