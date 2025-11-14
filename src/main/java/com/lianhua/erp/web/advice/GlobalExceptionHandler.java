@@ -14,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.format.DateTimeParseException;
 import java.util.stream.Collectors;
@@ -136,5 +137,16 @@ public class GlobalExceptionHandler {
         String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new InternalServerErrorResponse(msg));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<BaseErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
+
+        HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
+        String message = ex.getReason() != null ? ex.getReason() : "請求錯誤";
+
+        return ResponseEntity
+                .status(status)
+                .body(new BadRequestResponse(message));
     }
 }
