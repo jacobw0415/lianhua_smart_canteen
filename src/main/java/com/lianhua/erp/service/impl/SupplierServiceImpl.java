@@ -10,14 +10,16 @@ import com.lianhua.erp.service.SupplierService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -27,40 +29,76 @@ public class SupplierServiceImpl implements SupplierService {
     private final SupplierRepository supplierRepository;
     private final SupplierMapper supplierMapper;
 
+    // ================================================================
+    // 分頁取得全部供應商
+    // ================================================================
     @Override
     @Transactional(readOnly = true)
-    public List<SupplierDto> getAllSuppliers() {
-        return supplierRepository.findAll()
-                .stream()
-                .map(supplierMapper::toDto)
-                .collect(Collectors.toList());
+    public Page<SupplierDto> getAllSuppliers(Pageable pageable) {
+
+        Pageable safePageable = normalizePageable(pageable);
+
+        try {
+            return supplierRepository.findAll(safePageable)
+                    .map(supplierMapper::toDto);
+        } catch (PropertyReferenceException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "無效排序欄位：" + ex.getPropertyName()
+            );
+        }
     }
 
+    // ================================================================
+    // 單筆查詢
+    // ================================================================
     @Override
     @Transactional(readOnly = true)
     public SupplierDto getSupplierById(Long id) {
         Supplier supplier = supplierRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("找不到供應商 ID：" + id));
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到供應商 ID：" + id));
+
         return supplierMapper.toDto(supplier);
     }
 
+    // ================================================================
+    // 建立供應商
+    // ================================================================
     @Override
     public SupplierDto createSupplier(SupplierRequestDto dto) {
+
         if (supplierRepository.existsByName(dto.getName())) {
-            throw new IllegalArgumentException("供應商名稱已存在：" + dto.getName());
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "供應商名稱已存在：" + dto.getName()
+            );
         }
+
         Supplier supplier = supplierMapper.toEntity(dto);
-        return supplierMapper.toDto(supplierRepository.save(supplier));
+        supplier = supplierRepository.save(supplier);
+
+        return supplierMapper.toDto(supplier);
     }
 
+    // ================================================================
+    // 更新供應商
+    // ================================================================
     @Override
     public SupplierDto updateSupplier(Long id, SupplierRequestDto dto) {
-        Supplier supplier = supplierRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("找不到供應商 ID：" + id));
 
+        Supplier supplier = supplierRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到供應商 ID：" + id));
+
+        // 名稱變更才檢查是否重複
         if (!supplier.getName().equals(dto.getName())
                 && supplierRepository.existsByName(dto.getName())) {
-            throw new IllegalArgumentException("供應商名稱已存在：" + dto.getName());
+
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "供應商名稱已存在：" + dto.getName()
+            );
         }
 
         supplierMapper.updateEntityFromDto(dto, supplier);
@@ -68,12 +106,18 @@ public class SupplierServiceImpl implements SupplierService {
         try {
             supplier = supplierRepository.save(supplier);
         } catch (DataIntegrityViolationException ex) {
-            throw new IllegalArgumentException("更新供應商失敗，名稱可能已存在：" + dto.getName(), ex);
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "更新供應商失敗，名稱可能已存在：" + dto.getName(), ex
+            );
         }
 
         return supplierMapper.toDto(supplier);
     }
 
+    // ================================================================
+    // 刪除供應商
+    // ================================================================
     @Override
     public void deleteSupplier(Long id) {
         if (!supplierRepository.existsById(id)) {
@@ -83,13 +127,12 @@ public class SupplierServiceImpl implements SupplierService {
     }
 
     // ================================================================
-    // 供應商搜尋邏輯（含欄位客製化訊息）
+    // 分頁搜尋供應商
     // ================================================================
     @Override
     @Transactional(readOnly = true)
-    public List<SupplierDto> searchSuppliers(SupplierSearchRequest req) {
+    public Page<SupplierDto> searchSuppliers(SupplierSearchRequest req, Pageable pageable) {
 
-        // 🔍 至少一個搜尋條件必須提供
         if (isEmptySearch(req)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -97,67 +140,88 @@ public class SupplierServiceImpl implements SupplierService {
             );
         }
 
-        Specification<Supplier> spec = Specification.unrestricted();
-        StringBuilder searchInfo = new StringBuilder("查無匹配資料：");
+        Pageable safePageable = normalizePageable(pageable);
+        Specification<Supplier> spec = buildSupplierSpec(req);
 
-        // 1️⃣ 供應商名稱（模糊搜尋）
-        if (hasText(req.getSupplierName())) {
-            String keyword = req.getSupplierName().trim().toLowerCase();
-            searchInfo.append(STR."供應商名稱「\{req.getSupplierName()}」 ");
+        Page<Supplier> page;
 
-            spec = spec.and((root, query, cb) ->
-                    cb.like(cb.lower(root.get("name")), STR."%\{keyword}%"));
-        }
-
-        // 2️⃣ 聯絡人（模糊搜尋）
-        if (hasText(req.getContact())) {
-            String keyword = req.getContact().trim().toLowerCase();
-            searchInfo.append(STR."聯絡人「\{req.getContact()}」 ");
-
-            spec = spec.and((root, query, cb) ->
-                    cb.like(cb.lower(root.get("contact")), STR."%\{keyword}%"));
-        }
-
-        // 3️⃣ 電話（模糊搜尋）
-        if (hasText(req.getPhone())) {
-            String keyword = req.getPhone().trim();
-            searchInfo.append(STR."電話「\{req.getPhone()}」 ");
-
-            spec = spec.and((root, query, cb) ->
-                    cb.like(root.get("phone"), STR."%\{keyword}%"));
-        }
-
-        // 4️⃣ 結帳週期（ENUM 精確搜尋）
-        if (hasText(req.getBillingCycle())) {
-            searchInfo.append(STR."結帳週期「\{req.getBillingCycle()}」 ");
-
-            spec = spec.and((root, query, cb) ->
-                    cb.equal(root.get("billingCycle"), req.getBillingCycle()));
-        }
-
-        // 5️⃣ 備註（模糊搜尋）
-        if (hasText(req.getNote())) {
-            String keyword = req.getNote().trim().toLowerCase();
-            searchInfo.append(STR."備註「\{req.getNote()}」 ");
-
-            spec = spec.and((root, query, cb) ->
-                    cb.like(cb.lower(root.get("note")), STR."%\{keyword}%"));
-        }
-
-        List<Supplier> results = supplierRepository.findAll(spec);
-
-        // ❌ 沒結果 → 客製化錯誤
-        if (results.isEmpty()) {
+        try {
+            page = supplierRepository.findAll(spec, safePageable);
+        } catch (PropertyReferenceException ex) {
             throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    searchInfo.append("未找到符合的供應商資料").toString()
+                    HttpStatus.BAD_REQUEST,
+                    STR."無效排序欄位：\{ex.getPropertyName()}"
             );
         }
 
-        // ✔ 有結果
-        return results.stream()
-                .map(supplierMapper::toDto)
-                .toList();
+        if (page.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "查無匹配的供應商資料，請調整搜尋條件"
+            );
+        }
+
+        return page.map(supplierMapper::toDto);
+    }
+
+    // ================================================================
+    // 建立 Specification（搜尋邏輯最佳化）
+    // ================================================================
+    private Specification<Supplier> buildSupplierSpec(SupplierSearchRequest req) {
+
+        return (root, query, cb) -> {
+
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+
+            if (hasText(req.getSupplierName())) {
+                predicates.add(cb.like(cb.lower(root.get("name")),
+                        STR."%\{req.getSupplierName().toLowerCase()}%"));
+            }
+
+            if (hasText(req.getContact())) {
+                predicates.add(cb.like(cb.lower(root.get("contact")),
+                        STR."%\{req.getContact().toLowerCase()}%"));
+            }
+
+            if (hasText(req.getPhone())) {
+                predicates.add(cb.like(cb.lower(root.get("phone")),
+                        STR."%\{req.getPhone().toLowerCase()}%"));
+            }
+
+            if (hasText(req.getBillingCycle())) {
+                predicates.add(cb.equal(
+                        cb.lower(root.get("billingCycle")),
+                        req.getBillingCycle().toLowerCase()
+                ));
+            }
+
+            if (hasText(req.getNote())) {
+                predicates.add(cb.like(cb.lower(root.get("note")),
+                        STR."%\{req.getNote().toLowerCase()}%"));
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+    }
+
+    // ================================================================
+    // 分頁防呆 + 預設排序
+    // ================================================================
+    private Pageable normalizePageable(Pageable pageable) {
+
+        if (pageable.getPageNumber() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page 不可小於 0");
+        }
+
+        if (pageable.getPageSize() <= 0 || pageable.getPageSize() > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "size 需介於 1 - 200 之間");
+        }
+
+        Sort sort = pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.ASC, "id");
+
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
     }
 
     // ================================================================
