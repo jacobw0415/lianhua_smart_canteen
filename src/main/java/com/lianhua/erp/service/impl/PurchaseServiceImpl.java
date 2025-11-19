@@ -41,7 +41,9 @@ public class PurchaseServiceImpl implements PurchaseService {
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    // === 取得所有進貨單 ===
+    // ================================
+    // 取得所有進貨單（含分頁與排序防呆）
+    // ================================
     @Transactional(readOnly = true)
     @Override
     public Page<PurchaseResponseDto> getAllPurchases(Pageable pageable) {
@@ -53,9 +55,9 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
     }
 
-    // ================================================================
-    // 分頁防呆 + 預設排序
-    // ================================================================
+    // ================================
+    // 分頁防呆與預設排序
+    // ================================
     private Pageable normalizePageable(Pageable pageable) {
 
         if (pageable.getPageNumber() < 0) {
@@ -73,7 +75,9 @@ public class PurchaseServiceImpl implements PurchaseService {
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
     }
 
-    // === 查詢單筆 ===
+    // ================================
+    // 查詢單筆進貨單
+    // ================================
     @Override
     @Transactional(readOnly = true)
     public PurchaseResponseDto getPurchaseById(Long id) {
@@ -82,7 +86,9 @@ public class PurchaseServiceImpl implements PurchaseService {
         return purchaseMapper.toDto(purchase);
     }
 
-    // === 建立進貨單（含付款金額自動運算與會計期間）===
+    // ================================
+    // 建立進貨單（含付款檢查與會計期間設定）
+    // ================================
     @Override
     @Transactional
     public PurchaseResponseDto createPurchase(PurchaseRequestDto dto) {
@@ -90,15 +96,15 @@ public class PurchaseServiceImpl implements PurchaseService {
         Supplier supplier = supplierRepository.findById(dto.getSupplierId())
                 .orElseThrow(() -> new EntityNotFoundException("找不到供應商 ID：" + dto.getSupplierId()));
 
+        // 防止同一供應商、同日期、同品項重複建立
         if (purchaseRepository.existsBySupplierIdAndPurchaseDateAndItem(
                 dto.getSupplierId(), dto.getPurchaseDate(), dto.getItem())) {
             throw new IllegalArgumentException("該供應商於此日期的相同品項已存在，請勿重複建立。");
         }
 
-    /* =====================================================
-       ⭐ 1️⃣ 新增付款欄位必填規則（非常重要）
-       — 金額 / 日期 / 付款方式 必須同時存在或同時不存在
-    ====================================================== */
+        // ---------------------------------------------------------
+        // 1️⃣ 付款欄位必填規則：金額/日期/方式 必須同時存在或同時不存在
+        // ---------------------------------------------------------
         if (dto.getPayments() != null && !dto.getPayments().isEmpty()) {
 
             dto.getPayments().forEach(p -> {
@@ -107,7 +113,6 @@ public class PurchaseServiceImpl implements PurchaseService {
                 boolean hasDate   = p.getPayDate() != null;
                 boolean hasMethod = p.getMethod() != null && !p.getMethod().isBlank();
 
-                // 三者任意一個有填 → 必須三個都要填
                 if ((hasAmount || hasDate || hasMethod) &&
                         !(hasAmount && hasDate && hasMethod)) {
 
@@ -116,9 +121,9 @@ public class PurchaseServiceImpl implements PurchaseService {
             });
         }
 
-    /* =====================================================
-       2️⃣ 原本流程：建立 purchase entity
-    ====================================================== */
+        // ---------------------------------------------------------
+        // 2️⃣ 建立 Purchase entity
+        // ---------------------------------------------------------
         Purchase purchase = purchaseMapper.toEntity(dto);
         purchase.setSupplier(supplier);
 
@@ -129,14 +134,12 @@ public class PurchaseServiceImpl implements PurchaseService {
             purchase.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
         }
 
-        // 計算金額
+        // 計算稅額、總額等金額
         computeAmounts(purchase);
 
-    /* =====================================================
-       ⭐ 3️⃣ 付款日期不可早於進貨日期
-       並重新確認付款欄位
-    ====================================================== */
-
+        // ---------------------------------------------------------
+        // 3️⃣ 付款日期不可早於進貨日期 + 付款會計期間設定
+        // ---------------------------------------------------------
         BigDecimal paidTotal = BigDecimal.ZERO;
 
         if (dto.getPayments() != null && !dto.getPayments().isEmpty()) {
@@ -148,14 +151,12 @@ public class PurchaseServiceImpl implements PurchaseService {
 
                         if (p.getPayDate() != null) {
 
-                            // 日期不可早於進貨
                             if (purchase.getPurchaseDate() != null &&
                                     p.getPayDate().isBefore(purchase.getPurchaseDate())) {
                                 throw new IllegalArgumentException(
                                         STR."付款日期不得早於進貨日期 (\{purchase.getPurchaseDate()})");
                             }
 
-                            // 設定付款會計期間
                             p.setAccountingPeriod(p.getPayDate().format(PERIOD_FORMAT));
                         } else {
                             p.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
@@ -168,7 +169,7 @@ public class PurchaseServiceImpl implements PurchaseService {
                     .map(Payment::getAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            // 首筆付款不可大於總金額
+            // 首筆付款不可大於應付總額
             if (paidTotal.compareTo(purchase.getTotalAmount()) > 0) {
                 throw new IllegalArgumentException(
                         STR."首筆付款金額不可超過進貨應付總額 (\{purchase.getTotalAmount()})");
@@ -177,7 +178,7 @@ public class PurchaseServiceImpl implements PurchaseService {
             purchase.setPayments(payments);
         }
 
-        // 更新應付、狀態
+        // 更新總付款、餘額與狀態
         purchase.setPaidAmount(paidTotal);
 
         BigDecimal balance = purchase.getTotalAmount()
@@ -202,7 +203,9 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
     }
 
-    // ==== 更新進貨單（含金額修改與會計期間重新判定）===
+    // ================================
+    // 更新進貨單（僅允許修改付款資訊）
+    // ================================
     @Override
     @Transactional
     public PurchaseResponseDto updatePurchase(Long id, PurchaseRequestDto dto) {
@@ -210,7 +213,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         Purchase purchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 (ID: " + id + ")"));
 
-        // === 嚴格限制不可改欄位 ===
+        // 固定欄位不可修改
         if (dto.getItem() != null && !dto.getItem().equals(purchase.getItem())) {
             throw new IllegalArgumentException("不允許修改品名。");
         }
@@ -224,7 +227,7 @@ public class PurchaseServiceImpl implements PurchaseService {
             throw new IllegalArgumentException("不允許修改進貨日期。");
         }
 
-        // === 僅允許修改付款資訊 ===
+        // 未提供付款資料 → 視為不完整
         if (dto.getPayments() == null || dto.getPayments().isEmpty()) {
             throw new IllegalArgumentException("付款資訊不完整：金額、付款日期、付款方式需同時填寫。");
         }
@@ -239,23 +242,21 @@ public class PurchaseServiceImpl implements PurchaseService {
 
         BigDecimal unpaid = purchase.getTotalAmount().subtract(totalPaid);
 
-        // ============================================================
-        // ⭐ 1️⃣ 第一時間前置驗證（與 createPurchase 完全一致）
-        // ============================================================
+        // ---------------------------------------------------------
+        // 1️⃣ 前置驗證：與 createPurchase 的邏輯完全一致
+        // ---------------------------------------------------------
         for (var p : dto.getPayments()) {
 
             boolean hasAmount = p.getAmount() != null;
             boolean hasDate   = p.getPayDate() != null;
             boolean hasMethod = p.getMethod() != null && !p.getMethod().isBlank();
 
-            // 任意一項存在 → 三項都必須存在
             if ((hasAmount || hasDate || hasMethod) &&
                     !(hasAmount && hasDate && hasMethod)) {
 
                 throw new IllegalArgumentException("付款資訊不完整：金額、付款日期、付款方式需同時填寫。");
             }
 
-            // === 付款日期驗證 ===
             if (p.getPayDate() != null &&
                     p.getPayDate().isBefore(purchase.getPurchaseDate())) {
                 throw new IllegalArgumentException(
@@ -263,7 +264,6 @@ public class PurchaseServiceImpl implements PurchaseService {
                 );
             }
 
-            // === 金額驗證（最重要） ===
             if (p.getAmount() != null && p.getAmount().compareTo(unpaid) > 0) {
                 throw new IllegalArgumentException(
                         "付款金額不可超過尚未付款金額 (" + unpaid + ")"
@@ -271,14 +271,14 @@ public class PurchaseServiceImpl implements PurchaseService {
             }
         }
 
-        // ============================================================
-        // ⭐ 2️⃣ 通過前置驗證後 → 正式處理付款（原本 update 邏輯）
-        // ============================================================
+        // ---------------------------------------------------------
+        // 2️⃣ 通過前置驗證後 → 正式進行付款更新處理
+        // ---------------------------------------------------------
         for (var paymentDto : dto.getPayments()) {
             Payment newPayment = paymentMapper.toEntity(paymentDto);
             newPayment.setPurchase(purchase);
 
-            // 設定會計期間
+            // 付款會計期間
             if (newPayment.getPayDate() != null) {
                 newPayment.setAccountingPeriod(newPayment.getPayDate().format(PERIOD_FORMAT));
             } else {
@@ -321,7 +321,7 @@ public class PurchaseServiceImpl implements PurchaseService {
             );
         }
 
-        // 更新狀態
+        // 更新狀態與金額
         purchase.setPayments(existingPayments);
         purchase.setPaidAmount(totalPaidAfter);
         purchase.setBalance(
@@ -338,7 +338,10 @@ public class PurchaseServiceImpl implements PurchaseService {
             throw new IllegalArgumentException("資料重複或外鍵錯誤", e);
         }
     }
-    // === 狀態更新（不變）===
+
+    // ================================
+    // 更新進貨單狀態
+    // ================================
     @Override
     @Transactional
     public PurchaseResponseDto updateStatus(Long id, String status) {
@@ -358,7 +361,9 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
     }
 
-    // === 刪除進貨單 ===
+    // ================================
+    // 刪除進貨單
+    // ================================
     @Override
     @Transactional
     public void deletePurchase(Long id) {
@@ -375,7 +380,9 @@ public class PurchaseServiceImpl implements PurchaseService {
         return List.of();
     }
 
-    // === 稅額計算 ===
+    // ================================
+    // 計算稅額與總金額
+    // ================================
     private void computeAmounts(Purchase purchase) {
 
         if (purchase.getQty() == null || purchase.getUnitPrice() == null) {
@@ -401,7 +408,9 @@ public class PurchaseServiceImpl implements PurchaseService {
         purchase.setTotalAmount(totalAmount);
     }
 
-    // === 自動更新狀態 ===
+    // ================================
+    // 自動更新進貨單狀態與付款 note
+    // ================================
     private void updatePurchaseStatus(Purchase purchase) {
 
         BigDecimal total = purchase.getTotalAmount() != null ? purchase.getTotalAmount() : BigDecimal.ZERO;
