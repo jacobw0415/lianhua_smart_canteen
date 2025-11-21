@@ -6,6 +6,7 @@ import com.lianhua.erp.dto.supplier.SupplierRequestDto;
 import com.lianhua.erp.dto.supplier.SupplierSearchRequest;
 import com.lianhua.erp.mapper.SupplierMapper;
 import com.lianhua.erp.repository.SupplierRepository;
+import com.lianhua.erp.repository.PurchaseRepository;
 import com.lianhua.erp.service.SupplierService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class SupplierServiceImpl implements SupplierService {
 
     private final SupplierRepository supplierRepository;
     private final SupplierMapper supplierMapper;
+    private final PurchaseRepository purchaseRepository;
 
     // ================================================================
     // 分頁取得全部供應商
@@ -76,6 +78,7 @@ public class SupplierServiceImpl implements SupplierService {
         }
 
         Supplier supplier = supplierMapper.toEntity(dto);
+        supplier.setActive(true);
         supplier = supplierRepository.save(supplier);
 
         return supplierMapper.toDto(supplier);
@@ -108,9 +111,41 @@ public class SupplierServiceImpl implements SupplierService {
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "更新供應商失敗，名稱可能已存在：" + dto.getName(), ex
+                    STR."更新供應商失敗，名稱可能已存在：\{dto.getName()}", ex
             );
         }
+
+        return supplierMapper.toDto(supplier);
+    }
+
+    // ================================================================
+    // 停用供應商（active = false）
+    // ================================================================
+    @Override
+    public SupplierDto deactivateSupplier(Long id) {
+
+        Supplier supplier = supplierRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到供應商 ID：" + id));
+
+        supplier.setActive(false);
+        supplierRepository.save(supplier);
+
+        return supplierMapper.toDto(supplier);
+    }
+
+    // ================================================================
+    // 啟用供應商（active = true）
+    // ================================================================
+    @Override
+    public SupplierDto activateSupplier(Long id) {
+
+        Supplier supplier = supplierRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到供應商 ID：" + id));
+
+        supplier.setActive(true);
+        supplierRepository.save(supplier);
 
         return supplierMapper.toDto(supplier);
     }
@@ -120,10 +155,23 @@ public class SupplierServiceImpl implements SupplierService {
     // ================================================================
     @Override
     public void deleteSupplier(Long id) {
-        if (!supplierRepository.existsById(id)) {
-            throw new EntityNotFoundException("找不到供應商 ID：" + id);
+
+        // 1️⃣ 確認供應商存在
+        Supplier supplier = supplierRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到供應商 ID：" + id));
+
+        // 2️⃣ 檢查供應商是否仍有進貨紀錄
+        boolean hasPurchase = purchaseRepository.existsBySupplierId(id);
+        if (hasPurchase) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    STR."無法刪除供應商：「\{supplier.getName()}」，因已存在相關進貨單紀錄。請改為停用供應商。"
+            );
         }
-        supplierRepository.deleteById(id);
+
+        // 3️⃣ 通過檢查才可刪除
+        supplierRepository.delete(supplier);
     }
 
     // ================================================================

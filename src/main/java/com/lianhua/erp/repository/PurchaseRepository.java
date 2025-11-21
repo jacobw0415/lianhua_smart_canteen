@@ -11,6 +11,8 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     @EntityGraph(attributePaths = {"supplier"})
     Optional<Purchase> findWithSupplierById(Long id);
 
+    boolean existsBySupplierId(Long supplierId);
+
     boolean existsBySupplierIdAndPurchaseDateAndItem(Long supplierId, LocalDate purchaseDate, String item);
 
     boolean existsBySupplierIdAndPurchaseDateAndItemAndIdNot(Long supplierId, LocalDate purchaseDate, String item, Long id);

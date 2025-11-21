@@ -24,4 +24,9 @@ public class SupplierRequestDto {
     
     @Schema(description = "備註", example = "每月底結帳")
     private String note;
+
+    @Schema(description =
+            "是否啟用（true=啟用、false=停用）。建立時應忽略此欄位，更新時可用於停用供應商。",
+            example = "true")
+    private Boolean active;
 }

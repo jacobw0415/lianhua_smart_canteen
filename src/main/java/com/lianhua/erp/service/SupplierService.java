@@ -12,6 +12,17 @@ public interface SupplierService {
     SupplierDto getSupplierById(Long id);
     SupplierDto createSupplier(SupplierRequestDto dto);
     SupplierDto updateSupplier(Long id, SupplierRequestDto dto);
+
+    // ================================================================
+    // 停用供應商（active = false）
+    // ================================================================
+    SupplierDto deactivateSupplier(Long id);
+
+    // ================================================================
+    // 啟用供應商（active = true）
+    // ================================================================
+    SupplierDto activateSupplier(Long id);
+
     void deleteSupplier(Long id);
     Page<SupplierDto> searchSuppliers(SupplierSearchRequest request, Pageable pageable);
 }

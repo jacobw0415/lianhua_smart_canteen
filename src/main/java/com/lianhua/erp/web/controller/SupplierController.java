@@ -34,9 +34,9 @@ public class SupplierController {
     @Operation(
             summary = "分頁取得供應商清單",
             description = """
-                支援 page / size / sort，自動與 React-Admin 分頁整合。
-                例如：/api/suppliers?page=0&size=10&sort=name,asc
-                """
+                    支援 page / size / sort，自動與 React-Admin 分頁整合。
+                    例如：/api/suppliers?page=0&size=10&sort=name,asc
+                    """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200",
@@ -115,6 +115,47 @@ public class SupplierController {
     }
 
     // ============================================================
+    // 停用供應商（active = false）
+    // ============================================================
+    @Operation(summary = "停用供應商（active = false）")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200",
+                    description = "停用成功",
+                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+            @ApiResponse(responseCode = "404",
+                    description = "找不到供應商",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
+    })
+    @PutMapping("/{id}/deactivate")
+    public ResponseEntity<ApiResponseDto<SupplierDto>> deactivateSupplier(
+            @PathVariable Long id) {
+
+        SupplierDto updated = supplierService.deactivateSupplier(id);
+        return ResponseEntity.ok(ApiResponseDto.ok(updated));
+    }
+
+    // ============================================================
+    // 啟用供應商（active = true）
+    // ============================================================
+    @Operation(summary = "啟用供應商（active = true）")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200",
+                    description = "啟用成功",
+                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+            @ApiResponse(responseCode = "404",
+                    description = "找不到供應商",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
+    })
+    @PutMapping("/{id}/activate")
+    public ResponseEntity<ApiResponseDto<SupplierDto>> activateSupplier(
+            @PathVariable Long id) {
+
+        SupplierDto updated = supplierService.activateSupplier(id);
+        return ResponseEntity.ok(ApiResponseDto.ok(updated));
+    }
+
+
+    // ============================================================
     // 刪除供應商
     // ============================================================
     @Operation(summary = "刪除供應商")
@@ -130,12 +171,12 @@ public class SupplierController {
     @Operation(
             summary = "搜尋供應商（支援分頁 + 模糊搜尋 + 精確搜尋）",
             description = """
-                可依名稱、聯絡人、電話、結帳週期、備註搜尋。
-                支援 page / size / sort，自動整合 React-Admin 分頁。
-                
-                範例：
-                /api/suppliers/search?page=0&size=10&sort=name,asc&supplierName=食品
-                """
+                    可依名稱、聯絡人、電話、結帳週期、備註搜尋。
+                    支援 page / size / sort，自動整合 React-Admin 分頁。
+                    
+                    範例：
+                    /api/suppliers/search?page=0&size=10&sort=name,asc&supplierName=食品
+                    """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "搜尋成功",

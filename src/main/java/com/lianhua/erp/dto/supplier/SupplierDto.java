@@ -26,5 +26,8 @@ public class SupplierDto {
 
     @Schema(description = "備註", example = "固定週三送貨")
     private String note;
+
+    @Schema(description = "是否啟用（true=啟用、false=停用）", example = "true")
+    private Boolean active;
 }
 
