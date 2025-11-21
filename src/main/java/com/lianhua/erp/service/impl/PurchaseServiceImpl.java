@@ -94,7 +94,15 @@ public class PurchaseServiceImpl implements PurchaseService {
     public PurchaseResponseDto createPurchase(PurchaseRequestDto dto) {
 
         Supplier supplier = supplierRepository.findById(dto.getSupplierId())
-                .orElseThrow(() -> new EntityNotFoundException("找不到供應商 ID：" + dto.getSupplierId()));
+                .orElseThrow(() -> new EntityNotFoundException(STR."找不到供應商 ID：\{dto.getSupplierId()}"));
+
+        //  新增供應商停用檢查
+        if (!Boolean.TRUE.equals(supplier.getActive())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "SUPPLIER_DISABLED: 此供應商已被停用，無法建立進貨單"
+            );
+        }
 
         // 防止同一供應商、同日期、同品項重複建立
         if (purchaseRepository.existsBySupplierIdAndPurchaseDateAndItem(
@@ -110,7 +118,7 @@ public class PurchaseServiceImpl implements PurchaseService {
             dto.getPayments().forEach(p -> {
 
                 boolean hasAmount = p.getAmount() != null;
-                boolean hasDate   = p.getPayDate() != null;
+                boolean hasDate = p.getPayDate() != null;
                 boolean hasMethod = p.getMethod() != null && !p.getMethod().isBlank();
 
                 if ((hasAmount || hasDate || hasMethod) &&
@@ -211,7 +219,17 @@ public class PurchaseServiceImpl implements PurchaseService {
     public PurchaseResponseDto updatePurchase(Long id, PurchaseRequestDto dto) {
 
         Purchase purchase = purchaseRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 (ID: " + id + ")"));
+                .orElseThrow(() -> new EntityNotFoundException(STR."找不到進貨單 (ID: \{id})"));
+
+        Supplier supplier = purchase.getSupplier();
+
+        //  新增供應商停用檢查
+        if (!Boolean.TRUE.equals(supplier.getActive())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "SUPPLIER_DISABLED: 此供應商已被停用，無法建立進貨單"
+            );
+        }
 
         // 固定欄位不可修改
         if (dto.getItem() != null && !dto.getItem().equals(purchase.getItem())) {
@@ -248,7 +266,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         for (var p : dto.getPayments()) {
 
             boolean hasAmount = p.getAmount() != null;
-            boolean hasDate   = p.getPayDate() != null;
+            boolean hasDate = p.getPayDate() != null;
             boolean hasMethod = p.getMethod() != null && !p.getMethod().isBlank();
 
             if ((hasAmount || hasDate || hasMethod) &&
