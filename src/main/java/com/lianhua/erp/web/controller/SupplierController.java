@@ -20,6 +20,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/suppliers")
 @Tag(name = "供應商管理", description = "供應商 CRUD + 搜尋 API")
@@ -197,4 +199,27 @@ public class SupplierController {
 
         return ResponseEntity.ok(ApiResponseDto.ok(page));
     }
+
+    // ============================================================
+    // 取得所有啟用中的供應商（active = true）
+    // ============================================================
+    @Operation(
+            summary = "取得啟用中的供應商列表",
+            description = "此 API 專供前端下拉選單使用，只回傳 active = true 的供應商"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200",
+                    description = "成功取得啟用中的供應商列表",
+                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+            @ApiResponse(responseCode = "404",
+                    description = "沒有啟用中的供應商",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
+    })
+    @GetMapping("/active")
+    public ResponseEntity<ApiResponseDto<List<SupplierDto>>> getActiveSuppliers() {
+
+        List<SupplierDto> list = supplierService.getActiveSuppliers();
+        return ResponseEntity.ok(ApiResponseDto.ok(list));
+    }
+
 }

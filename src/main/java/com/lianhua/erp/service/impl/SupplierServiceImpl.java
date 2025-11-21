@@ -286,4 +286,26 @@ public class SupplierServiceImpl implements SupplierService {
                 !hasText(req.getBillingCycle()) &&
                 !hasText(req.getNote());
     }
+
+    // ================================================================
+    // 取得所有啟用中的供應商（for 新增進貨單 Dropdown）
+    // ================================================================
+    @Override
+    @Transactional(readOnly = true)
+    public List<SupplierDto> getActiveSuppliers() {
+
+        List<Supplier> suppliers = supplierRepository.findByActiveTrueOrderByNameAsc();
+
+        if (suppliers.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "目前沒有可用（啟用中）的供應商"
+            );
+        }
+
+        return suppliers.stream()
+                .map(supplierMapper::toDto)
+                .toList();
+    }
+
 }

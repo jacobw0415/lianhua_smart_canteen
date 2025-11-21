@@ -6,6 +6,8 @@ import com.lianhua.erp.dto.supplier.SupplierSearchRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
+
 public interface SupplierService {
 
     Page<SupplierDto> getAllSuppliers(Pageable pageable);
@@ -25,4 +27,7 @@ public interface SupplierService {
 
     void deleteSupplier(Long id);
     Page<SupplierDto> searchSuppliers(SupplierSearchRequest request, Pageable pageable);
+
+    List<SupplierDto> getActiveSuppliers();
+
 }
