@@ -54,4 +54,8 @@ public interface PurchaseMapper {
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
     }
+
+    default PurchaseResponseDto toResponseDto(Purchase entity) {
+        return toDto(entity);
+    }
 }

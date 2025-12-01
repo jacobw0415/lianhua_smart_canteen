@@ -93,7 +93,7 @@ CREATE INDEX idx_payments_purchase_id ON payments(purchase_id);
 CREATE INDEX idx_payments_accounting_period ON payments(accounting_period);
 
 -- ------------------------------------------------------------
--- 5A. 商品分類表
+-- 5. 商品分類表
 -- ------------------------------------------------------------
 CREATE TABLE product_categories (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -109,7 +109,7 @@ CREATE INDEX idx_product_categories_code ON product_categories(code);
 CREATE INDEX idx_product_categories_active ON product_categories(active);
 
 -- ------------------------------------------------------------
--- 5B. 商品表
+-- 5. 商品表
 -- ------------------------------------------------------------
 CREATE TABLE products (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -148,7 +148,7 @@ CREATE INDEX idx_sales_product_id ON sales(product_id);
 CREATE INDEX idx_sales_accounting_period ON sales(accounting_period);
 
 -- ------------------------------------------------------------
--- 7A. 費用類別主檔
+-- 7. 費用類別主檔
 -- ------------------------------------------------------------
 CREATE TABLE expense_categories (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -167,7 +167,7 @@ CREATE INDEX idx_expense_categories_account_code ON expense_categories(account_c
 CREATE INDEX idx_expense_categories_parent_id ON expense_categories(parent_id);
 
 -- ------------------------------------------------------------
--- 7B. 開支表 (含會計期間)
+-- 8. 開支表 (含會計期間)
 -- ------------------------------------------------------------
 CREATE TABLE expenses (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -192,7 +192,7 @@ CREATE INDEX idx_expenses_date ON expenses(expense_date);
 CREATE INDEX idx_expenses_accounting_period ON expenses(accounting_period);
 
 -- ------------------------------------------------------------
--- 8. 使用者表
+-- 9. 使用者表
 -- ------------------------------------------------------------
 CREATE TABLE users (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -205,7 +205,7 @@ CREATE TABLE users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 9. 角色表
+-- 10. 角色表
 -- ------------------------------------------------------------
 CREATE TABLE roles (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -213,7 +213,7 @@ CREATE TABLE roles (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 10. 使用者角色關聯表
+-- 11. 使用者角色關聯表
 -- ------------------------------------------------------------
 CREATE TABLE user_roles (
   user_id BIGINT NOT NULL,
@@ -229,7 +229,7 @@ CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
 CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
 
 -- ------------------------------------------------------------
--- 11. 訂單商家表 (合作單位)
+-- 12. 訂單商家表 (合作單位)
 -- ------------------------------------------------------------
 CREATE TABLE order_customers (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -244,7 +244,7 @@ CREATE TABLE order_customers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 12. 訂單表 (含會計期間)
+-- 13. 訂單表 (含會計期間)
 -- ------------------------------------------------------------
 CREATE TABLE orders (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -266,7 +266,7 @@ CREATE INDEX idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX idx_orders_accounting_period ON orders(accounting_period);
 
 -- ------------------------------------------------------------
--- 13. 訂單明細表 (含會計期間)
+-- 14. 訂單明細表 (含會計期間)
 -- ------------------------------------------------------------
 CREATE TABLE order_items (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -293,7 +293,7 @@ CREATE INDEX idx_order_items_product_id ON order_items(product_id);
 CREATE INDEX idx_order_items_accounting_period ON order_items(accounting_period);
 
 -- ------------------------------------------------------------
--- 14. 收款表 Receipts
+-- 15. 收款表 Receipts
 -- ------------------------------------------------------------
 CREATE TABLE receipts (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,

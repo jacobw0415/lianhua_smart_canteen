@@ -4,6 +4,7 @@ import com.lianhua.erp.dto.error.*;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,11 +38,12 @@ public class GlobalExceptionHandler {
 
         if (ex instanceof MethodArgumentNotValidException e) {
             msg = e.getBindingResult().getFieldErrors().stream()
-                    .map(err -> err.getField() + " " + err.getDefaultMessage())
+                    .map(DefaultMessageSourceResolvable::getDefaultMessage)   // ⭐ 修正，避免出現 name prefix
                     .collect(Collectors.joining(", "));
         } else if (ex instanceof MethodArgumentTypeMismatchException e) {
             msg = String.format("參數 %s 格式錯誤，期望型別為 %s",
-                    e.getName(), e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "未知");
+                    e.getName(),
+                    e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "未知");
         } else if (ex instanceof DateTimeParseException) {
             msg = "日期格式錯誤，請使用 yyyy-MM-dd 或 yyyy-MM 格式";
         } else {

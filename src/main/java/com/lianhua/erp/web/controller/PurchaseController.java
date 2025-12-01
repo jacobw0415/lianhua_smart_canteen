@@ -37,9 +37,9 @@ public class PurchaseController {
     @Operation(
             summary = "分頁取得進貨單清單",
             description = """
-            支援 page / size / sort，自動與 React-Admin 分頁整合。
-            例如：/api/purchases?page=0&size=10&sort=id,asc
-            """
+                    支援 page / size / sort，自動與 React-Admin 分頁整合。
+                    例如：/api/purchases?page=0&size=10&sort=id,asc
+                    """
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "成功取得進貨單列表"),
@@ -159,5 +159,46 @@ public class PurchaseController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletePurchase(@PathVariable Long id) {
         purchaseService.deletePurchase(id);
+    }
+
+    // ============================================================
+    // 🔍 搜尋進貨單
+    // ============================================================
+    @Operation(
+            summary = "搜尋進貨單（支援分頁 + 模糊與精準搜尋）",
+            description = """
+                    可依以下條件組合搜尋：
+                    - 供應商名稱（supplierName, 模糊）
+                    - 品項（item, 模糊）
+                    - 狀態（status, 精準）
+                    - 會計期間（accountingPeriod, 精準 YYYY-MM）
+                    - 供應商 ID（supplierId, 精準）
+                    - 起始日期（fromDate >=）
+                    - 結束日期（toDate <=）
+                    
+                    與 React-Admin 的 List / Filter 完整整合。
+                    範例：
+                    /api/purchases/search?page=0&size=10&sort=id,asc&supplierName=食品&fromDate=2025-01-01
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200",
+                    description = "搜尋成功",
+                    content = @Content(schema = @Schema(implementation = PurchaseResponseDto.class))),
+            @ApiResponse(responseCode = "400",
+                    description = "搜尋條件錯誤",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "404",
+                    description = "無符合條件資料",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
+    })
+    @PageableAsQueryParam
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponseDto<Page<PurchaseResponseDto>>> searchPurchases(
+            @ParameterObject @ModelAttribute PurchaseSearchRequest req,   //  自動綁定查詢參數
+            @ParameterObject Pageable pageable                            //  Page / size / sort
+    ) {
+        Page<PurchaseResponseDto> page = purchaseService.searchPurchases(req, pageable);
+        return ResponseEntity.ok(ApiResponseDto.ok(page));
     }
 }

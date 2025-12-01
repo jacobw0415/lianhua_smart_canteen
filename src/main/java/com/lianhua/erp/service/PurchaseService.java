@@ -18,4 +18,6 @@ public interface PurchaseService {
     PurchaseResponseDto updateStatus(Long id, String status);
     void deletePurchase(Long id);
     List<PurchaseResponseDto> findAll();
+    Page<PurchaseResponseDto> searchPurchases(PurchaseSearchRequest req, Pageable pageable);
+
 }

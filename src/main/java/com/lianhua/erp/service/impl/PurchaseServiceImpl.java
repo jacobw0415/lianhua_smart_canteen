@@ -8,6 +8,7 @@ import com.lianhua.erp.repository.PurchaseRepository;
 import com.lianhua.erp.repository.PaymentRepository;
 import com.lianhua.erp.repository.SupplierRepository;
 import com.lianhua.erp.service.PurchaseService;
+import com.lianhua.erp.service.impl.spec.PurchaseSpecifications;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -92,6 +94,9 @@ public class PurchaseServiceImpl implements PurchaseService {
     @Override
     @Transactional
     public PurchaseResponseDto createPurchase(PurchaseRequestDto dto) {
+
+        dto.trimAll();
+        dto.validateSelf();
 
         Supplier supplier = supplierRepository.findById(dto.getSupplierId())
                 .orElseThrow(() -> new EntityNotFoundException(STR."找不到供應商 ID：\{dto.getSupplierId()}"));
@@ -217,6 +222,9 @@ public class PurchaseServiceImpl implements PurchaseService {
     @Override
     @Transactional
     public PurchaseResponseDto updatePurchase(Long id, PurchaseRequestDto dto) {
+
+        dto.trimAll();
+        dto.validateSelf();
 
         Purchase purchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException(STR."找不到進貨單 (ID: \{id})"));
@@ -453,5 +461,18 @@ public class PurchaseServiceImpl implements PurchaseService {
                 }
             }
         }
+    }
+
+    // ================================
+    // 模糊搜尋
+    // ================================
+    @Override
+    public Page<PurchaseResponseDto> searchPurchases(PurchaseSearchRequest req, Pageable pageable) {
+
+        Specification<Purchase> spec = PurchaseSpecifications.build(req);
+
+        Page<Purchase> result = purchaseRepository.findAll(spec, pageable);
+
+        return result.map(purchaseMapper::toResponseDto);
     }
 }
