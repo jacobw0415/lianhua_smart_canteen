@@ -1,32 +1,42 @@
 package com.lianhua.erp.dto.supplier;
 
-import com.lianhua.erp.domain.Supplier.BillingCycle;
+
+import com.lianhua.erp.dto.validation.BaseRequestDto;
+import com.lianhua.erp.validation.ValidName;
+import com.lianhua.erp.validation.ValidNote;
+import com.lianhua.erp.validation.ValidPhone;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
+import jakarta.validation.constraints.Size;
+import lombok.*;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
-@Schema(description = "供應商請求物件（建立或更新用）")
-public class SupplierRequestDto {
-    
-    @NotBlank
-    @Schema(description = "供應商名稱", example = "蓮華蔬果供應行")
-    private String name;
-    
-    @Schema(description = "聯絡人", example = "王先生")
-    private String contact;
-    
-    @Schema(description = "電話", example = "0912-345-678")
-    private String phone;
-    
-    @Schema(description = "帳單週期", example = "MONTHLY")
-    private BillingCycle billingCycle = BillingCycle.MONTHLY;
-    
-    @Schema(description = "備註", example = "每月底結帳")
-    private String note;
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Schema(description = "供應商新增 / 更新請求 DTO")
+public class SupplierRequestDto extends BaseRequestDto {
 
-    @Schema(description =
-            "是否啟用（true=啟用、false=停用）。建立時應忽略此欄位，更新時可用於停用供應商。",
-            example = "true")
-    private Boolean active;
+    @Schema(description = "供應商名稱", example = "有機蔬菜行")
+    @NotBlank(message = "供應商名稱不可為空")
+    @ValidName
+    private String name;
+
+    @Schema(description = "聯絡人", example = "陳先生")
+    @ValidName   // 允許英文/中文，但不允許奇怪符號
+    private String contact;
+
+    @Schema(description = "聯絡電話", example = "0912345678")
+    @ValidPhone  // 使用你的 PhoneValidator
+    private String phone;
+
+    @Schema(description = "結帳週期", example = "MONTHLY")
+    @NotBlank(message = "結帳週期不可為空")
+    private String billingCycle;
+
+    @Schema(description = "備註", example = "固定週三送貨")
+    @ValidNote
+    @Size(max = 100, message = "備註最多 100 字")
+    private String note;
 }

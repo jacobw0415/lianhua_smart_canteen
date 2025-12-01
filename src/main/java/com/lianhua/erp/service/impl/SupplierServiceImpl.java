@@ -1,7 +1,7 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.Supplier;
-import com.lianhua.erp.dto.supplier.SupplierDto;
+import com.lianhua.erp.dto.supplier.SupplierResponseDto;
 import com.lianhua.erp.dto.supplier.SupplierRequestDto;
 import com.lianhua.erp.dto.supplier.SupplierSearchRequest;
 import com.lianhua.erp.mapper.SupplierMapper;
@@ -36,7 +36,7 @@ public class SupplierServiceImpl implements SupplierService {
     // ================================================================
     @Override
     @Transactional(readOnly = true)
-    public Page<SupplierDto> getAllSuppliers(Pageable pageable) {
+    public Page<SupplierResponseDto> getAllSuppliers(Pageable pageable) {
 
         Pageable safePageable = normalizePageable(pageable);
 
@@ -56,7 +56,7 @@ public class SupplierServiceImpl implements SupplierService {
     // ================================================================
     @Override
     @Transactional(readOnly = true)
-    public SupplierDto getSupplierById(Long id) {
+    public SupplierResponseDto getSupplierById(Long id) {
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() ->
                         new EntityNotFoundException("找不到供應商 ID：" + id));
@@ -65,10 +65,13 @@ public class SupplierServiceImpl implements SupplierService {
     }
 
     // ================================================================
-    // 建立供應商
+    // 建立供應商（加入 trimAll + 驗證）
     // ================================================================
     @Override
-    public SupplierDto createSupplier(SupplierRequestDto dto) {
+    public SupplierResponseDto createSupplier(SupplierRequestDto dto) {
+
+        dto.trimAll(); // ⭐ 自動移除所有字串欄位的前後空白
+        // DTO 中的 @ValidName / @ValidPhone / @ValidNote 已自動生效
 
         if (supplierRepository.existsByName(dto.getName())) {
             throw new ResponseStatusException(
@@ -85,10 +88,13 @@ public class SupplierServiceImpl implements SupplierService {
     }
 
     // ================================================================
-    // 更新供應商
+    // 更新供應商（加入 trimAll + 驗證）
     // ================================================================
     @Override
-    public SupplierDto updateSupplier(Long id, SupplierRequestDto dto) {
+    public SupplierResponseDto updateSupplier(Long id, SupplierRequestDto dto) {
+
+        dto.trimAll();  // ⭐ 自動去除字串空白
+        // DTO 驗證仍然由 @Valid 在 controller 自動處理
 
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() ->
@@ -111,7 +117,8 @@ public class SupplierServiceImpl implements SupplierService {
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    STR."更新供應商失敗，名稱可能已存在：\{dto.getName()}", ex
+                    STR."更新供應商失敗，名稱可能已存在：\{dto.getName()}",
+                    ex
             );
         }
 
@@ -119,10 +126,10 @@ public class SupplierServiceImpl implements SupplierService {
     }
 
     // ================================================================
-    // 停用供應商（active = false）
+    // 停用供應商
     // ================================================================
     @Override
-    public SupplierDto deactivateSupplier(Long id) {
+    public SupplierResponseDto deactivateSupplier(Long id) {
 
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() ->
@@ -135,10 +142,10 @@ public class SupplierServiceImpl implements SupplierService {
     }
 
     // ================================================================
-    // 啟用供應商（active = true）
+    // 啟用供應商
     // ================================================================
     @Override
-    public SupplierDto activateSupplier(Long id) {
+    public SupplierResponseDto activateSupplier(Long id) {
 
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() ->
@@ -156,30 +163,26 @@ public class SupplierServiceImpl implements SupplierService {
     @Override
     public void deleteSupplier(Long id) {
 
-        // 1️⃣ 確認供應商存在
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() ->
                         new EntityNotFoundException("找不到供應商 ID：" + id));
 
-        // 2️⃣ 檢查供應商是否仍有進貨紀錄
-        boolean hasPurchase = purchaseRepository.existsBySupplierId(id);
-        if (hasPurchase) {
+        if (purchaseRepository.existsBySupplierId(id)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     STR."無法刪除供應商：「\{supplier.getName()}」，因已存在相關進貨單紀錄。請改為停用供應商。"
             );
         }
 
-        // 3️⃣ 通過檢查才可刪除
         supplierRepository.delete(supplier);
     }
 
     // ================================================================
-    // 分頁搜尋供應商
+    // 搜尋供應商
     // ================================================================
     @Override
     @Transactional(readOnly = true)
-    public Page<SupplierDto> searchSuppliers(SupplierSearchRequest req, Pageable pageable) {
+    public Page<SupplierResponseDto> searchSuppliers(SupplierSearchRequest req, Pageable pageable) {
 
         if (isEmptySearch(req)) {
             throw new ResponseStatusException(
@@ -213,7 +216,7 @@ public class SupplierServiceImpl implements SupplierService {
     }
 
     // ================================================================
-    // 建立 Specification（搜尋邏輯最佳化）
+    // Specification 建置
     // ================================================================
     private Specification<Supplier> buildSupplierSpec(SupplierSearchRequest req) {
 
@@ -222,18 +225,24 @@ public class SupplierServiceImpl implements SupplierService {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
 
             if (hasText(req.getSupplierName())) {
-                predicates.add(cb.like(cb.lower(root.get("name")),
-                        STR."%\{req.getSupplierName().toLowerCase()}%"));
+                predicates.add(cb.like(
+                        cb.lower(root.get("name")),
+                        STR."%\{req.getSupplierName().toLowerCase()}%"
+                ));
             }
 
             if (hasText(req.getContact())) {
-                predicates.add(cb.like(cb.lower(root.get("contact")),
-                        STR."%\{req.getContact().toLowerCase()}%"));
+                predicates.add(cb.like(
+                        cb.lower(root.get("contact")),
+                        STR."%\{req.getContact().toLowerCase()}%"
+                ));
             }
 
             if (hasText(req.getPhone())) {
-                predicates.add(cb.like(cb.lower(root.get("phone")),
-                        STR."%\{req.getPhone().toLowerCase()}%"));
+                predicates.add(cb.like(
+                        cb.lower(root.get("phone")),
+                        STR."%\{req.getPhone().toLowerCase()}%"
+                ));
             }
 
             if (hasText(req.getBillingCycle())) {
@@ -244,8 +253,10 @@ public class SupplierServiceImpl implements SupplierService {
             }
 
             if (hasText(req.getNote())) {
-                predicates.add(cb.like(cb.lower(root.get("note")),
-                        STR."%\{req.getNote().toLowerCase()}%"));
+                predicates.add(cb.like(
+                        cb.lower(root.get("note")),
+                        STR."%\{req.getNote().toLowerCase()}%"
+                ));
             }
 
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
@@ -253,7 +264,7 @@ public class SupplierServiceImpl implements SupplierService {
     }
 
     // ================================================================
-    // 分頁防呆 + 預設排序
+    // pageable 安全檢查
     // ================================================================
     private Pageable normalizePageable(Pageable pageable) {
 
@@ -288,13 +299,14 @@ public class SupplierServiceImpl implements SupplierService {
     }
 
     // ================================================================
-    // 取得所有啟用中的供應商（for 新增進貨單 Dropdown）
+    // Dropdown 使用啟用供應商
     // ================================================================
     @Override
     @Transactional(readOnly = true)
-    public List<SupplierDto> getActiveSuppliers() {
+    public List<SupplierResponseDto> getActiveSuppliers() {
 
-        List<Supplier> suppliers = supplierRepository.findByActiveTrueOrderByNameAsc();
+        List<Supplier> suppliers =
+                supplierRepository.findByActiveTrueOrderByNameAsc();
 
         if (suppliers.isEmpty()) {
             throw new ResponseStatusException(
@@ -307,5 +319,4 @@ public class SupplierServiceImpl implements SupplierService {
                 .map(supplierMapper::toDto)
                 .toList();
     }
-
 }

@@ -1,8 +1,9 @@
-package com.lianhua.erp.validation;
+package com.lianhua.erp.validation.annotations;
 
+import com.lianhua.erp.validation.ValidPhone;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
-import org.lianhua.erp.common.validation.annotations.ValidPhone;
+
 
 public class PhoneValidator implements ConstraintValidator<ValidPhone, String> {
 

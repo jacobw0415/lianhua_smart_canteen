@@ -8,7 +8,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @Schema(description = "供應商 DTO")
-public class SupplierDto {
+public class SupplierResponseDto {
     @Schema(description = "供應商 ID", example = "10")
     private Long id;
 

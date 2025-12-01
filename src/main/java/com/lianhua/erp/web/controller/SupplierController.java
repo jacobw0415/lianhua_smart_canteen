@@ -48,10 +48,10 @@ public class SupplierController {
     })
     @PageableAsQueryParam      // 🔥 美化 pageable
     @GetMapping
-    public ResponseEntity<ApiResponseDto<Page<SupplierDto>>> getAllSuppliers(
+    public ResponseEntity<ApiResponseDto<Page<SupplierResponseDto>>> getAllSuppliers(
             @ParameterObject Pageable pageable      // 🔥 讓 pageable 展開成 page/size/sort
     ) {
-        Page<SupplierDto> page = supplierService.getAllSuppliers(pageable);
+        Page<SupplierResponseDto> page = supplierService.getAllSuppliers(pageable);
         return ResponseEntity.ok(ApiResponseDto.ok(page));
     }
 
@@ -62,13 +62,13 @@ public class SupplierController {
     @ApiResponses({
             @ApiResponse(responseCode = "200",
                     description = "成功取得供應商資料",
-                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+                    content = @Content(schema = @Schema(implementation = SupplierResponseDto.class))),
             @ApiResponse(responseCode = "404",
                     description = "找不到供應商",
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponseDto<SupplierDto>> getSupplierById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponseDto<SupplierResponseDto>> getSupplierById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(supplierService.getSupplierById(id)));
     }
 
@@ -79,7 +79,7 @@ public class SupplierController {
     @ApiResponses({
             @ApiResponse(responseCode = "201",
                     description = "成功建立供應商",
-                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+                    content = @Content(schema = @Schema(implementation = SupplierResponseDto.class))),
             @ApiResponse(responseCode = "400",
                     description = "參數錯誤",
                     content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
@@ -88,10 +88,10 @@ public class SupplierController {
                     content = @Content(schema = @Schema(implementation = ConflictResponse.class)))
     })
     @PostMapping
-    public ResponseEntity<ApiResponseDto<SupplierDto>> createSupplier(
+    public ResponseEntity<ApiResponseDto<SupplierResponseDto>> createSupplier(
             @Valid @RequestBody SupplierRequestDto dto) {
 
-        SupplierDto created = supplierService.createSupplier(dto);
+        SupplierResponseDto created = supplierService.createSupplier(dto);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponseDto.created(created));
     }
@@ -103,13 +103,13 @@ public class SupplierController {
     @ApiResponses({
             @ApiResponse(responseCode = "200",
                     description = "更新成功",
-                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+                    content = @Content(schema = @Schema(implementation = SupplierResponseDto.class))),
             @ApiResponse(responseCode = "404",
                     description = "找不到供應商",
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponseDto<SupplierDto>> updateSupplier(
+    public ResponseEntity<ApiResponseDto<SupplierResponseDto>> updateSupplier(
             @PathVariable Long id,
             @Valid @RequestBody SupplierRequestDto dto) {
 
@@ -123,16 +123,16 @@ public class SupplierController {
     @ApiResponses({
             @ApiResponse(responseCode = "200",
                     description = "停用成功",
-                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+                    content = @Content(schema = @Schema(implementation = SupplierResponseDto.class))),
             @ApiResponse(responseCode = "404",
                     description = "找不到供應商",
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}/deactivate")
-    public ResponseEntity<ApiResponseDto<SupplierDto>> deactivateSupplier(
+    public ResponseEntity<ApiResponseDto<SupplierResponseDto>> deactivateSupplier(
             @PathVariable Long id) {
 
-        SupplierDto updated = supplierService.deactivateSupplier(id);
+        SupplierResponseDto updated = supplierService.deactivateSupplier(id);
         return ResponseEntity.ok(ApiResponseDto.ok(updated));
     }
 
@@ -143,16 +143,16 @@ public class SupplierController {
     @ApiResponses({
             @ApiResponse(responseCode = "200",
                     description = "啟用成功",
-                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+                    content = @Content(schema = @Schema(implementation = SupplierResponseDto.class))),
             @ApiResponse(responseCode = "404",
                     description = "找不到供應商",
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}/activate")
-    public ResponseEntity<ApiResponseDto<SupplierDto>> activateSupplier(
+    public ResponseEntity<ApiResponseDto<SupplierResponseDto>> activateSupplier(
             @PathVariable Long id) {
 
-        SupplierDto updated = supplierService.activateSupplier(id);
+        SupplierResponseDto updated = supplierService.activateSupplier(id);
         return ResponseEntity.ok(ApiResponseDto.ok(updated));
     }
 
@@ -182,7 +182,7 @@ public class SupplierController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "搜尋成功",
-                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+                    content = @Content(schema = @Schema(implementation = SupplierResponseDto.class))),
             @ApiResponse(responseCode = "400", description = "搜尋條件全為空",
                     content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
             @ApiResponse(responseCode = "404", description = "查無匹配資料",
@@ -190,12 +190,12 @@ public class SupplierController {
     })
     @PageableAsQueryParam   // 🔥 讓 Swagger 把 Pageable 展開成 page/size/sort
     @GetMapping("/search")
-    public ResponseEntity<ApiResponseDto<Page<SupplierDto>>> searchSuppliers(
+    public ResponseEntity<ApiResponseDto<Page<SupplierResponseDto>>> searchSuppliers(
             @ParameterObject @ModelAttribute SupplierSearchRequest req, // 🔥 搜尋參數展開
             @ParameterObject Pageable pageable                         // 🔥 分頁展開
     ) {
 
-        Page<SupplierDto> page = supplierService.searchSuppliers(req, pageable);
+        Page<SupplierResponseDto> page = supplierService.searchSuppliers(req, pageable);
 
         return ResponseEntity.ok(ApiResponseDto.ok(page));
     }
@@ -210,15 +210,15 @@ public class SupplierController {
     @ApiResponses({
             @ApiResponse(responseCode = "200",
                     description = "成功取得啟用中的供應商列表",
-                    content = @Content(schema = @Schema(implementation = SupplierDto.class))),
+                    content = @Content(schema = @Schema(implementation = SupplierResponseDto.class))),
             @ApiResponse(responseCode = "404",
                     description = "沒有啟用中的供應商",
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @GetMapping("/active")
-    public ResponseEntity<ApiResponseDto<List<SupplierDto>>> getActiveSuppliers() {
+    public ResponseEntity<ApiResponseDto<List<SupplierResponseDto>>> getActiveSuppliers() {
 
-        List<SupplierDto> list = supplierService.getActiveSuppliers();
+        List<SupplierResponseDto> list = supplierService.getActiveSuppliers();
         return ResponseEntity.ok(ApiResponseDto.ok(list));
     }
 
