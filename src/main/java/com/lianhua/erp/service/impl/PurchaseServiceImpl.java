@@ -95,13 +95,56 @@ public class PurchaseServiceImpl implements PurchaseService {
     @Transactional
     public PurchaseResponseDto createPurchase(PurchaseRequestDto dto) {
 
+        // =============================================
+        // 0️⃣ 前置：字串去空白、自帶 DTO 基本驗證
+        // =============================================
         dto.trimAll();
         dto.validateSelf();
 
-        Supplier supplier = supplierRepository.findById(dto.getSupplierId())
-                .orElseThrow(() -> new EntityNotFoundException(STR."找不到供應商 ID：\{dto.getSupplierId()}"));
+        // 商品名稱正規化
+        String normalizedItem = dto.getItem() != null ? dto.getItem().trim() : null;
+        dto.setItem(normalizedItem);
 
-        //  新增供應商停用檢查
+
+        // =============================================
+        // 1️⃣ 基本欄位完整性檢查（主體欄位）
+        // =============================================
+
+        if (dto.getSupplierId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "supplierId 為必填欄位");
+        }
+
+        if (normalizedItem == null || normalizedItem.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（品項名稱）為必填欄位");
+        }
+
+        if (dto.getQty() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（數量）為必填欄位");
+        }
+
+        if (dto.getQty() <= 0) {
+            throw new IllegalArgumentException("數量必須大於 0");
+        }
+
+        if (dto.getUnitPrice() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（單價）為必填欄位");
+        }
+        if (dto.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "單價必須大於 0");
+        }
+
+        if (dto.getPurchaseDate() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（進貨日期）為必填欄位");
+        }
+
+        // =============================================
+        // 2️⃣ 找供應商 + 停用檢查
+        // =============================================
+        Supplier supplier = supplierRepository.findById(dto.getSupplierId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, STR."找不到供應商 ID：\{dto.getSupplierId()}"
+                ));
+
         if (!Boolean.TRUE.equals(supplier.getActive())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -109,15 +152,39 @@ public class PurchaseServiceImpl implements PurchaseService {
             );
         }
 
-        // 防止同一供應商、同日期、同品項重複建立
+
+        // =============================================
+        // 3️⃣ 同供應商 + 日期 + 品項 不可重複
+        // =============================================
         if (purchaseRepository.existsBySupplierIdAndPurchaseDateAndItem(
-                dto.getSupplierId(), dto.getPurchaseDate(), dto.getItem())) {
-            throw new IllegalArgumentException("該供應商於此日期的相同品項已存在，請勿重複建立。");
+                dto.getSupplierId(),
+                dto.getPurchaseDate(),
+                normalizedItem
+        )) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "該供應商於此日期的相同品項已存在，請勿重複建立。"
+            );
         }
 
-        // ---------------------------------------------------------
-        // 1️⃣ 付款欄位必填規則：金額/日期/方式 必須同時存在或同時不存在
-        // ---------------------------------------------------------
+        // =============================================
+        //  移除空白付款資訊
+        // =============================================
+        if (dto.getPayments() != null) {
+            dto.setPayments(
+                    dto.getPayments().stream()
+                            .filter(p ->
+                                    p.getAmount() != null ||
+                                            p.getPayDate() != null ||
+                                            (p.getMethod() != null && !p.getMethod().isBlank())
+                            )
+                            .toList()
+            );
+        }
+
+        // =============================================
+        // 4️⃣ 付款欄位完整性檢查（強化版）
+        // =============================================
         if (dto.getPayments() != null && !dto.getPayments().isEmpty()) {
 
             dto.getPayments().forEach(p -> {
@@ -126,19 +193,35 @@ public class PurchaseServiceImpl implements PurchaseService {
                 boolean hasDate = p.getPayDate() != null;
                 boolean hasMethod = p.getMethod() != null && !p.getMethod().isBlank();
 
+                // 必須全部都有或全部沒有，不可部分填寫
                 if ((hasAmount || hasDate || hasMethod) &&
                         !(hasAmount && hasDate && hasMethod)) {
 
-                    throw new IllegalArgumentException("付款資訊不完整：金額、付款日期、付款方式需同時填寫。");
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "付款資訊不完整：金額、付款日期與付款方式需同時填寫"
+                    );
+                }
+
+                // 金額 > 0
+                if (hasAmount && p.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "付款金額必須大於 0");
+                }
+
+                // 付款日期不得晚於今天（避免未來付款）
+                if (hasDate && p.getPayDate().isAfter(LocalDate.now())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "付款日期不可為未來日期");
                 }
             });
         }
 
-        // ---------------------------------------------------------
-        // 2️⃣ 建立 Purchase entity
-        // ---------------------------------------------------------
+
+        // =============================================
+        // 5️⃣ 建立 Purchase Entity
+        // =============================================
         Purchase purchase = purchaseMapper.toEntity(dto);
         purchase.setSupplier(supplier);
+        purchase.setItem(normalizedItem);
 
         // 設定會計期間
         if (purchase.getPurchaseDate() != null) {
@@ -147,15 +230,16 @@ public class PurchaseServiceImpl implements PurchaseService {
             purchase.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
         }
 
-        // 計算稅額、總額等金額
         computeAmounts(purchase);
 
-        // ---------------------------------------------------------
-        // 3️⃣ 付款日期不可早於進貨日期 + 付款會計期間設定
-        // ---------------------------------------------------------
+
+        // =============================================
+        // 6️⃣ 付款資料：日期不得早於進貨日 + 會計期間設定
+        // =============================================
         BigDecimal paidTotal = BigDecimal.ZERO;
 
         if (dto.getPayments() != null && !dto.getPayments().isEmpty()) {
+
             Set<Payment> payments = dto.getPayments().stream()
                     .map(paymentMapper::toEntity)
                     .peek(p -> {
@@ -164,44 +248,52 @@ public class PurchaseServiceImpl implements PurchaseService {
 
                         if (p.getPayDate() != null) {
 
+                            // 付款日期 < 進貨日期 → 錯誤
                             if (purchase.getPurchaseDate() != null &&
                                     p.getPayDate().isBefore(purchase.getPurchaseDate())) {
-                                throw new IllegalArgumentException(
-                                        STR."付款日期不得早於進貨日期 (\{purchase.getPurchaseDate()})");
+
+                                throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        STR."付款日期不得早於進貨日期 (\{purchase.getPurchaseDate()})"
+                                );
                             }
 
                             p.setAccountingPeriod(p.getPayDate().format(PERIOD_FORMAT));
                         } else {
                             p.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
                         }
-
                     })
                     .collect(Collectors.toSet());
 
+            // 總付款金額計算
             paidTotal = payments.stream()
-                    .map(Payment::getAmount)
+                    .map(p -> p.getAmount() == null ? BigDecimal.ZERO : p.getAmount())
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            // 首筆付款不可大於應付總額
+            // 首筆付款不得超過應付總額
             if (paidTotal.compareTo(purchase.getTotalAmount()) > 0) {
-                throw new IllegalArgumentException(
-                        STR."首筆付款金額不可超過進貨應付總額 (\{purchase.getTotalAmount()})");
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        STR."首筆付款金額不可超過進貨應付總額 (\{purchase.getTotalAmount()})"
+                );
             }
 
             purchase.setPayments(payments);
         }
 
-        // 更新總付款、餘額與狀態
+        // 設定付款總額與餘額
         purchase.setPaidAmount(paidTotal);
-
         BigDecimal balance = purchase.getTotalAmount()
                 .subtract(paidTotal)
                 .setScale(2, RoundingMode.HALF_UP);
-
         purchase.setBalance(balance);
+
         updatePurchaseStatus(purchase);
 
-        // 儲存
+
+        // =============================================
+        // 7️⃣ 儲存
+        // =============================================
         try {
             Purchase saved = purchaseRepository.save(purchase);
 
@@ -212,7 +304,10 @@ public class PurchaseServiceImpl implements PurchaseService {
             return purchaseMapper.toDto(saved);
 
         } catch (DataIntegrityViolationException e) {
-            throw new IllegalArgumentException("資料重複：該供應商於此日期的相同品項已存在。", e);
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "資料重複：該供應商於此日期的相同品項已存在。"
+            );
         }
     }
 
@@ -330,15 +425,14 @@ public class PurchaseServiceImpl implements PurchaseService {
                 unpaid = unpaid.subtract(diff.max(BigDecimal.ZERO));
 
             } else {
-                existingPayments.add(newPayment);
-                unpaid = unpaid.subtract(newPayment.getAmount());
+                BigDecimal amt = newPayment.getAmount() == null ? BigDecimal.ZERO : newPayment.getAmount();
+                unpaid = unpaid.subtract(amt);
             }
         }
 
         // 最終金額驗證
         BigDecimal totalPaidAfter = existingPayments.stream()
-                .map(Payment::getAmount)
-                .filter(Objects::nonNull)
+                .map(p -> p.getAmount() == null ? BigDecimal.ZERO : p.getAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         if (totalPaidAfter.compareTo(purchase.getTotalAmount()) > 0) {
@@ -464,15 +558,51 @@ public class PurchaseServiceImpl implements PurchaseService {
     }
 
     // ================================
-    // 模糊搜尋
+    // 進貨搜尋（支援動態 Specification）
     // ================================
     @Override
+    @Transactional(readOnly = true)
     public Page<PurchaseResponseDto> searchPurchases(PurchaseSearchRequest req, Pageable pageable) {
 
+        // =======================================================
+        // ★ 1. 檢查搜尋條件是否全為空（後端防呆）
+        // =======================================================
+        boolean empty =
+                isEmpty(req.getSupplierName()) &&
+                        req.getSupplierId() == null &&
+                        isEmpty(req.getItem()) &&
+                        isEmpty(req.getStatus()) &&
+                        isEmpty(req.getAccountingPeriod()) &&
+                        isEmpty(req.getFromDate()) &&
+                        isEmpty(req.getToDate());
+
+        if (empty) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "搜尋條件不可全為空，至少需提供一項搜尋欄位"
+            );
+        }
+
+        // =======================================================
+        // ★ 2. 正常情況 → 使用 Specification 查詢
+        // =======================================================
         Specification<Purchase> spec = PurchaseSpecifications.build(req);
 
-        Page<Purchase> result = purchaseRepository.findAll(spec, pageable);
+        Page<Purchase> result;
+
+        try {
+            result = purchaseRepository.findAll(spec, pageable);
+        } catch (PropertyReferenceException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "無效排序欄位：" + ex.getPropertyName()
+            );
+        }
 
         return result.map(purchaseMapper::toResponseDto);
+    }
+
+    private boolean isEmpty(String s) {
+        return s == null || s.trim().isEmpty();
     }
 }
