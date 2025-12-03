@@ -322,19 +322,32 @@ public class PurchaseServiceImpl implements PurchaseService {
         dto.validateSelf();
 
         Purchase purchase = purchaseRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(STR."找不到進貨單 (ID: \{id})"));
+                .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 (ID: " + id + ")"));
 
-        Supplier supplier = purchase.getSupplier();
-
-        //  新增供應商停用檢查
-        if (!Boolean.TRUE.equals(supplier.getActive())) {
+        // ========================================
+        // 1️⃣ 若進貨單已付清 → 禁止新增或修改付款
+        // ========================================
+        if (purchase.getStatus() == Purchase.Status.PAID) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "SUPPLIER_DISABLED: 此供應商已被停用，無法建立進貨單"
+                    "此進貨單已全額付清，不可新增或修改付款"
             );
         }
 
-        // 固定欄位不可修改
+        // ========================================
+        // 2️⃣ 停用供應商不可新增付款
+        // ========================================
+        Supplier supplier = purchase.getSupplier();
+        if (!Boolean.TRUE.equals(supplier.getActive())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "SUPPLIER_DISABLED: 此供應商已被停用，無法新增付款"
+            );
+        }
+
+        // ========================================
+        // 3️⃣ 固定欄位不可修改
+        // ========================================
         if (dto.getItem() != null && !dto.getItem().equals(purchase.getItem())) {
             throw new IllegalArgumentException("不允許修改品名。");
         }
@@ -348,63 +361,95 @@ public class PurchaseServiceImpl implements PurchaseService {
             throw new IllegalArgumentException("不允許修改進貨日期。");
         }
 
-        // 未提供付款資料 → 視為不完整
+        // ========================================
+        // 4️⃣ 付款資料必須至少有一筆
+        // ========================================
         if (dto.getPayments() == null || dto.getPayments().isEmpty()) {
-            throw new IllegalArgumentException("付款資訊不完整：金額、付款日期、付款方式需同時填寫。");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "請至少新增 1 筆付款紀錄，包含完整欄位必填資訊"
+            );
         }
 
+        // ========================================
+        // 5️⃣ 付款不可全為空白欄位
+        // ========================================
+        boolean emptyPayment = dto.getPayments().stream().allMatch(p ->
+                (p.getAmount() == null) &&
+                        p.getPayDate() == null &&
+                        (p.getMethod() == null || p.getMethod().isBlank())
+        );
+
+        if (emptyPayment) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "付款資訊不可全為空"
+            );
+        }
+
+        // ========================================
+        // 6️⃣ 現有付款資料
+        // ========================================
         Set<Payment> existingPayments =
                 purchase.getPayments() != null ? purchase.getPayments() : new HashSet<>();
 
-        BigDecimal totalPaid = existingPayments.stream()
-                .map(Payment::getAmount)
-                .filter(Objects::nonNull)
+        BigDecimal totalAmount = purchase.getTotalAmount();
+
+        BigDecimal totalPaidBefore = existingPayments.stream()
+                .map(p -> p.getAmount() == null ? BigDecimal.ZERO : p.getAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal unpaid = purchase.getTotalAmount().subtract(totalPaid);
+        // ========================================
+        // 7️⃣ 先驗證每筆付款欄位完整性
+        // ========================================
+        for (var pDto : dto.getPayments()) {
 
-        // ---------------------------------------------------------
-        // 1️⃣ 前置驗證：與 createPurchase 的邏輯完全一致
-        // ---------------------------------------------------------
-        for (var p : dto.getPayments()) {
+            boolean hasAny =
+                    pDto.getAmount() != null ||
+                            pDto.getPayDate() != null ||
+                            (pDto.getMethod() != null && !pDto.getMethod().isBlank());
 
-            boolean hasAmount = p.getAmount() != null;
-            boolean hasDate = p.getPayDate() != null;
-            boolean hasMethod = p.getMethod() != null && !p.getMethod().isBlank();
+            boolean hasAll =
+                    pDto.getAmount() != null &&
+                            pDto.getPayDate() != null &&
+                            (pDto.getMethod() != null && !pDto.getMethod().isBlank());
 
-            if ((hasAmount || hasDate || hasMethod) &&
-                    !(hasAmount && hasDate && hasMethod)) {
-
-                throw new IllegalArgumentException("付款資訊不完整：金額、付款日期、付款方式需同時填寫。");
-            }
-
-            if (p.getPayDate() != null &&
-                    p.getPayDate().isBefore(purchase.getPurchaseDate())) {
-                throw new IllegalArgumentException(
-                        "付款日期不得早於進貨日期 (" + purchase.getPurchaseDate() + ")"
+            if (hasAny && !hasAll) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "付款資訊不完整：金額、付款日期、付款方式需同時填寫"
                 );
             }
 
-            if (p.getAmount() != null && p.getAmount().compareTo(unpaid) > 0) {
-                throw new IllegalArgumentException(
-                        "付款金額不可超過尚未付款金額 (" + unpaid + ")"
+            // 付款日期不可早於進貨日期
+            if (pDto.getPayDate() != null &&
+                    pDto.getPayDate().isBefore(purchase.getPurchaseDate())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "付款日期不得早於進貨日期 (" + purchase.getPurchaseDate() + ")"
                 );
             }
         }
 
-        // ---------------------------------------------------------
-        // 2️⃣ 通過前置驗證後 → 正式進行付款更新處理
-        // ---------------------------------------------------------
-        for (var paymentDto : dto.getPayments()) {
-            Payment newPayment = paymentMapper.toEntity(paymentDto);
+        // ========================================
+        // 8️⃣ 逐筆處理付款（新增 or 更新）
+        // ========================================
+        for (var pDto : dto.getPayments()) {
+
+            Payment newPayment = paymentMapper.toEntity(pDto);
             newPayment.setPurchase(purchase);
 
-            // 付款會計期間
-            if (newPayment.getPayDate() != null) {
-                newPayment.setAccountingPeriod(newPayment.getPayDate().format(PERIOD_FORMAT));
-            } else {
-                newPayment.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
+            // referenceNo 必須存在
+            if (newPayment.getReferenceNo() == null) {
+                newPayment.setReferenceNo(UUID.randomUUID().toString());
             }
+
+            // 會計期間
+            newPayment.setAccountingPeriod(
+                    (newPayment.getPayDate() != null)
+                            ? newPayment.getPayDate().format(PERIOD_FORMAT)
+                            : LocalDate.now().format(PERIOD_FORMAT)
+            );
 
             Optional<Payment> existing = existingPayments.stream()
                     .filter(p -> p.getReferenceNo() != null &&
@@ -412,51 +457,70 @@ public class PurchaseServiceImpl implements PurchaseService {
                     .findFirst();
 
             if (existing.isPresent()) {
+                // ===== 更新既有付款 =====
                 Payment old = existing.get();
-                BigDecimal diff = newPayment.getAmount().subtract(old.getAmount());
 
-                if (diff.compareTo(BigDecimal.ZERO) > 0 && diff.compareTo(unpaid) > 0) {
-                    throw new IllegalArgumentException(
-                            "付款金額不可超過尚未付款金額 (" + unpaid + ")"
+                BigDecimal newTotal = totalPaidBefore
+                        .subtract(old.getAmount())
+                        .add(newPayment.getAmount());
+
+                if (newTotal.compareTo(totalAmount) > 0) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "更新後將超出應付總額 (" + totalAmount + ")"
                     );
                 }
 
                 old.setAmount(newPayment.getAmount());
-                unpaid = unpaid.subtract(diff.max(BigDecimal.ZERO));
+                old.setPayDate(newPayment.getPayDate());
+                old.setMethod(newPayment.getMethod());
+                old.setAccountingPeriod(newPayment.getAccountingPeriod());
+                old.setNote(null); // 後續自動重寫
+
+                totalPaidBefore = newTotal;
 
             } else {
-                BigDecimal amt = newPayment.getAmount() == null ? BigDecimal.ZERO : newPayment.getAmount();
-                unpaid = unpaid.subtract(amt);
+                // ===== 新增付款 =====
+                BigDecimal newTotal = totalPaidBefore.add(newPayment.getAmount());
+
+                if (newTotal.compareTo(totalAmount) > 0) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "新增付款金額不得超過應付總額 (" + totalAmount + ")"
+                    );
+                }
+
+                existingPayments.add(newPayment);
+                totalPaidBefore = newTotal;
             }
         }
 
-        // 最終金額驗證
-        BigDecimal totalPaidAfter = existingPayments.stream()
+        // ========================================
+        // 9️⃣ 最終安全驗證：總額不可超付
+        // ========================================
+        BigDecimal totalPaid = existingPayments.stream()
                 .map(p -> p.getAmount() == null ? BigDecimal.ZERO : p.getAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        if (totalPaidAfter.compareTo(purchase.getTotalAmount()) > 0) {
-            throw new IllegalArgumentException(
-                    "總付款金額不可超過應付總額 (" + purchase.getTotalAmount() + ")"
+        if (totalPaid.compareTo(totalAmount) > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "總付款金額不可超過應付總額 (" + totalAmount + ")"
             );
         }
 
-        // 更新狀態與金額
+        // ========================================
+        // 🔟 更新狀態、金額、餘額、note
+        // ========================================
         purchase.setPayments(existingPayments);
-        purchase.setPaidAmount(totalPaidAfter);
-        purchase.setBalance(
-                purchase.getTotalAmount().subtract(totalPaidAfter).setScale(2, RoundingMode.HALF_UP));
+        purchase.setPaidAmount(totalPaid);
+        purchase.setBalance(totalAmount.subtract(totalPaid).setScale(2, RoundingMode.HALF_UP));
         updatePurchaseStatus(purchase);
 
-        // 儲存
-        try {
-            Purchase updated = purchaseRepository.save(purchase);
-            paymentRepository.saveAll(purchase.getPayments());
-            return purchaseMapper.toDto(updated);
+        purchaseRepository.save(purchase);
+        paymentRepository.saveAll(existingPayments);
 
-        } catch (DataIntegrityViolationException e) {
-            throw new IllegalArgumentException("資料重複或外鍵錯誤", e);
-        }
+        return purchaseMapper.toDto(purchase);
     }
 
     // ================================

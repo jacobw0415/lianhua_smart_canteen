@@ -35,6 +35,9 @@ public class SupplierRequestDto extends BaseRequestDto {
     @NotBlank(message = "結帳週期不可為空")
     private String billingCycle;
 
+    @Schema(description = "是否啟用", example = "true")
+    private Boolean active;
+
     @Schema(description = "備註", example = "固定週三送貨")
     @ValidNote
     @Size(max = 100, message = "備註最多 100 字")
