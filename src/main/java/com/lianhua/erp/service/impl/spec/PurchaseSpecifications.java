@@ -83,7 +83,7 @@ public class PurchaseSpecifications {
      * 6. 日期區間（fromDate ～ toDate）
      * ---------------------------------------------------------- */
     private static Specification<Purchase> byDateRange(PurchaseSearchRequest req) {
-        Specification<Purchase> spec = Specification.where(null);
+        Specification<Purchase> spec = Specification.allOf();
 
         // 起：purchaseDate >= from
         if (!isEmpty(req.getFromDate())) {

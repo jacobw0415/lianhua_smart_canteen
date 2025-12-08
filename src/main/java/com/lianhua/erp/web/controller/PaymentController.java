@@ -3,6 +3,7 @@ package com.lianhua.erp.web.controller;
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
 import com.lianhua.erp.dto.error.NotFoundResponse;
 import com.lianhua.erp.dto.payment.PaymentResponseDto;
+import com.lianhua.erp.dto.payment.PaymentSearchRequest;
 import com.lianhua.erp.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -89,5 +90,32 @@ public class PaymentController {
     ) {
         paymentService.deleteByPurchaseId(purchaseId);
         return ResponseEntity.ok(ApiResponseDto.ok(null));
+    }
+
+    /* ============================================================
+     * 📌 付款紀錄搜尋（支援模糊搜尋 + 分頁 + 動態條件）
+     * ============================================================ */
+    @Operation(
+            summary = "搜尋付款紀錄（支援模糊搜尋與分頁）",
+            description = """
+                可依供應商名稱、品項摘要、付款方式、會計期間、付款日期區間進行搜尋。
+                支援 page / size / sort，自動整合 React-Admin 查詢方式。
+                查詢示例：
+                  /api/payments/search?filter={...}&page=0&size=10&sort=payDate,desc
+                """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "搜尋成功"),
+            @ApiResponse(responseCode = "400", description = "搜尋條件無效"),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤")
+    })
+    @PageableAsQueryParam
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponseDto<Page<PaymentResponseDto>>> searchPayments(
+            @ParameterObject PaymentSearchRequest req,
+            @ParameterObject Pageable pageable
+    ) {
+        Page<PaymentResponseDto> page = paymentService.searchPayments(req, pageable);
+        return ResponseEntity.ok(ApiResponseDto.ok(page));
     }
 }
