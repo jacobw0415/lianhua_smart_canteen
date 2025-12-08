@@ -1,20 +1,21 @@
 package com.lianhua.erp.web.controller;
 
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
-import com.lianhua.erp.dto.error.InternalServerErrorResponse;
 import com.lianhua.erp.dto.error.NotFoundResponse;
 import com.lianhua.erp.dto.payment.PaymentResponseDto;
 import com.lianhua.erp.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
-import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springdoc.core.converters.models.PageableAsQueryParam;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -24,43 +25,69 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
-    @Operation(summary = "取得所有付款紀錄", description = "回傳所有付款紀錄清單")
+
+    /* ============================================================
+     * 📌 付款紀錄列表（分頁版）
+     * ============================================================ */
+    @Operation(
+            summary = "分頁取得付款紀錄清單",
+            description = """
+                    支援 page / size / sort，自動與 React-Admin 分頁整合。
+                    例如：/api/payments?page=0&size=10&sort=id,asc
+                    """
+    )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "查詢成功",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = PaymentResponseDto.class)))),
-            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
-                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+            @ApiResponse(responseCode = "200", description = "成功取得付款紀錄列表"),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
+    @PageableAsQueryParam
     @GetMapping
-    public List<PaymentResponseDto> findAll() {
-        return paymentService.findAll();
+    public ResponseEntity<ApiResponseDto<Page<PaymentResponseDto>>> getAllPayments(
+            @ParameterObject Pageable pageable
+    ) {
+        Page<PaymentResponseDto> page = paymentService.findAll(pageable);
+        return ResponseEntity.ok(ApiResponseDto.ok(page));
     }
 
-    @Operation(summary = "依進貨單 ID 取得付款紀錄", description = "輸入 purchaseId 取得對應付款資料")
+
+    /* ============================================================
+     * 📌 依進貨單 ID 查詢付款紀錄（沿用原邏輯）
+     * ============================================================ */
+    @Operation(summary = "依進貨單 ID 取得付款紀錄")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "查詢成功",
-                    content = @Content(schema = @Schema(implementation = PaymentResponseDto.class))),
+            @ApiResponse(responseCode = "200", description = "查詢成功"),
             @ApiResponse(responseCode = "404", description = "找不到對應的付款紀錄",
-                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
-            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
-                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            schema = @Schema(implementation = NotFoundResponse.class)
+                    )),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @GetMapping("/{purchaseId}")
-    public PaymentResponseDto findByPurchase(@PathVariable Long purchaseId) {
-        return paymentService.findByPurchaseId(purchaseId);
+    public ResponseEntity<ApiResponseDto<PaymentResponseDto>> getPaymentsByPurchase(
+            @PathVariable Long purchaseId
+    ) {
+        PaymentResponseDto dto = paymentService.findByPurchaseId(purchaseId);
+        return ResponseEntity.ok(ApiResponseDto.ok(dto));
     }
 
-    @Operation(summary = "刪除付款紀錄", description = "依進貨單 ID 刪除對應的付款紀錄")
+
+    /* ============================================================
+     * 📌 刪除某進貨單底下的所有付款紀錄
+     * ============================================================ */
+    @Operation(summary = "刪除指定進貨單的所有付款紀錄")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "刪除成功",
-                    content = @Content(schema = @Schema(implementation = ApiResponseDto.class))),
+            @ApiResponse(responseCode = "200", description = "刪除成功"),
             @ApiResponse(responseCode = "404", description = "找不到要刪除的紀錄",
-                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
-            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
-                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            schema = @Schema(implementation = NotFoundResponse.class)
+                    )),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @DeleteMapping("/{purchaseId}")
-    public void deleteByPurchase(@PathVariable Long purchaseId) {
+    public ResponseEntity<ApiResponseDto<Void>> deletePaymentsByPurchase(
+            @PathVariable Long purchaseId
+    ) {
         paymentService.deleteByPurchaseId(purchaseId);
+        return ResponseEntity.ok(ApiResponseDto.ok(null));
     }
 }

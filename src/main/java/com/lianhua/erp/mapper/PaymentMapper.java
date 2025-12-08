@@ -7,14 +7,39 @@ import org.mapstruct.*;
 
 @Mapper(componentModel = "spring")
 public interface PaymentMapper {
-    
-    @Mapping(source = "purchase.id", target = "purchaseId")
+
+    /* ============================================
+     * 📌 Payment → PaymentResponseDto
+     * ============================================ */
+    @Mappings({
+            @Mapping(source = "purchase.id", target = "purchaseId"),
+
+            // 新增：供應商名稱
+            @Mapping(source = "purchase.supplier.name", target = "supplierName"),
+
+            // 新增：品項摘要
+            @Mapping(source = "purchase.item", target = "item"),
+
+            // 新增：會計期間
+            @Mapping(source = "accountingPeriod", target = "accountingPeriod")
+    })
     PaymentResponseDto toDto(Payment entity);
-    
-    @Mapping(target = "id", ignore = true)  // Ignore ID as it will be generated
-    @Mapping(target = "purchase", ignore = true)  // Will be set manually
+
+
+    /* ============================================
+     * 📌 PaymentRequestDto → Payment（新增付款時使用）
+     * ============================================ */
+    @Mappings({
+            @Mapping(target = "id", ignore = true),          // ID 自動生成
+            @Mapping(target = "purchase", ignore = true),    // 由 Service 手動設定
+            @Mapping(target = "method", expression = "java(mapMethod(dto.getMethod()))")
+    })
     Payment toEntity(PaymentRequestDto dto);
-    
+
+
+    /* ============================================
+     * 📌 付款方式字串 → Enum
+     * ============================================ */
     default Payment.Method mapMethod(String method) {
         if (method == null) return Payment.Method.CASH;
         try {
@@ -24,4 +49,3 @@ public interface PaymentMapper {
         }
     }
 }
-
