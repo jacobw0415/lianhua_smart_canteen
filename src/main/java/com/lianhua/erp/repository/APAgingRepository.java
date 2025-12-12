@@ -31,7 +31,9 @@ public class APAgingRepository {
      * ① Summary（不分頁）
      * ============================================================= */
     public List<APAgingSummaryDto> findAgingSummary() {
-        String sql = baseSummarySql() + " ORDER BY balance DESC ";
+        String sql = baseSummarySql()
+                + " HAVING SUM(p.balance) > 0 "
+                + " ORDER BY balance DESC ";
         return jdbcTemplate.query(sql, this::mapSummaryRow);
     }
 
@@ -96,7 +98,7 @@ public class APAgingRepository {
             }
         }
 
-        if (filter != null && Boolean.TRUE.equals(filter.getOnlyUnpaid())) {
+        if (filter == null || filter.getOnlyUnpaid() == null || Boolean.TRUE.equals(filter.getOnlyUnpaid())) {
             havingConditions.add(" SUM(p.balance) > 0 ");
         }
 
