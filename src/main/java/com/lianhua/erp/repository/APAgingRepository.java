@@ -48,10 +48,10 @@ public class APAgingRepository {
                 jdbcTemplate.query(pagedSql, this::mapSummaryRow, size, offset);
 
         String countSql = """
-            SELECT COUNT(*) FROM (
+                SELECT COUNT(*) FROM (
                 """ + baseSummarySql() + """
-            ) AS t
-            """;
+                ) AS t
+                """;
 
         Integer total = jdbcTemplate.queryForObject(countSql, Integer.class);
 
@@ -64,47 +64,47 @@ public class APAgingRepository {
     private String baseSummarySql() {
 
         return """
-            SELECT 
-                s.id AS supplier_id,
-                s.name AS supplier_name,
-
-                /* ---- Aging bucket 計算 ---- */
-                SUM(
-                    CASE 
-                        WHEN DATEDIFF(CURDATE(), p.purchase_date) <= 30 
-                        THEN p.balance
-                        ELSE 0 
-                    END
-                ) AS aging_0_30,
-
-                SUM(
-                    CASE 
-                        WHEN DATEDIFF(CURDATE(), p.purchase_date) BETWEEN 31 AND 60
-                        THEN p.balance
-                        ELSE 0 
-                    END
-                ) AS aging_31_60,
-
-                SUM(
-                    CASE 
-                        WHEN DATEDIFF(CURDATE(), p.purchase_date) > 60
-                        THEN p.balance
-                        ELSE 0 
-                    END
-                ) AS aging_60_plus,
-
-                /* ---- 應付總額、已付、未付 ---- */
-                SUM(p.total_amount) AS total_amount,
-                SUM(p.paid_amount) AS paid_amount,
-                SUM(p.balance) AS balance
-
-            FROM purchases p
-            JOIN suppliers s ON s.id = p.supplier_id
-
-            WHERE p.balance > 0
-
-            GROUP BY s.id, s.name
-            """;
+                SELECT 
+                    s.id AS supplier_id,
+                    s.name AS supplier_name,
+                
+                    /* ---- Aging bucket 計算 ---- */
+                    SUM(
+                        CASE 
+                            WHEN DATEDIFF(CURDATE(), p.purchase_date) <= 30 
+                            THEN p.balance
+                            ELSE 0 
+                        END
+                    ) AS aging_0_30,
+                
+                    SUM(
+                        CASE 
+                            WHEN DATEDIFF(CURDATE(), p.purchase_date) BETWEEN 31 AND 60
+                            THEN p.balance
+                            ELSE 0 
+                        END
+                    ) AS aging_31_60,
+                
+                    SUM(
+                        CASE 
+                            WHEN DATEDIFF(CURDATE(), p.purchase_date) > 60
+                            THEN p.balance
+                            ELSE 0 
+                        END
+                    ) AS aging_60_plus,
+                
+                    /* ---- 應付總額、已付、未付 ---- */
+                    SUM(p.total_amount) AS total_amount,
+                    SUM(p.paid_amount) AS paid_amount,
+                    SUM(p.balance) AS balance
+                
+                FROM purchases p
+                JOIN suppliers s ON s.id = p.supplier_id
+                
+                WHERE p.balance > 0
+                
+                GROUP BY s.id, s.name
+                """;
     }
 
     private APAgingSummaryDto mapSummaryRow(ResultSet rs, int rowNum) throws SQLException {
@@ -127,18 +127,26 @@ public class APAgingRepository {
     public List<APAgingPurchaseDetailDto> findPurchasesBySupplierId(Long supplierId) {
 
         String sql = """
-            SELECT
-                p.id AS purchase_id,
-                p.purchase_date,
-                p.total_amount,
-                p.paid_amount,
-                p.balance,
-                p.status
-            FROM purchases p
-            WHERE p.supplier_id = ?
-              AND p.balance > 0
-            ORDER BY p.purchase_date DESC
-            """;
+                SELECT
+                    p.id AS purchase_id,
+                    p.purchase_date,
+                    p.total_amount,
+                    p.paid_amount,
+                    p.balance,
+                    p.status,
+                
+                    /* ---- 帳齡區間（暫以 purchase_date 為基準） ---- */
+                    CASE
+                        WHEN DATEDIFF(CURDATE(), p.purchase_date) <= 30 THEN '0–30'
+                        WHEN DATEDIFF(CURDATE(), p.purchase_date) BETWEEN 31 AND 60 THEN '31–60'
+                        ELSE '>60'
+                    END AS aging_bucket
+                
+                FROM purchases p
+                WHERE p.supplier_id = ?
+                  AND p.balance > 0
+                ORDER BY p.purchase_date DESC
+                """;
 
         return jdbcTemplate.query(sql, this::mapDetailRow, supplierId);
     }
@@ -148,9 +156,10 @@ public class APAgingRepository {
                 .id(rs.getLong("purchase_id"))
                 .purchaseId(rs.getLong("purchase_id"))
                 .purchaseDate(rs.getDate("purchase_date").toLocalDate())
-                .amount(getDecimal(rs, "total_amount"))
+                .totalAmount(getDecimal(rs, "total_amount"))
                 .paidAmount(getDecimal(rs, "paid_amount"))
                 .balance(getDecimal(rs, "balance"))
+                .agingBucket(rs.getString("aging_bucket"))
                 .status(rs.getString("status"))
                 .build();
     }

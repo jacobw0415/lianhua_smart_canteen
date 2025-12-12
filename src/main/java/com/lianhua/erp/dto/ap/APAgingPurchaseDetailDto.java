@@ -24,13 +24,16 @@ public class APAgingPurchaseDetailDto {
     private LocalDate purchaseDate;
 
     @Schema(description = "該筆進貨金額（total amount）", example = "5000.00")
-    private BigDecimal amount;
+    private BigDecimal totalAmount;
 
     @Schema(description = "已付款金額", example = "3000.00")
     private BigDecimal paidAmount;
 
     @Schema(description = "未付款金額（amount - paidAmount）", example = "2000.00")
     private BigDecimal balance;
+
+    @Schema(description = "帳齡區間（以到期日為基準）", example = "31–60")
+    private String agingBucket;
 
     @Schema(description = "付款狀態：PENDING / PARTIAL / PAID", example = "PARTIAL")
     private String status;
