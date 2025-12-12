@@ -1,10 +1,12 @@
 package com.lianhua.erp.web.controller;
 
+import com.lianhua.erp.dto.ap.APAgingFilterDto;
 import com.lianhua.erp.dto.ap.APAgingSummaryDto;
 import com.lianhua.erp.dto.ap.APAgingPurchaseDetailDto;
 import com.lianhua.erp.service.APAgingService;
 
 import lombok.RequiredArgsConstructor;
+
 import org.springdoc.core.annotations.ParameterObject;
 import org.springdoc.core.converters.models.PageableAsQueryParam;
 import org.springframework.data.domain.Page;
@@ -23,20 +25,22 @@ public class APAgingController {
     private final APAgingService agingService;
 
     /**
-     * ⭐ React-Admin List 用的標準分頁 API
-     * 完全符合 dataProvider 解析格式：
-     *   { "content": [...], "totalElements": 123 }
+     * ⭐ AP Aging Summary（分頁 + 搜尋）
+     * - React-Admin List 使用
+     * - 支援供應商名稱 / 帳齡區間 / 是否未付款
      */
     @PageableAsQueryParam
     @GetMapping
     public ResponseEntity<?> getAgingPaged(
+            @ParameterObject APAgingFilterDto filter,
             @ParameterObject Pageable pageable
     ) {
-        Page<APAgingSummaryDto> page = agingService.getAgingSummary(pageable);
+        Page<APAgingSummaryDto> page =
+                agingService.getAgingSummary(filter, pageable);
 
-        // React-Admin dataProvider 會讀取：
-        //   payload.content → data
-        //   payload.totalElements → total
+        // React-Admin dataProvider 解析：
+        // - content → data
+        // - totalElements → total
         return ResponseEntity.ok(
                 Map.of(
                         "content", page.getContent(),
@@ -49,17 +53,19 @@ public class APAgingController {
     }
 
     /**
-     * ⭐ 匯出 / 不分頁 Summary
+     * ⭐ AP Aging Summary（不分頁）
+     * - 匯出 / 報表專用
      */
     @GetMapping("/summary")
-    public ResponseEntity<?> getAllSummary() {
+    public ResponseEntity<List<APAgingSummaryDto>> getAllSummary() {
         return ResponseEntity.ok(
                 agingService.getAgingSummaryAll()
         );
     }
 
     /**
-     * ⭐ AP Detail — 單一供應商未付款進貨明細
+     * ⭐ AP Detail
+     * - 單一供應商逐筆未付款進貨明細
      */
     @GetMapping("/{supplierId}/purchases")
     public ResponseEntity<List<APAgingPurchaseDetailDto>> getSupplierPurchases(

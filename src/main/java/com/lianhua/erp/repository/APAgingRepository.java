@@ -1,5 +1,6 @@
 package com.lianhua.erp.repository;
 
+import com.lianhua.erp.dto.ap.APAgingFilterDto;
 import com.lianhua.erp.dto.ap.APAgingSummaryDto;
 import com.lianhua.erp.dto.ap.APAgingPurchaseDetailDto;
 
@@ -11,11 +12,12 @@ import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Repository
@@ -34,32 +36,108 @@ public class APAgingRepository {
     }
 
     /* =============================================================
-     * ② Summary（分頁）
+     * ② Summary（分頁 + 搜尋）
      * ============================================================= */
-    public Page<APAgingSummaryDto> findAgingSummaryPaged(int page, int size) {
+    public Page<APAgingSummaryDto> findAgingSummaryPaged(
+            APAgingFilterDto filter,
+            int page,
+            int size
+    ) {
 
         int offset = page * size;
 
-        String pagedSql = baseSummarySql()
-                + " ORDER BY balance DESC "
-                + " LIMIT ? OFFSET ? ";
+        String baseSql = baseSummarySql();
+
+        // ⭐ 關鍵修正：在 GROUP BY 前插入 WHERE 條件
+        int groupByIndex = baseSql.lastIndexOf("GROUP BY");
+
+        StringBuilder sql = new StringBuilder();
+        List<Object> params = new ArrayList<>();
+
+        if (groupByIndex > -1) {
+            sql.append(baseSql, 0, groupByIndex);
+
+            /* ===============================
+             * WHERE（非聚合條件）
+             * =============================== */
+            if (filter != null && StringUtils.hasText(filter.getSupplierName())) {
+                sql.append(" AND s.name LIKE ? ");
+                params.add("%" + filter.getSupplierName().trim() + "%");
+            }
+
+            // 接回 GROUP BY
+            sql.append(baseSql.substring(groupByIndex));
+        } else {
+            // fallback（理論上不會進）
+            sql.append(baseSql);
+        }
+
+        /* ===============================
+         * HAVING（聚合條件）
+         * =============================== */
+        List<String> havingConditions = new ArrayList<>();
+
+        if (filter != null && filter.getAgingBucket() != null) {
+            switch (filter.getAgingBucket()) {
+                case "DAYS_0_30" -> havingConditions.add("""
+                            SUM(CASE WHEN DATEDIFF(CURDATE(), p.purchase_date) <= 30
+                            THEN p.balance ELSE 0 END) > 0
+                        """);
+                case "DAYS_31_60" -> havingConditions.add("""
+                            SUM(CASE WHEN DATEDIFF(CURDATE(), p.purchase_date) BETWEEN 31 AND 60
+                            THEN p.balance ELSE 0 END) > 0
+                        """);
+                case "DAYS_60_PLUS" -> havingConditions.add("""
+                            SUM(CASE WHEN DATEDIFF(CURDATE(), p.purchase_date) > 60
+                            THEN p.balance ELSE 0 END) > 0
+                        """);
+                default -> {
+                }
+            }
+        }
+
+        if (filter != null && Boolean.TRUE.equals(filter.getOnlyUnpaid())) {
+            havingConditions.add(" SUM(p.balance) > 0 ");
+        }
+
+        if (!havingConditions.isEmpty()) {
+            sql.append(" HAVING ");
+            sql.append(String.join(" AND ", havingConditions));
+        }
+
+        /* ===============================
+         * 排序 + 分頁
+         * =============================== */
+        sql.append(" ORDER BY balance DESC ");
+        String countBaseSql = sql.toString();
+
+        sql.append(" LIMIT ? OFFSET ? ");
+        params.add(size);
+        params.add(offset);
 
         List<APAgingSummaryDto> content =
-                jdbcTemplate.query(pagedSql, this::mapSummaryRow, size, offset);
+                jdbcTemplate.query(sql.toString(), this::mapSummaryRow, params.toArray());
 
+        /* ===============================
+         * Count SQL
+         * =============================== */
         String countSql = """
                 SELECT COUNT(*) FROM (
-                """ + baseSummarySql() + """
-                ) AS t
+                """ + countBaseSql + """
+                ) t
                 """;
 
-        Integer total = jdbcTemplate.queryForObject(countSql, Integer.class);
+        Integer total = jdbcTemplate.queryForObject(
+                countSql,
+                Integer.class,
+                params.subList(0, params.size() - 2).toArray()
+        );
 
         return new PageImpl<>(content, PageRequest.of(page, size), total);
     }
 
     /* =============================================================
-     * 共用 Summary SQL
+     * 共用 Summary SQL（骨架）
      * ============================================================= */
     private String baseSummarySql() {
 
@@ -101,7 +179,7 @@ public class APAgingRepository {
                 FROM purchases p
                 JOIN suppliers s ON s.id = p.supplier_id
                 
-                WHERE p.balance > 0
+                WHERE 1=1
                 
                 GROUP BY s.id, s.name
                 """;
@@ -122,7 +200,7 @@ public class APAgingRepository {
     }
 
     /* =============================================================
-     * ③ Detail — 指定供應商未付進貨明細
+     * ③ Detail — 指定供應商未付進貨明細（未動）
      * ============================================================= */
     public List<APAgingPurchaseDetailDto> findPurchasesBySupplierId(Long supplierId) {
 
@@ -135,7 +213,6 @@ public class APAgingRepository {
                     p.balance,
                     p.status,
                 
-                    /* ---- 帳齡區間（暫以 purchase_date 為基準） ---- */
                     CASE
                         WHEN DATEDIFF(CURDATE(), p.purchase_date) <= 30 THEN '0–30'
                         WHEN DATEDIFF(CURDATE(), p.purchase_date) BETWEEN 31 AND 60 THEN '31–60'
