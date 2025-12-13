@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.lianhua.erp.dto.payment.PaymentResponseDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -12,11 +13,14 @@ import java.util.List;
 @Data
 @Schema(description = "進貨單回應資料（含付款明細）")
 @JsonPropertyOrder({
-        "id", "supplierName", "item", "qty", "unitPrice",
+        "purchaseNo", "id", "supplierName", "item", "qty", "unitPrice",
         "totalAmount", "paidAmount", "balance", "status",
         "purchaseDate", "note", "payments"
 })
 public class PurchaseResponseDto {
+    
+    @Schema(description = "進貨單編號（商業單號）", example = "PO-202511-0003")
+    private String purchaseNo;
     
     @Schema(description = "進貨單 ID", example = "10")
     private Long id;

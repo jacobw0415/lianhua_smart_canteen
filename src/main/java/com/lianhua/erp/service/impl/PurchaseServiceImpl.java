@@ -40,7 +40,8 @@ public class PurchaseServiceImpl implements PurchaseService {
     private final SupplierRepository supplierRepository;
     private final PurchaseMapper purchaseMapper;
     private final PaymentMapper paymentMapper;
-
+    private final com.lianhua.erp.numbering.PurchaseNoGenerator purchaseNoGenerator;
+    
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
 
     // ================================
@@ -222,7 +223,11 @@ public class PurchaseServiceImpl implements PurchaseService {
         Purchase purchase = purchaseMapper.toEntity(dto);
         purchase.setSupplier(supplier);
         purchase.setItem(normalizedItem);
-
+        
+        // ⭐ 產生進貨單編號（商業單號）
+        String purchaseNo = purchaseNoGenerator.generate(dto.getPurchaseDate());
+        purchase.setPurchaseNo(purchaseNo);
+        
         // 設定會計期間
         if (purchase.getPurchaseDate() != null) {
             purchase.setAccountingPeriod(purchase.getPurchaseDate().format(PERIOD_FORMAT));

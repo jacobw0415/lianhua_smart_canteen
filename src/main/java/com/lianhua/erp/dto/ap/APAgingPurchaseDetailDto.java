@@ -19,6 +19,9 @@ public class APAgingPurchaseDetailDto {
 
     @Schema(description = "進貨單 ID", example = "105")
     private Long purchaseId;
+    
+    @Schema(description = "進貨單編號（商業單號）", example = "PO-202501-0008")
+    private String purchaseNo;
 
     @Schema(description = "進貨日期", example = "2025-01-08")
     private LocalDate purchaseDate;

@@ -20,6 +20,10 @@ import java.util.Set;
                 @UniqueConstraint(
                         name = "uk_purchase_supplier_date_item",
                         columnNames = {"supplier_id", "purchase_date", "item"}
+                ),
+                @UniqueConstraint(
+                        name = "uk_purchases_purchase_no",
+                        columnNames = {"purchase_no"}
                 )
         }
 )
@@ -35,6 +39,10 @@ public class Purchase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Schema(description = "進貨單 ID")
     private Long id;
+    
+    @Column(name = "purchase_no", nullable = false, length = 20, updatable = false)
+    @Schema(description = "進貨單編號（PO-YYYYMM-XXXX）")
+    private String purchaseNo;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supplier_id", nullable = false)

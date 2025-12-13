@@ -20,6 +20,9 @@ public class PaymentResponseDto {
 
     @Schema(description = "對應的進貨單 ID", example = "10")
     private Long purchaseId;
+    
+    @Schema(description = "對應的進貨單編號（商業單號）", example = "PO-202512-0007")
+    private String purchaseNo;
 
     @Schema(description = "付款金額", example = "1200.00")
     private BigDecimal amount;

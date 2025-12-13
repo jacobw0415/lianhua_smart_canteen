@@ -209,6 +209,7 @@ public class APAgingRepository {
         String sql = """
                 SELECT
                     p.id AS purchase_id,
+                    p.purchase_no,
                     p.purchase_date,
                     p.total_amount,
                     p.paid_amount,
@@ -234,6 +235,7 @@ public class APAgingRepository {
         return APAgingPurchaseDetailDto.builder()
                 .id(rs.getLong("purchase_id"))
                 .purchaseId(rs.getLong("purchase_id"))
+                .purchaseNo(rs.getString("purchase_no"))
                 .purchaseDate(rs.getDate("purchase_date").toLocalDate())
                 .totalAmount(getDecimal(rs, "total_amount"))
                 .paidAmount(getDecimal(rs, "paid_amount"))

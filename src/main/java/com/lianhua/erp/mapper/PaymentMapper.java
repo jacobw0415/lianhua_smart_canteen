@@ -13,7 +13,9 @@ public interface PaymentMapper {
      * ============================================ */
     @Mappings({
             @Mapping(source = "purchase.id", target = "purchaseId"),
-
+            
+            @Mapping(source = "purchase.purchaseNo", target = "purchaseNo"),
+            
             // 新增：供應商名稱
             @Mapping(source = "purchase.supplier.name", target = "supplierName"),
 

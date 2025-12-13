@@ -42,6 +42,7 @@ CREATE TABLE suppliers (
 -- ------------------------------------------------------------
 CREATE TABLE purchases (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  purchase_no VARCHAR(20) NOT NULL COMMENT '進貨單編號（PO-YYYYMM-XXXX）',
   supplier_id BIGINT NOT NULL,
   purchase_date DATE NOT NULL,
   accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
@@ -58,13 +59,13 @@ CREATE TABLE purchases (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-  -- 不允許刪除時連動刪除進貨紀錄
+  CONSTRAINT uk_purchases_purchase_no UNIQUE (purchase_no),
   CONSTRAINT fk_purchases_supplier
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
     ON DELETE RESTRICT
     ON UPDATE CASCADE,
 
-  UNIQUE (supplier_id, purchase_date, item)
+  CONSTRAINT uk_purchase_supplier_date_item UNIQUE (supplier_id, purchase_date, item)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_purchases_supplier_id ON purchases(supplier_id);
