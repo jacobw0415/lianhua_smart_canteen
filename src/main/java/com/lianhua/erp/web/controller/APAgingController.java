@@ -5,6 +5,7 @@ import com.lianhua.erp.dto.ap.APAgingSummaryDto;
 import com.lianhua.erp.dto.ap.APAgingPurchaseDetailDto;
 import com.lianhua.erp.service.APAgingService;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 import org.springdoc.core.annotations.ParameterObject;
@@ -20,6 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ap")
 @RequiredArgsConstructor
+@Tag(name = "應付帳款紀錄", description = "應付帳款 API")
 public class APAgingController {
 
     private final APAgingService agingService;

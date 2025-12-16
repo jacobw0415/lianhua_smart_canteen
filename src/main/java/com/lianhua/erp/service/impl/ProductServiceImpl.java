@@ -9,7 +9,10 @@ import com.lianhua.erp.repository.ProductCategoryRepository;
 import com.lianhua.erp.service.ProductService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.ExampleMatcher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -96,6 +99,41 @@ public class ProductServiceImpl implements ProductService {
         product.getOrderItems().size();
 
         return mapper.toDto(product);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductResponseDto> search(ProductSearchRequest search) {
+
+        Product probe = new Product();
+
+        // ===== 模糊搜尋條件 =====
+        if (StringUtils.hasText(search.getName())) {
+            probe.setName(search.getName().trim());
+        }
+
+        // ===== 是否啟用 =====
+        if (search.getActive() != null) {
+            probe.setActive(search.getActive());
+        }
+
+        // ===== 分類（⚠️ Example 無法直接處理關聯）=====
+        if (search.getCategoryId() != null) {
+            ProductCategory categoryRef = categoryRepository.getReferenceById(search.getCategoryId());
+            probe.setCategory(categoryRef);
+        }
+
+        ExampleMatcher matcher = ExampleMatcher.matching()
+                .withIgnoreNullValues()
+                .withIgnoreCase()
+                .withStringMatcher(ExampleMatcher.StringMatcher.CONTAINING);
+
+        Example<Product> example = Example.of(probe, matcher);
+
+        return repository.findAll(example)
+                .stream()
+                .map(mapper::toDto)
+                .toList();
     }
 
     @Override

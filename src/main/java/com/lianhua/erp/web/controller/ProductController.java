@@ -25,6 +25,10 @@ public class ProductController {
 
     private final ProductService service;
 
+
+    // ================================================================
+    // 建立商品
+    // ================================================================
     @Operation(
             summary = "建立新商品",
             description = "建立一筆新的商品資料。若商品名稱或資料不合法，將回傳錯誤。"
@@ -42,6 +46,9 @@ public class ProductController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.ok(created));
     }
 
+    // ================================================================
+    // 更新商品
+    // ================================================================
     @Operation(
             summary = "更新商品資料",
             description = "根據商品 ID 更新其屬性資料（例如名稱、價格、是否啟用等）。"
@@ -141,6 +148,62 @@ public class ProductController {
         if (list.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NO_CONTENT)
                     .body(ApiResponseDto.error(HttpStatus.NO_CONTENT.value(), "該分類下目前沒有商品"));
+        }
+
+        return ResponseEntity.ok(ApiResponseDto.ok(list));
+    }
+
+    // ================================================================
+    // 模糊搜尋商品
+    // ================================================================
+
+    @Operation(
+            summary = "模糊搜尋商品",
+            description = """
+                依條件模糊搜尋商品資料。
+                
+                支援條件：
+                - 商品名稱（模糊比對）
+                - 是否啟用（active）
+                - 商品分類（categoryId）
+                
+                所有條件皆為非必填，未傳入條件時等同於查詢全部商品。
+                """
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "查詢成功",
+                    content = @Content(
+                            array = @ArraySchema(
+                                    schema = @Schema(implementation = ProductResponseDto.class)
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "204",
+                    description = "查無符合條件的商品"
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "伺服器錯誤",
+                    content = @Content(
+                            schema = @Schema(implementation = InternalServerErrorResponse.class)
+                    )
+            )
+    })
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponseDto<List<ProductResponseDto>>> search(
+            @ModelAttribute ProductSearchRequest search) {
+
+        List<ProductResponseDto> list = service.search(search);
+
+        if (list.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NO_CONTENT)
+                    .body(ApiResponseDto.error(
+                            HttpStatus.NO_CONTENT.value(),
+                            "查無符合條件的商品"
+                    ));
         }
 
         return ResponseEntity.ok(ApiResponseDto.ok(list));
