@@ -13,7 +13,7 @@ public class ProductSearchRequest {
     private String name;
 
     @Schema(description = "商品代碼（模糊搜尋）", example = "P001")
-    private String code;
+    private String categoryCode;
 
     @Schema(description = "是否啟用", example = "true")
     private Boolean active;

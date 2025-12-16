@@ -208,6 +208,26 @@ public class ProductController {
 
         return ResponseEntity.ok(ApiResponseDto.ok(list));
     }
+    
+    @Operation(
+            summary = "停用商品分類",
+            description = "將指定商品分類設為停用，停用後該分類不可用於新增銷售單。"
+    )
+    @PutMapping("/{id}/deactivate")
+    public ResponseEntity<ApiResponseDto<ProductResponseDto>> deactivate(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.deactivate(id)));
+    }
+    
+    @Operation(
+            summary = "啟用商品分類",
+            description = "將指定商品分類重新設為啟用狀態，使其可再次用於業務流程。"
+    )
+    @PutMapping("/{id}/activate")
+    public ResponseEntity<ApiResponseDto<ProductResponseDto>> activate(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.activate(id)));
+    }
 
 
     @Operation(

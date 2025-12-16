@@ -2,19 +2,22 @@ package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.Product;
 import com.lianhua.erp.domain.ProductCategory;
-import com.lianhua.erp.dto.product.*;
+import com.lianhua.erp.dto.product.ProductRequestDto;
+import com.lianhua.erp.dto.product.ProductResponseDto;
+import com.lianhua.erp.dto.product.ProductSearchRequest;
 import com.lianhua.erp.mapper.ProductMapper;
-import com.lianhua.erp.repository.ProductRepository;
 import com.lianhua.erp.repository.ProductCategoryRepository;
+import com.lianhua.erp.repository.ProductRepository;
 import com.lianhua.erp.service.ProductService;
+import com.lianhua.erp.service.impl.spec.ProductSpecification;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.util.StringUtils;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Example;
-import org.springframework.data.domain.ExampleMatcher;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,137 +26,243 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class ProductServiceImpl implements ProductService {
-
+    
     private final ProductRepository repository;
-    private final ProductCategoryRepository categoryRepository; // 🔹 新增：分類存取用
+    private final ProductCategoryRepository categoryRepository;
     private final ProductMapper mapper;
-
+    
+    /**
+     * 建立商品
+     *
+     * 錯誤處理原則（對齊 PurchaseServiceImpl）：
+     * - 業務規則錯誤 → ResponseStatusException
+     * - DB constraint 錯誤 → catch 後轉 ResponseStatusException
+     */
     @Override
     public ProductResponseDto create(ProductRequestDto dto) {
-        // ✅ 檢查商品名稱唯一性
-        if (repository.existsByName(dto.getName())) {
-            throw new DataIntegrityViolationException("相同商品名稱已存在，請重新輸入商品名稱。");
+        
+        // === 基本必填欄位檢查 ===
+        if (!StringUtils.hasText(dto.getName())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "商品名稱為必填欄位"
+            );
         }
-
-        // ✅ 檢查分類是否存在
+        
+        if (dto.getCategoryId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "商品分類為必填欄位"
+            );
+        }
+        
+        // === 商品名稱唯一性（業務規則） ===
+        String name = dto.getName().trim();
+        if (repository.existsByName(name)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "相同商品名稱已存在，請重新輸入商品名稱。"
+            );
+        }
+        
+        // === 分類存在性檢查 ===
         ProductCategory category = categoryRepository.findById(dto.getCategoryId())
-                .orElseThrow(() -> new EntityNotFoundException("找不到分類 ID: " + dto.getCategoryId()));
-
-        // ✅ 轉換 DTO → Entity 並設定分類
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "找不到商品分類 ID：" + dto.getCategoryId()
+                ));
+        
+        // === 建立 Entity 並設定關聯 ===
         Product product = mapper.toEntity(dto);
+        product.setName(name);
         product.setCategory(category);
-
-        // ✅ 儲存並轉換回 DTO
-        return mapper.toDto(repository.save(product));
+        
+        // === 儲存（攔截 DB constraint） ===
+        try {
+            return mapper.toDto(repository.save(product));
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "資料重複或違反資料完整性限制，請確認商品名稱是否已存在"
+            );
+        }
     }
-
+    
+    /**
+     * 更新商品
+     *
+     * - 僅在名稱實際變更時檢查唯一性
+     * - 分類變更時檢查分類是否存在
+     */
     @Override
     public ProductResponseDto update(Long id, ProductRequestDto dto) {
+        
         Product existing = repository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("找不到商品 ID: " + id));
-
-        // 若名稱改變，需檢查是否重複
-        if (!existing.getName().equalsIgnoreCase(dto.getName()) && repository.existsByName(dto.getName())) {
-            throw new DataIntegrityViolationException("相同商品名稱已存在，請重新輸入商品名稱。");
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "找不到商品 ID：" + id
+                ));
+        
+        // === 商品名稱變更檢查 ===
+        if (StringUtils.hasText(dto.getName())) {
+            String newName = dto.getName().trim();
+            
+            if (!newName.equalsIgnoreCase(existing.getName())
+                    && repository.existsByName(newName)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "相同商品名稱已存在，請重新輸入商品名稱。"
+                );
+            }
+            existing.setName(newName);
         }
-
-        // ✅ 檢查是否更新分類
+        
+        // === 分類更新檢查 ===
         if (dto.getCategoryId() != null) {
             ProductCategory category = categoryRepository.findById(dto.getCategoryId())
-                    .orElseThrow(() -> new EntityNotFoundException("找不到分類 ID: " + dto.getCategoryId()));
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "找不到商品分類 ID：" + dto.getCategoryId()
+                    ));
             existing.setCategory(category);
         }
-
+        
+        // === 套用其餘可更新欄位 ===
         mapper.updateEntityFromDto(dto, existing);
-        return mapper.toDto(repository.save(existing));
+        
+        try {
+            return mapper.toDto(repository.save(existing));
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "資料重複或違反資料完整性限制，請確認商品資料"
+            );
+        }
     }
-
+    
+    /**
+     * 取得單一商品
+     */
     @Override
     @Transactional(readOnly = true)
     public ProductResponseDto getById(Long id) {
         return repository.findById(id)
                 .map(mapper::toDto)
-                .orElseThrow(() -> new EntityNotFoundException("找不到商品 ID: " + id));
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到商品 ID：" + id)
+                );
     }
-
+    
+    /**
+     * 停用商品
+     */
+    @Override
+    public ProductResponseDto deactivate(Long id) {
+        Product product = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "找不到商品 ID：" + id
+                ));
+        
+        product.setActive(false);
+        return mapper.toDto(repository.save(product));
+    }
+    
+    /**
+     * 啟用商品
+     */
+    @Override
+    public ProductResponseDto activate(Long id) {
+        Product product = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "找不到商品 ID：" + id
+                ));
+        
+        product.setActive(true);
+        return mapper.toDto(repository.save(product));
+    }
+    
+    /**
+     * 取得全部商品（不含關聯）
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ProductResponseDto> getAll() {
-        return repository.findAll().stream().map(mapper::toDto).collect(Collectors.toList());
+        return repository.findAll()
+                .stream()
+                .map(mapper::toDto)
+                .collect(Collectors.toList());
     }
-
+    
+    /**
+     * 取得啟用中的商品
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ProductResponseDto> getActiveProducts() {
-        return repository.findByActiveTrue().stream().map(mapper::toDto).collect(Collectors.toList());
+        return repository.findByActiveTrue()
+                .stream()
+                .map(mapper::toDto)
+                .collect(Collectors.toList());
     }
-
+    
+    /**
+     * 取得商品（含關聯資料）
+     */
     @Override
     @Transactional(readOnly = true)
     public ProductResponseDto getWithRelations(Long id) {
+        
         Product product = repository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("找不到商品 ID: " + id));
-
-        // 預先載入關聯資料
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到商品 ID：" + id)
+                );
+        
+        // 預先載入關聯，避免 LazyInitializationException
         product.getSales().size();
         product.getOrderItems().size();
-
+        
         return mapper.toDto(product);
     }
-
+    
+    /**
+     * 商品搜尋（Specification）
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ProductResponseDto> search(ProductSearchRequest search) {
-
-        Product probe = new Product();
-
-        // ===== 模糊搜尋條件 =====
-        if (StringUtils.hasText(search.getName())) {
-            probe.setName(search.getName().trim());
-        }
-
-        // ===== 是否啟用 =====
-        if (search.getActive() != null) {
-            probe.setActive(search.getActive());
-        }
-
-        // ===== 分類（⚠️ Example 無法直接處理關聯）=====
-        if (search.getCategoryId() != null) {
-            ProductCategory categoryRef = categoryRepository.getReferenceById(search.getCategoryId());
-            probe.setCategory(categoryRef);
-        }
-
-        ExampleMatcher matcher = ExampleMatcher.matching()
-                .withIgnoreNullValues()
-                .withIgnoreCase()
-                .withStringMatcher(ExampleMatcher.StringMatcher.CONTAINING);
-
-        Example<Product> example = Example.of(probe, matcher);
-
-        return repository.findAll(example)
+        
+        return repository.findAll(ProductSpecification.build(search))
                 .stream()
                 .map(mapper::toDto)
                 .toList();
     }
-
+    
+    /**
+     * 刪除商品
+     */
     @Override
     public void delete(Long id) {
         if (!repository.existsById(id)) {
-            throw new EntityNotFoundException("刪除失敗，找不到商品 ID: " + id);
+            throw new EntityNotFoundException("刪除失敗，找不到商品 ID：" + id);
         }
         repository.deleteById(id);
     }
-
+    
+    /**
+     * 依分類取得商品
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ProductResponseDto> getByCategory(Long categoryId) {
+        
         if (!categoryRepository.existsById(categoryId)) {
-            throw new EntityNotFoundException("找不到分類 ID: " + categoryId);
+            throw new EntityNotFoundException("找不到分類 ID：" + categoryId);
         }
+        
         return repository.findByCategoryId(categoryId)
                 .stream()
                 .map(mapper::toDto)
                 .collect(Collectors.toList());
     }
-
 }

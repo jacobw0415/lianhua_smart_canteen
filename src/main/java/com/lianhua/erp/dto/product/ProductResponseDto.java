@@ -54,5 +54,8 @@ public class ProductResponseDto {
 
         @Schema(description = "分類代碼", example = "VEG")
         private String code;
+        
+        @Schema(description = "是否啟用（true=啟用、false=停用）", example = "true")
+        private Boolean active;
     }
 }
