@@ -23,7 +23,7 @@ public class ProductCategoryResponseDto {
     @Schema(description = "分類描述", example = "提供素食便當類商品")
     private String description;
 
-    @Schema(description = "是否啟用", example = "true")
+    @Schema(description = "是否啟用（true=啟用、false=停用）", example = "true")
     private Boolean active;
 
     @Schema(description = "建立時間")

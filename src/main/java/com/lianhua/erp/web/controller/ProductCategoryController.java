@@ -25,19 +25,13 @@ public class ProductCategoryController {
 
     private final ProductCategoryService service;
 
-
+    // ================================================================
+    // 建立商品分類
+    // ================================================================
     @Operation(
             summary = "建立新分類",
-            description = "建立一筆商品分類資料（name 與 code 需唯一）。"
+            description = "建立一筆新的商品分類資料，分類名稱與代碼需為唯一值。"
     )
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "建立成功",
-                    content = @Content(schema = @Schema(implementation = ProductCategoryResponseDto.class))),
-            @ApiResponse(responseCode = "409", description = "分類名稱或代碼重複",
-                    content = @Content(schema = @Schema(implementation = ConflictResponse.class))),
-            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
-                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
-    })
     @PostMapping
     public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> create(
             @Valid @RequestBody ProductCategoryRequestDto dto) {
@@ -45,18 +39,13 @@ public class ProductCategoryController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.ok(created));
     }
 
-
+    // ================================================================
+    // 更新商品分類
+    // ================================================================
     @Operation(
             summary = "更新分類資料",
-            description = "根據分類 ID 更新名稱、代碼、描述或啟用狀態。"
+            description = "依分類 ID 更新分類的基本資料（名稱、代碼、描述等）。"
     )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "更新成功"),
-            @ApiResponse(responseCode = "404", description = "找不到分類 ID",
-                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
-            @ApiResponse(responseCode = "409", description = "名稱或代碼重複",
-                    content = @Content(schema = @Schema(implementation = ConflictResponse.class)))
-    })
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> update(
             @PathVariable Long id,
@@ -64,13 +53,13 @@ public class ProductCategoryController {
         return ResponseEntity.ok(ApiResponseDto.ok(service.update(id, dto)));
     }
 
-
-    @Operation(summary = "取得所有分類清單", description = "回傳所有商品分類資料。")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "查詢成功",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ProductCategoryResponseDto.class)))),
-            @ApiResponse(responseCode = "204", description = "目前沒有分類資料")
-    })
+    // ================================================================
+    // 取得全部分類
+    // ================================================================
+    @Operation(
+            summary = "取得所有分類清單",
+            description = "查詢系統中所有商品分類（包含啟用與停用）。"
+    )
     @GetMapping
     public ResponseEntity<ApiResponseDto<List<ProductCategoryResponseDto>>> getAll() {
         List<ProductCategoryResponseDto> list = service.getAll();
@@ -81,12 +70,13 @@ public class ProductCategoryController {
         return ResponseEntity.ok(ApiResponseDto.ok(list));
     }
 
-
-    @Operation(summary = "取得啟用中分類清單", description = "回傳 active=true 的商品分類。")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "查詢成功"),
-            @ApiResponse(responseCode = "204", description = "目前沒有啟用中分類")
-    })
+    // ================================================================
+    // 取得啟用中的分類
+    // ================================================================
+    @Operation(
+            summary = "取得啟用中分類清單",
+            description = "查詢目前可用於業務流程的商品分類（active = true）。"
+    )
     @GetMapping("/active")
     public ResponseEntity<ApiResponseDto<List<ProductCategoryResponseDto>>> getActive() {
         List<ProductCategoryResponseDto> list = service.getActive();
@@ -97,30 +87,83 @@ public class ProductCategoryController {
         return ResponseEntity.ok(ApiResponseDto.ok(list));
     }
 
-
-    @Operation(summary = "依 ID 取得分類", description = "傳入分類 ID 取得詳細資料。")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "查詢成功"),
-            @ApiResponse(responseCode = "404", description = "找不到分類 ID",
-                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
-    })
+    // ================================================================
+    // 依 ID 查詢分類
+    // ================================================================
+    @Operation(
+            summary = "依 ID 取得分類",
+            description = "根據分類 ID 取得單一商品分類的詳細資料。"
+    )
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> getById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> getById(
+            @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getById(id)));
     }
 
-
+    // ================================================================
+    // 停用商品分類
+    // ================================================================
     @Operation(
-            summary = "刪除分類",
-            description = "根據分類 ID 刪除指定資料。若該分類被商品引用則可能刪除失敗。"
+            summary = "停用商品分類",
+            description = "將指定商品分類設為停用，停用後該分類不可用於新增銷售單。"
+    )
+    @PutMapping("/{id}/deactivate")
+    public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> deactivate(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.deactivate(id)));
+    }
+
+    // ================================================================
+    // 啟用商品分類
+    // ================================================================
+    @Operation(
+            summary = "啟用商品分類",
+            description = "將指定商品分類重新設為啟用狀態，使其可再次用於業務流程。"
+    )
+    @PutMapping("/{id}/activate")
+    public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> activate(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.activate(id)));
+    }
+
+    // ================================================================
+    // 模糊搜尋商品分類
+    // ================================================================
+    @Operation(
+            summary = "搜尋商品分類",
+            description = "依分類名稱、代碼或啟用狀態進行模糊搜尋，未提供條件時回傳全部分類。"
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "刪除成功"),
-            @ApiResponse(responseCode = "404", description = "找不到分類 ID",
-                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
-            @ApiResponse(responseCode = "409", description = "刪除失敗：分類被引用",
-                    content = @Content(schema = @Schema(implementation = ConflictResponse.class)))
+            @ApiResponse(responseCode = "200", description = "搜尋成功",
+                    content = @Content(array = @ArraySchema(
+                            schema = @Schema(implementation = ProductCategoryResponseDto.class)
+                    ))),
+            @ApiResponse(responseCode = "204", description = "查無符合條件的分類資料")
     })
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponseDto<List<ProductCategoryResponseDto>>> search(
+            ProductCategorySearchRequest search) {
+
+        List<ProductCategoryResponseDto> list = service.search(search);
+
+        if (list.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NO_CONTENT)
+                    .body(ApiResponseDto.error(
+                            HttpStatus.NO_CONTENT.value(),
+                            "查無符合條件的分類資料"
+                    ));
+        }
+
+        return ResponseEntity.ok(ApiResponseDto.ok(list));
+    }
+
+    // ================================================================
+    // 刪除商品分類
+    // ================================================================
+    @Operation(
+            summary = "刪除分類",
+            description = "依分類 ID 刪除商品分類，若分類已被商品引用則可能刪除失敗。"
+    )
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponseDto<Void>> delete(@PathVariable Long id) {
         service.delete(id);

@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.product;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -7,6 +8,7 @@ import lombok.Data;
 
 @Data
 @Schema(description = "商品分類建立／更新請求 DTO")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ProductCategoryRequestDto {
 
     @NotBlank
