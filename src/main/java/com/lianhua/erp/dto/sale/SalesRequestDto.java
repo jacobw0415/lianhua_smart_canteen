@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.sale;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -8,6 +9,7 @@ import java.time.LocalDate;
 
 @Data
 @Schema(description = "銷售資料請求 DTO")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class SalesRequestDto {
     
     @Schema(description = "銷售日期", example = "2025-10-16")
