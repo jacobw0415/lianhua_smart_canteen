@@ -6,6 +6,7 @@ import com.lianhua.erp.dto.product.ProductCategoryResponseDto;
 import com.lianhua.erp.dto.product.ProductCategorySearchRequest;
 import com.lianhua.erp.mapper.ProductCategoryMapper;
 import com.lianhua.erp.repository.ProductCategoryRepository;
+import com.lianhua.erp.repository.ProductRepository;
 import com.lianhua.erp.service.ProductCategoryService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 public class ProductCategoryServiceImpl implements ProductCategoryService {
     
     private final ProductCategoryRepository repository;
+    private final ProductRepository productRepository;
     private final ProductCategoryMapper mapper;
     
     /**
@@ -244,9 +246,24 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
      */
     @Override
     public void delete(Long id) {
+
+        // 分類不存在
         if (!repository.existsById(id)) {
-            throw new EntityNotFoundException("刪除失敗，找不到分類 ID：" + id);
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "刪除失敗，找不到商品分類 ID：" + id
+            );
         }
+
+        // 分類已被商品使用 → 不允許刪除
+        if (productRepository.existsByCategoryId(id)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "此商品類別已有創建商品，無法刪除，請改為停用!"
+            );
+        }
+
+        // 可安全刪除
         repository.deleteById(id);
     }
 }

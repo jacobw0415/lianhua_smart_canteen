@@ -8,6 +8,7 @@ import com.lianhua.erp.dto.product.ProductSearchRequest;
 import com.lianhua.erp.mapper.ProductMapper;
 import com.lianhua.erp.repository.ProductCategoryRepository;
 import com.lianhua.erp.repository.ProductRepository;
+import com.lianhua.erp.repository.SalesRepository;
 import com.lianhua.erp.service.ProductService;
 import com.lianhua.erp.service.impl.spec.ProductSpecification;
 import jakarta.persistence.EntityNotFoundException;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 public class ProductServiceImpl implements ProductService {
     
     private final ProductRepository repository;
+    private final SalesRepository salesRepository;
     private final ProductCategoryRepository categoryRepository;
     private final ProductMapper mapper;
     
@@ -245,6 +247,10 @@ public class ProductServiceImpl implements ProductService {
     public void delete(Long id) {
         if (!repository.existsById(id)) {
             throw new EntityNotFoundException("刪除失敗，找不到商品 ID：" + id);
+        }
+
+        if (salesRepository.existsByProductId(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "此商品已有銷售紀錄，無法刪除，請改為停用!");
         }
         repository.deleteById(id);
     }
