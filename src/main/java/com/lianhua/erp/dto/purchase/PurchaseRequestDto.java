@@ -25,6 +25,9 @@ public class PurchaseRequestDto extends BaseRequestDto {
     
     @Schema(description = "數量", example = "100")
     private Integer qty;
+
+    @Schema(description = "數量單位（顯示用，例如：斤、箱、盒）")
+    private String unit;
     
     @Schema(description = "單價", example = "25.50")
     private BigDecimal unitPrice;

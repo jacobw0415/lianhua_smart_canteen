@@ -47,6 +47,7 @@ CREATE TABLE purchases (
   purchase_date DATE NOT NULL,
   accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
   item VARCHAR(120) NOT NULL,
+  unit VARCHAR(20) NOT NULL COMMENT '顯示用單位（斤、箱、盒）',
   qty INT UNSIGNED NOT NULL,
   unit_price DECIMAL(10,2) UNSIGNED NOT NULL,
   tax_rate DECIMAL(5,2) DEFAULT 0.00,

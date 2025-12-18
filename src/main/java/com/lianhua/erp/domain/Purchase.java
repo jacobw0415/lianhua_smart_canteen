@@ -66,6 +66,10 @@ public class Purchase {
     @Schema(description = "數量")
     private Integer qty;
 
+    @Column(length = 20, nullable = false)
+    @Schema(description = "數量單位（顯示用，例如：斤、箱、盒）")
+    private String unit;
+
     @Column(name = "unit_price", precision = 10, scale = 2, nullable = false)
     @Schema(description = "單價")
     private BigDecimal unitPrice;
