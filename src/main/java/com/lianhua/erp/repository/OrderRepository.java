@@ -6,4 +6,5 @@ import java.time.LocalDate;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
     boolean existsByCustomer_IdAndOrderDate(Long customerId, LocalDate orderDate);
+    boolean existsByCustomerId(Long customerId);
 }

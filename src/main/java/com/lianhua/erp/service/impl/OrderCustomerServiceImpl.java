@@ -4,6 +4,7 @@ import com.lianhua.erp.domain.OrderCustomer;
 import com.lianhua.erp.dto.orderCustomer.*;
 import com.lianhua.erp.mapper.OrderCustomerMapper;
 import com.lianhua.erp.repository.OrderCustomerRepository;
+import com.lianhua.erp.repository.OrderRepository;
 import com.lianhua.erp.service.OrderCustomerService;
 import com.lianhua.erp.service.impl.spec.OrderCustomerSpecifications;
 import jakarta.persistence.EntityNotFoundException;
@@ -13,8 +14,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +27,7 @@ public class OrderCustomerServiceImpl implements OrderCustomerService {
 
     private final OrderCustomerRepository repository;
     private final OrderCustomerMapper mapper;
+    private final OrderRepository orderRepository;
 
     /**
      * 建立新客戶
@@ -34,8 +38,12 @@ public class OrderCustomerServiceImpl implements OrderCustomerService {
      */
     @Override
     public OrderCustomerResponseDto create(OrderCustomerRequestDto dto) {
+
         if (repository.existsByName(dto.getName())) {
-            throw new DataIntegrityViolationException("客戶名稱已存在：" + dto.getName());
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "建立失敗，客戶名稱已存在：" + dto.getName()
+            );
         }
 
         OrderCustomer entity = mapper.toEntity(dto);
@@ -44,8 +52,7 @@ public class OrderCustomerServiceImpl implements OrderCustomerService {
             entity.setBillingCycle(OrderCustomer.BillingCycle.valueOf(dto.getBillingCycle()));
         }
 
-        repository.save(entity);
-        return mapper.toResponseDto(entity);
+        return mapper.toResponseDto(repository.save(entity));
     }
 
     /**
@@ -59,6 +66,13 @@ public class OrderCustomerServiceImpl implements OrderCustomerService {
     public OrderCustomerResponseDto update(Long id, OrderCustomerRequestDto dto) {
         OrderCustomer entity = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到客戶 ID: " + id));
+        
+        if (dto.getName() != null && repository.existsByNameAndIdNot(dto.getName(), id)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "更新失敗，客戶名稱已存在：" + dto.getName()
+            );
+        }
 
         mapper.updateEntityFromDto(dto, entity);
 
@@ -79,6 +93,14 @@ public class OrderCustomerServiceImpl implements OrderCustomerService {
     public void delete(Long id) {
         if (!repository.existsById(id)) {
             throw new EntityNotFoundException("找不到要刪除的客戶 ID: " + id);
+        }
+
+        boolean hasOrders = orderRepository.existsByCustomerId(id);
+        if (hasOrders) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "刪除失敗，該客戶已有訂單紀錄，無法刪除"
+            );
         }
         repository.deleteById(id);
     }

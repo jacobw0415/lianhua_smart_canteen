@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface OrderCustomerRepository extends JpaRepository<OrderCustomer, Long> , JpaSpecificationExecutor<OrderCustomer> {
     Optional<OrderCustomer> findByName(String name);
     boolean existsByName(String name);
+    boolean existsByNameAndIdNot(String name, Long id);
 }
