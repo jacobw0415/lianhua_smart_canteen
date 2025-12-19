@@ -122,6 +122,10 @@ public class PurchaseServiceImpl implements PurchaseService {
         if (dto.getQty() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（數量）為必填欄位");
         }
+        
+        if (dto.getUnit() == null || dto.getUnit().isBlank()){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"（單位）為必填欄位");
+        }
 
         if (dto.getQty() <= 0) {
             throw new IllegalArgumentException("數量必須大於 0");

@@ -20,6 +20,7 @@ public interface PurchaseMapper {
     Purchase toEntity(PurchaseRequestDto dto);
     @Mapping(source = "purchaseNo", target = "purchaseNo")
     @Mapping(source = "supplier.name", target = "supplierName")
+    @Mapping(source = "unit", target = "unit")
     @Mapping(source = "payments", target = "payments")
     @Mapping(target = "totalAmount", expression = "java(calcTotal(entity))")
     @Mapping(target = "paidAmount", expression = "java(calcPaid(entity))")
