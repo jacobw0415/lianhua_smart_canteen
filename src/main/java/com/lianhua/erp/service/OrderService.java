@@ -1,12 +1,41 @@
 package com.lianhua.erp.service;
 
 import com.lianhua.erp.dto.order.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 
 public interface OrderService {
-    OrderResponseDto create(OrderRequestDto dto);
-    OrderResponseDto update(Long id, OrderRequestDto dto);
-    void delete(Long id);
+
+
+    Page<OrderResponseDto> page(Pageable pageable);
+
+    // ================================
+    // 查詢訂單（搜尋 + 分頁）
+    // ================================
+    Page<OrderResponseDto> search(
+            OrderSearchRequest searchRequest,
+            Pageable pageable
+    );
+
+    // ================================
+    // 查詢單筆訂單
+    // ================================
     OrderResponseDto findById(Long id);
-    List<OrderResponseDto> findAll();
+
+    // ================================
+    // 建立訂單
+    // ================================
+    OrderResponseDto create(OrderRequestDto dto);
+
+    // ================================
+    // 更新訂單
+    // ================================
+    OrderResponseDto update(Long id, OrderRequestDto dto);
+
+    // ================================
+    // 刪除訂單
+    // ================================
+    void delete(Long id);
 }
