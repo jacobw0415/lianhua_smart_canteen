@@ -5,53 +5,76 @@ import com.lianhua.erp.dto.orderCustomer.*;
 import com.lianhua.erp.mapper.OrderCustomerMapper;
 import com.lianhua.erp.repository.OrderCustomerRepository;
 import com.lianhua.erp.service.OrderCustomerService;
+import com.lianhua.erp.service.impl.spec.OrderCustomerSpecifications;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 @Slf4j
 public class OrderCustomerServiceImpl implements OrderCustomerService {
-    
+
     private final OrderCustomerRepository repository;
     private final OrderCustomerMapper mapper;
-    
+
+    /**
+     * 建立新客戶
+     * - 檢查名稱是否重複
+     * - 轉換 DTO -> Entity
+     * - 設定 BillingCycle（如有）
+     * - 儲存並回傳 Response DTO
+     */
     @Override
     public OrderCustomerResponseDto create(OrderCustomerRequestDto dto) {
         if (repository.existsByName(dto.getName())) {
             throw new DataIntegrityViolationException("客戶名稱已存在：" + dto.getName());
         }
-        
+
         OrderCustomer entity = mapper.toEntity(dto);
+
         if (dto.getBillingCycle() != null) {
             entity.setBillingCycle(OrderCustomer.BillingCycle.valueOf(dto.getBillingCycle()));
         }
-        
+
         repository.save(entity);
         return mapper.toResponseDto(entity);
     }
-    
+
+    /**
+     * 更新既有客戶
+     * - 根據 ID 找 Entity（找不到則 Exception）
+     * - 更新欄位
+     * - 覆寫 BillingCycle（如有）
+     * - 儲存並回傳 Response DTO
+     */
     @Override
     public OrderCustomerResponseDto update(Long id, OrderCustomerRequestDto dto) {
         OrderCustomer entity = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到客戶 ID: " + id));
-        
+
         mapper.updateEntityFromDto(dto, entity);
-        
+
         if (dto.getBillingCycle() != null) {
             entity.setBillingCycle(OrderCustomer.BillingCycle.valueOf(dto.getBillingCycle()));
         }
-        
+
         return mapper.toResponseDto(repository.save(entity));
     }
-    
+
+    /**
+     * 刪除客戶
+     * - 根據 ID 找是否存在
+     * - 不存在則拋出 404 Exception
+     * - 存在則刪除
+     */
     @Override
     public void delete(Long id) {
         if (!repository.existsById(id)) {
@@ -59,13 +82,49 @@ public class OrderCustomerServiceImpl implements OrderCustomerService {
         }
         repository.deleteById(id);
     }
-    
+
+    /**
+     * 純分頁查詢（不包含搜尋條件）
+     * - 使用 Spring Data JPA 內建 findAll(Pageable)
+     * - 回傳 DTO Page
+     * Page<T> findAll(Pageable) 是 Spring Data JPA Pagination 功能的一部分，
+     * 會自動把前端傳入的 page/size/sort 轉成 SQL limit/offset 排序。 :contentReference[oaicite:0]{index=0}
+     */
     @Override
-    public List<OrderCustomerResponseDto> findAll() {
-        return repository.findAll().stream().map(mapper::toResponseDto).toList();
+    public Page<OrderCustomerResponseDto> page(Pageable pageable) {
+        return repository
+                .findAll(pageable)
+                .map(mapper::toResponseDto);
     }
-    
+
+    /**
+     * 分頁 + 模糊搜尋
+     * - 透過 Specification 動態組合查詢條件
+     * - 適用於 List Filter & React-Admin 搜尋介面
+     * - 結果以 Page 回傳
+     * findAll(Specification, Pageable) 會同時處理條件查詢與分頁排序。 :contentReference[oaicite:1]{index=1}
+     */
     @Override
+    @Transactional(readOnly = true)
+    public Page<OrderCustomerResponseDto> search(
+            OrderCustomerRequestDto request,
+            Pageable pageable
+    ) {
+        Specification<OrderCustomer> spec =
+                OrderCustomerSpecifications.bySearchRequest(request);
+
+        return repository.findAll(spec, pageable)
+                .map(mapper::toResponseDto);
+    }
+
+    /**
+     * 單一客戶查詢
+     * - 根據 ID 查詢
+     * - 找不到則拋出 NotFound Exception
+     * - 找到則回傳對應 DTO
+     */
+    @Override
+    @Transactional(readOnly = true)
     public OrderCustomerResponseDto findById(Long id) {
         return repository.findById(id)
                 .map(mapper::toResponseDto)
