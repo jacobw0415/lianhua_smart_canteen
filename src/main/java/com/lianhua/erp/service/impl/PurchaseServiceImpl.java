@@ -11,6 +11,7 @@ import com.lianhua.erp.service.PurchaseService;
 import com.lianhua.erp.service.impl.spec.PurchaseSpecifications;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class PurchaseServiceImpl implements PurchaseService {
 
     private final PurchaseRepository purchaseRepository;
@@ -128,7 +130,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
 
         if (dto.getQty() <= 0) {
-            throw new IllegalArgumentException("數量必須大於 0");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"數量必須大於 0");
         }
 
         if (dto.getUnitPrice() == null) {
@@ -147,7 +149,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         // =============================================
         Supplier supplier = supplierRepository.findById(dto.getSupplierId())
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, STR."找不到供應商 ID：\{dto.getSupplierId()}"
+                        HttpStatus.BAD_REQUEST, "找不到供應商 ID：" + dto.getSupplierId()
                 ));
 
         if (!Boolean.TRUE.equals(supplier.getActive())) {
@@ -263,7 +265,7 @@ public class PurchaseServiceImpl implements PurchaseService {
 
                                 throw new ResponseStatusException(
                                         HttpStatus.BAD_REQUEST,
-                                        STR."付款日期不得早於進貨日期 (\{purchase.getPurchaseDate()})"
+                                        "付款日期不得早於進貨日期 (" + purchase.getPurchaseDate() + ")"
                                 );
                             }
 
@@ -283,7 +285,7 @@ public class PurchaseServiceImpl implements PurchaseService {
             if (paidTotal.compareTo(purchase.getTotalAmount()) > 0) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        STR."首筆付款金額不可超過進貨應付總額 (\{purchase.getTotalAmount()})"
+                        "首筆付款金額不可超過進貨應付總額 (" + purchase.getTotalAmount() + ")"
                 );
             }
 
@@ -304,12 +306,13 @@ public class PurchaseServiceImpl implements PurchaseService {
         // 7️⃣ 儲存
         // =============================================
         try {
+            log.info("建立進貨單：supplierId={}, item={}, totalAmount={}, paidAmount={}",
+                    dto.getSupplierId(), normalizedItem, purchase.getTotalAmount(), paidTotal);
+            
             Purchase saved = purchaseRepository.save(purchase);
+            // Cascade 會自動保存 payments，不需要手動保存
 
-            if (purchase.getPayments() != null && !purchase.getPayments().isEmpty()) {
-                paymentRepository.saveAll(purchase.getPayments());
-            }
-
+            log.info("進貨單建立成功：purchaseId={}, purchaseNo={}", saved.getId(), saved.getPurchaseNo());
             return purchaseMapper.toDto(saved);
 
         } catch (DataIntegrityViolationException e) {
@@ -358,16 +361,16 @@ public class PurchaseServiceImpl implements PurchaseService {
         // 3️⃣ 固定欄位不可修改
         // ========================================
         if (dto.getItem() != null && !dto.getItem().equals(purchase.getItem())) {
-            throw new IllegalArgumentException("不允許修改品名。");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改品名。");
         }
         if (dto.getQty() != null && dto.getQty().compareTo(purchase.getQty()) != 0) {
-            throw new IllegalArgumentException("不允許修改數量。");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改數量。");
         }
         if (dto.getUnitPrice() != null && dto.getUnitPrice().compareTo(purchase.getUnitPrice()) != 0) {
-            throw new IllegalArgumentException("不允許修改單價。");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改單價。");
         }
         if (dto.getPurchaseDate() != null && !dto.getPurchaseDate().equals(purchase.getPurchaseDate())) {
-            throw new IllegalArgumentException("不允許修改進貨日期。");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改進貨日期。");
         }
 
         // ========================================
@@ -526,10 +529,13 @@ public class PurchaseServiceImpl implements PurchaseService {
         purchase.setBalance(totalAmount.subtract(totalPaid).setScale(2, RoundingMode.HALF_UP));
         updatePurchaseStatus(purchase);
 
-        purchaseRepository.save(purchase);
-        paymentRepository.saveAll(existingPayments);
-
-        return purchaseMapper.toDto(purchase);
+        log.info("更新進貨單付款：purchaseId={}, totalPaid={}, balance={}, status={}",
+                id, totalPaid, purchase.getBalance(), purchase.getStatus());
+        
+        Purchase saved = purchaseRepository.save(purchase);
+        // Cascade 會自動處理 payments 的新增、更新、刪除
+        
+        return purchaseMapper.toDto(saved);
     }
 
     // ================================
@@ -550,7 +556,10 @@ public class PurchaseServiceImpl implements PurchaseService {
             return purchaseMapper.toDto(updated);
 
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("無效的狀態: " + status);
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "無效的狀態: " + status
+            );
         }
     }
 
@@ -564,13 +573,9 @@ public class PurchaseServiceImpl implements PurchaseService {
             throw new EntityNotFoundException("找不到進貨單 (ID: " + id + ")");
         }
 
-        paymentRepository.deleteAllByPurchaseId(id);
+        log.info("刪除進貨單：purchaseId={}", id);
         purchaseRepository.deleteById(id);
-    }
-
-    @Override
-    public List<PurchaseResponseDto> findAll() {
-        return List.of();
+        // orphanRemoval = true 會自動刪除關聯的 payments
     }
 
     // ================================

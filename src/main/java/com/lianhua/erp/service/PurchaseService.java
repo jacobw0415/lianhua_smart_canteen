@@ -17,7 +17,6 @@ public interface PurchaseService {
     PurchaseResponseDto updatePurchase(Long id, PurchaseRequestDto dto);
     PurchaseResponseDto updateStatus(Long id, String status);
     void deletePurchase(Long id);
-    List<PurchaseResponseDto> findAll();
     Page<PurchaseResponseDto> searchPurchases(PurchaseSearchRequest req, Pageable pageable);
 
 }
