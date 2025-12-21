@@ -26,7 +26,6 @@ public class OrderItemServiceImpl implements OrderItemService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final OrderItemMapper mapper;
-    private Pageable pageable;
     
     @Override
     public List<OrderItemResponseDto> findByOrderId(Long orderId) {
@@ -41,13 +40,24 @@ public class OrderItemServiceImpl implements OrderItemService {
         Product product = productRepository.findById(dto.getProductId())
                 .orElseThrow(() -> new EntityNotFoundException("找不到商品 ID: " + dto.getProductId()));
 
+        // ✅ 從商品表自動帶入單價
+        BigDecimal unitPrice = product.getUnitPrice();
+        if (unitPrice == null) {
+            throw new IllegalStateException("商品「" + product.getName() + "」未設定單價。");
+        }
+
+        // ✅ 計算小計（不考慮折扣與稅額）
+        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(dto.getQty()));
+
         OrderItem item = mapper.toEntity(dto);
         item.setOrder(order);
         item.setProduct(product);
-
-        // 自動計算小計與會計期
-        item.setSubtotal(dto.getUnitPrice().multiply(BigDecimal.valueOf(dto.getQty())));
+        item.setUnitPrice(unitPrice);  // ✅ 使用商品表的單價
+        item.setSubtotal(subtotal);
         item.setAccountingPeriod(order.getAccountingPeriod());
+
+        log.info("新增訂單明細：orderId={}, productId={}, qty={}, unitPrice={}, subtotal={}",
+                orderId, dto.getProductId(), dto.getQty(), unitPrice, subtotal);
 
         itemRepository.save(item);
 
@@ -64,12 +74,27 @@ public class OrderItemServiceImpl implements OrderItemService {
         OrderItem item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new EntityNotFoundException("找不到訂單明細 ID: " + itemId));
 
+        // ✅ 從商品表自動帶入單價（如果商品有變更）
+        Product product = productRepository.findById(dto.getProductId())
+                .orElseThrow(() -> new EntityNotFoundException("找不到商品 ID: " + dto.getProductId()));
+        
+        BigDecimal unitPrice = product.getUnitPrice();
+        if (unitPrice == null) {
+            throw new IllegalStateException("商品「" + product.getName() + "」未設定單價。");
+        }
+
+        // ✅ 計算小計（不考慮折扣與稅額）
+        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(dto.getQty()));
+
+        item.setProduct(product);
         item.setQty(dto.getQty());
-        item.setUnitPrice(dto.getUnitPrice());
-        item.setDiscount(dto.getDiscount());
-        item.setTax(dto.getTax());
+        item.setUnitPrice(unitPrice);  // ✅ 使用商品表的單價
         item.setNote(dto.getNote());
-        item.setSubtotal(dto.getUnitPrice().multiply(BigDecimal.valueOf(dto.getQty())));
+        item.setSubtotal(subtotal);
+        
+        log.info("更新訂單明細：orderId={}, itemId={}, productId={}, qty={}, unitPrice={}, subtotal={}",
+                orderId, itemId, dto.getProductId(), dto.getQty(), unitPrice, subtotal);
+
         itemRepository.save(item);
 
         // 更新訂單金額

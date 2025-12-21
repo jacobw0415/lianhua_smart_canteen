@@ -16,6 +16,9 @@ import java.util.List;
 @Schema(description = "訂單回應 DTO（含明細與客戶資訊）")
 public class OrderResponseDto {
     
+    @Schema(description = "訂單編號（商業單號）", example = "SO-202511-0003")
+    private String orderNo;
+    
     @Schema(description = "訂單 ID", example = "20251028001")
     private Long id;
     

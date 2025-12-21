@@ -7,6 +7,7 @@ import com.lianhua.erp.mapper.*;
 import com.lianhua.erp.repository.*;
 import com.lianhua.erp.service.OrderService;
 import com.lianhua.erp.service.impl.spec.OrderSpecifications;
+import com.lianhua.erp.numbering.OrderNoGenerator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository itemRepository;
     private final OrderMapper orderMapper;
     private final OrderItemMapper itemMapper;
+    private final OrderNoGenerator orderNoGenerator;
 
     // ================================
     // 查詢（支援分頁）
@@ -90,6 +92,13 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(Order.Status.PENDING);
         order.setAccountingPeriod(dto.getOrderDate().format(DateTimeFormatter.ofPattern("yyyy-MM")));
         order.setTotalAmount(BigDecimal.ZERO);
+        
+        // ⭐ 產生訂單編號（商業單號）
+        String orderNo = orderNoGenerator.generate(dto.getOrderDate());
+        order.setOrderNo(orderNo);
+
+        log.info("建立訂單：customerId={}, orderNo={}, orderDate={}",
+                dto.getCustomerId(), orderNo, dto.getOrderDate());
 
         // 先儲存主表以取得 order.id
         orderRepository.save(order);
@@ -109,22 +118,16 @@ public class OrderServiceImpl implements OrderService {
                     throw new IllegalStateException("商品「" + product.getName() + "」未設定單價。");
                 }
 
-                // 3️⃣ 預設折扣與稅額
-                BigDecimal discount = itemDto.getDiscount() != null ? itemDto.getDiscount() : BigDecimal.ZERO;
-                BigDecimal tax = itemDto.getTax() != null ? itemDto.getTax() : BigDecimal.ZERO;
-
-                // 4️⃣ 計算小計
+                // 3️⃣ 計算小計（不考慮折扣與稅額，與 OrderItemServiceImpl 一致）
                 BigDecimal qty = BigDecimal.valueOf(itemDto.getQty());
-                BigDecimal subtotal = unitPrice.multiply(qty).subtract(discount).add(tax);
+                BigDecimal subtotal = unitPrice.multiply(qty);
 
-                // 5️⃣ 建立明細
+                // 4️⃣ 建立明細
                 OrderItem item = new OrderItem();
                 item.setOrder(order);
                 item.setProduct(product);
                 item.setQty(itemDto.getQty());
                 item.setUnitPrice(unitPrice);
-                item.setDiscount(discount);
-                item.setTax(tax);
                 item.setSubtotal(subtotal);
                 item.setAccountingPeriod(order.getAccountingPeriod());
                 item.setNote(itemDto.getNote());
@@ -133,11 +136,11 @@ public class OrderServiceImpl implements OrderService {
 
                 order.getItems().add(item);
 
-                // 6️⃣ 累計總金額
+                // 5️⃣ 累計總金額
                 total = total.add(subtotal);
             }
 
-            // 7️⃣ 更新訂單總金額
+            // 6️⃣ 更新訂單總金額
             order.setTotalAmount(total);
             orderRepository.save(order);
         }

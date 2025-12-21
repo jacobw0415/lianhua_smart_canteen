@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.order;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.lianhua.erp.dto.orderItem.OrderItemRequestDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
@@ -13,6 +14,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @Schema(description = "訂單建立／更新請求 DTO")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class OrderRequestDto {
 
     @NotNull

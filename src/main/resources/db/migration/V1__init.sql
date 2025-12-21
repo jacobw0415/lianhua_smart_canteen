@@ -250,6 +250,7 @@ CREATE TABLE order_customers (
 -- ------------------------------------------------------------
 CREATE TABLE orders (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  order_no VARCHAR(20) NOT NULL COMMENT '訂單編號（SO-YYYYMM-XXXX）',
   customer_id BIGINT NOT NULL,
   order_date DATE NOT NULL,
   delivery_date DATE NOT NULL,
@@ -261,9 +262,10 @@ CREATE TABLE orders (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY(customer_id) REFERENCES order_customers(id)
     ON DELETE CASCADE ON UPDATE CASCADE,
-  UNIQUE (customer_id, order_date)
+  UNIQUE (order_no, customer_id, order_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE INDEX idx_orders_order_no ON orders(order_no);
 CREATE INDEX idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX idx_orders_accounting_period ON orders(accounting_period);
 

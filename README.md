@@ -216,8 +216,11 @@ docker-compose up -d
 
 ## 💡 Future Enhancements / 後續規劃
 
-- 📦 Inventory module (存貨模組)
 - 🧾 Payroll management (薪資管理)
 - 📅 Monthly/Quarterly tax filing reports (報稅報表自動生成)
 - 📈 Grafana integration for real-time monitoring (即時數據監控)
 - 🔐 Role-based Access Control (角色權限強化)
+
+**系統定位說明**：  
+本系統專注於**帳務管理與銷售紀錄**，不包含原物料庫存管理功能。  
+此設計符合外燴/便當業務模式，便當為即時製作，無需庫存管理。

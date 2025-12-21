@@ -13,7 +13,10 @@ import java.util.List;
 @Entity
 @Table(
         name = "orders",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"customer_id", "order_date"})
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"customer_id", "order_date"}),
+                @UniqueConstraint(name = "uk_orders_order_no", columnNames = {"order_no"})
+        }
 )
 @Getter
 @Setter
@@ -25,6 +28,9 @@ public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    
+    @Column(name = "order_no", nullable = false, length = 20, updatable = false)
+    private String orderNo;
     
     // 關聯到客戶表
     @ManyToOne(fetch = FetchType.LAZY)
