@@ -15,8 +15,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
@@ -168,7 +170,20 @@ public class OrderServiceImpl implements OrderService {
         if (order.getOrderStatus() == OrderStatus.DELIVERED ||
                 order.getOrderStatus() == OrderStatus.CANCELLED) {
 
-            throw new IllegalStateException("已交付或已取消的訂單不可修改");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "已交付或已取消的訂單不可修改"
+            );
+        }
+
+        // ⚠️ 如果要改為取消狀態，需檢查付款狀態
+        if (dto.getOrderStatus() == OrderStatus.CANCELLED) {
+            if (order.getPaymentStatus() != PaymentStatus.UNPAID) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "已有收款紀錄的訂單不可取消，請先處理退款後再取消訂單"
+                );
+            }
         }
 
         orderMapper.updateEntityFromDto(dto, order);
@@ -190,7 +205,10 @@ public class OrderServiceImpl implements OrderService {
                 );
 
         if (order.getPaymentStatus() != PaymentStatus.UNPAID) {
-            throw new IllegalStateException("已有收款紀錄的訂單不可刪除");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "已有收款紀錄的訂單不可刪除"
+            );
         }
 
         orderRepository.delete(order);

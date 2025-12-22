@@ -131,6 +131,15 @@ public class GlobalExceptionHandler {
     }
 
     // ============================================================
+    // 400：業務狀態錯誤（IllegalState）
+    // ============================================================
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<BadRequestResponse> handleIllegalState(IllegalStateException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new BadRequestResponse(ex.getMessage()));
+    }
+
+    // ============================================================
     // 500：伺服器內部錯誤
     // ============================================================
     @ExceptionHandler(Exception.class)
