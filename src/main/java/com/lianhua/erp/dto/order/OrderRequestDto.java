@@ -1,6 +1,7 @@
 package com.lianhua.erp.dto.order;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.lianhua.erp.domain.OrderStatus;
 import com.lianhua.erp.dto.orderItem.OrderItemRequestDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
@@ -20,6 +21,20 @@ public class OrderRequestDto {
     @NotNull
     @Schema(description = "客戶 ID", example = "1")
     private Long customerId;
+
+    /**
+     * 建單時允許：
+     * - PENDING
+     * - CONFIRMED
+     *
+     * 禁止：
+     * - DELIVERED
+     * - CANCELLED
+     * - paymentStatus（不存在）
+     */
+    @NotNull
+    @Schema(description = "訂單業務狀態（僅允許 PENDING / CONFIRMED）", example = "PENDING")
+    private OrderStatus orderStatus;
 
     @NotNull
     @Schema(description = "訂單日期", example = "2025-10-26")

@@ -4,35 +4,39 @@ import com.lianhua.erp.domain.Receipt;
 import com.lianhua.erp.dto.receipt.*;
 import org.mapstruct.*;
 
-
 @Mapper(componentModel = "spring")
 public interface ReceiptMapper {
-    
+
     /**
-     * 將建立用 DTO 轉換為 Entity
-     * 注意：不自動設置金額與訂單，Service 會補上。
+     * 建立收款時使用
+     *
+     * 規則：
+     * - order 由 Service 設定
+     * - accountingPeriod 由 Service 計算
+     * - amount 由 DTO 傳入（支援階段性付款）
      */
     @Mapping(target = "order", ignore = true)
-    @Mapping(target = "amount", ignore = true)
     @Mapping(target = "accountingPeriod", ignore = true)
     Receipt toEntity(ReceiptRequestDto dto);
-    
+
     /**
-     * 將 Entity 轉換為回應 DTO
+     * Entity → Response DTO
      */
     @Mapping(source = "order.id", target = "orderId")
-    @Mapping(source = "method", target = "method")
     ReceiptResponseDto toDto(Receipt entity);
-    
+
     /**
-     * 用於部分更新的映射：
-     * - 忽略 null 欄位（不覆蓋現有值）
-     * - 忽略不應修改的欄位（order、amount、accountingPeriod）
+     * 更新收款時使用（部分更新）
+     *
+     * 規則：
+     * - null 不覆蓋
+     * - order 不可改
+     * - accountingPeriod 由 Service 依 receivedDate 重算
+     * - amount 允許修改（修正輸入錯誤）
      */
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mappings({
             @Mapping(target = "order", ignore = true),
-            @Mapping(target = "amount", ignore = true),
             @Mapping(target = "accountingPeriod", ignore = true)
     })
     void updateEntityFromDto(ReceiptRequestDto dto, @MappingTarget Receipt entity);

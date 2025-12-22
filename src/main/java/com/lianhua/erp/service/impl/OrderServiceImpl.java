@@ -36,7 +36,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderNoGenerator orderNoGenerator;
 
     // ================================
-    // 查詢（支援分頁）
+    // 查詢（分頁）
     // ================================
     @Override
     @Transactional(readOnly = true)
@@ -45,9 +45,8 @@ public class OrderServiceImpl implements OrderService {
                 .map(order -> orderMapper.toResponseDto(order, itemMapper));
     }
 
-
     // ================================
-    // 查詢訂單（搜尋 + 分頁）
+    // 搜尋 + 分頁
     // ================================
     @Override
     @Transactional(readOnly = true)
@@ -63,115 +62,137 @@ public class OrderServiceImpl implements OrderService {
     }
 
     // ================================
-    // 查詢單筆訂單
+    // 查詢單筆
     // ================================
     @Override
+    @Transactional(readOnly = true)
     public OrderResponseDto findById(Long id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到訂單 ID: " + id));
+
         return orderMapper.toResponseDto(order, itemMapper);
     }
 
     // ================================
-    // 建立訂單（可同時含明細）
+    // 建立訂單
     // ================================
     @Override
     public OrderResponseDto create(OrderRequestDto dto) {
-        // 驗證客戶
-        OrderCustomer customer = customerRepository.findById(dto.getCustomerId())
-                .orElseThrow(() -> new EntityNotFoundException("找不到客戶 ID: " + dto.getCustomerId()));
 
-        // 檢查唯一約束 (customer_id + order_date)
-        if (orderRepository.existsByCustomer_IdAndOrderDate(dto.getCustomerId(), dto.getOrderDate())) {
+        // 1️⃣ 驗證客戶
+        OrderCustomer customer = customerRepository.findById(dto.getCustomerId())
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到客戶 ID: " + dto.getCustomerId())
+                );
+
+        // 2️⃣ 驗證建單狀態
+        if (dto.getOrderStatus() != OrderStatus.PENDING &&
+                dto.getOrderStatus() != OrderStatus.CONFIRMED) {
+
+            throw new IllegalArgumentException("建單時僅允許 PENDING 或 CONFIRMED 狀態");
+        }
+
+        // 3️⃣ 防止重複建單
+        if (orderRepository.existsByCustomer_IdAndOrderDate(
+                dto.getCustomerId(), dto.getOrderDate())) {
+
             throw new DataIntegrityViolationException("該客戶於該日期已有訂單，請勿重複建立。");
         }
 
-        // 建立主表
+        // 4️⃣ 建立主檔
         Order order = orderMapper.toEntity(dto);
         order.setCustomer(customer);
-        order.setStatus(Order.Status.PENDING);
-        order.setAccountingPeriod(dto.getOrderDate().format(DateTimeFormatter.ofPattern("yyyy-MM")));
+        order.setOrderStatus(dto.getOrderStatus());
+        order.setPaymentStatus(PaymentStatus.UNPAID);
+        order.setAccountingPeriod(
+                dto.getOrderDate().format(DateTimeFormatter.ofPattern("yyyy-MM"))
+        );
         order.setTotalAmount(BigDecimal.ZERO);
-        
-        // ⭐ 產生訂單編號（商業單號）
+
+        // 5️⃣ 產生訂單編號
         String orderNo = orderNoGenerator.generate(dto.getOrderDate());
         order.setOrderNo(orderNo);
 
-        log.info("建立訂單：customerId={}, orderNo={}, orderDate={}",
-                dto.getCustomerId(), orderNo, dto.getOrderDate());
-
-        // 先儲存主表以取得 order.id
         orderRepository.save(order);
 
-        // 若包含明細，一併處理
-        if (dto.getItems() != null && !dto.getItems().isEmpty()) {
-            BigDecimal total = BigDecimal.ZERO;
+        // 6️⃣ 處理明細
+        BigDecimal total = BigDecimal.ZERO;
 
-            for (OrderItemRequestDto itemDto : dto.getItems()) {
-                // 1️⃣ 驗證商品存在
-                Product product = productRepository.findById(itemDto.getProductId())
-                        .orElseThrow(() -> new EntityNotFoundException("找不到商品 ID: " + itemDto.getProductId()));
+        for (OrderItemRequestDto itemDto : dto.getItems()) {
 
-                // 2️⃣ 從商品表自動帶入單價
-                BigDecimal unitPrice = product.getUnitPrice();
-                if (unitPrice == null) {
-                    throw new IllegalStateException("商品「" + product.getName() + "」未設定單價。");
-                }
+            Product product = productRepository.findById(itemDto.getProductId())
+                    .orElseThrow(() ->
+                            new EntityNotFoundException("找不到商品 ID: " + itemDto.getProductId())
+                    );
 
-                // 3️⃣ 計算小計（不考慮折扣與稅額，與 OrderItemServiceImpl 一致）
-                BigDecimal qty = BigDecimal.valueOf(itemDto.getQty());
-                BigDecimal subtotal = unitPrice.multiply(qty);
+            BigDecimal unitPrice = product.getUnitPrice();
+            BigDecimal subtotal =
+                    unitPrice.multiply(BigDecimal.valueOf(itemDto.getQty()));
 
-                // 4️⃣ 建立明細
-                OrderItem item = new OrderItem();
-                item.setOrder(order);
-                item.setProduct(product);
-                item.setQty(itemDto.getQty());
-                item.setUnitPrice(unitPrice);
-                item.setSubtotal(subtotal);
-                item.setAccountingPeriod(order.getAccountingPeriod());
-                item.setNote(itemDto.getNote());
+            OrderItem item = new OrderItem();
+            item.setOrder(order);
+            item.setProduct(product);
+            item.setQty(itemDto.getQty());
+            item.setUnitPrice(unitPrice);
+            item.setSubtotal(subtotal);
+            item.setAccountingPeriod(order.getAccountingPeriod());
+            item.setNote(itemDto.getNote());
 
-                itemRepository.save(item);
+            itemRepository.save(item);
+            order.getItems().add(item);
 
-                order.getItems().add(item);
-
-                // 5️⃣ 累計總金額
-                total = total.add(subtotal);
-            }
-
-            // 6️⃣ 更新訂單總金額
-            order.setTotalAmount(total);
-            orderRepository.save(order);
+            total = total.add(subtotal);
         }
+
+        // 7️⃣ 更新總金額
+        order.setTotalAmount(total);
+        orderRepository.save(order);
+
+        log.info("✅ 建立訂單成功：orderNo={}, total={}", orderNo, total);
 
         return orderMapper.toResponseDto(order, itemMapper);
     }
 
     // ================================
-    // 更新訂單（日期、交貨日、備註、狀態）
+    // 更新訂單
     // ================================
     @Override
     public OrderResponseDto update(Long id, OrderRequestDto dto) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("找不到訂單 ID: " + id));
 
-        order.setOrderDate(dto.getOrderDate());
-        order.setDeliveryDate(dto.getDeliveryDate());
-        order.setNote(dto.getNote());
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到訂單 ID: " + id)
+                );
+
+        // ❌ 已交付或取消不可修改
+        if (order.getOrderStatus() == OrderStatus.DELIVERED ||
+                order.getOrderStatus() == OrderStatus.CANCELLED) {
+
+            throw new IllegalStateException("已交付或已取消的訂單不可修改");
+        }
+
+        orderMapper.updateEntityFromDto(dto, order);
+
         orderRepository.save(order);
 
         return orderMapper.toResponseDto(order, itemMapper);
     }
 
     // ================================
-    // 刪除訂單
+    // 刪除訂單（嚴格限制）
     // ================================
     @Override
     public void delete(Long id) {
-        if (!orderRepository.existsById(id)) {
-            throw new EntityNotFoundException("找不到訂單 ID: " + id);
+
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到訂單 ID: " + id)
+                );
+
+        if (order.getPaymentStatus() != PaymentStatus.UNPAID) {
+            throw new IllegalStateException("已有收款紀錄的訂單不可刪除");
         }
-        orderRepository.deleteById(id);
+
+        orderRepository.delete(order);
     }
 }

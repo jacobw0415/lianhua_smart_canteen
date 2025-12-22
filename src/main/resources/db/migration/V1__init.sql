@@ -255,7 +255,20 @@ CREATE TABLE orders (
   order_date DATE NOT NULL,
   delivery_date DATE NOT NULL,
   accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
-  status ENUM('PENDING','CONFIRMED','DELIVERED','CANCELLED','PAID') DEFAULT 'PENDING',
+  order_status ENUM(
+      'PENDING',     -- 尚未確認
+      'CONFIRMED',   -- 已確認
+      'DELIVERED',   -- 已交付（由收款完成自動推進）
+      'CANCELLED'    -- 已取消
+    ) NOT NULL DEFAULT 'PENDING'
+      COMMENT '業務狀態（物流 / 訂單流程）',
+
+    payment_status ENUM(
+      'UNPAID',      -- 尚未收款
+      'PARTIAL',     -- 部分收款
+      'PAID'         -- 已全額收款
+    ) NOT NULL DEFAULT 'UNPAID'
+      COMMENT '付款狀態（由 receipts 計算）',
   total_amount DECIMAL(10,2) UNSIGNED NOT NULL,
   note VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -310,13 +323,13 @@ CREATE TABLE receipts (
   note VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE (order_id),
   FOREIGN KEY (order_id) REFERENCES orders(id)
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_receipts_order_id ON receipts(order_id);
 CREATE INDEX idx_receipts_accounting_period ON receipts(accounting_period);
+CREATE INDEX idx_receipts_received_date ON receipts(received_date);
 
 -- ============================================================
 --    Schema v2.5 完成：

@@ -12,6 +12,10 @@ import io.swagger.v3.oas.annotations.responses.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springdoc.core.converters.models.PageableAsQueryParam;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -70,20 +74,26 @@ public class ReceiptController {
     }
     
     // ------------------------------------------------------
-    // 3️⃣ 查詢全部收款
+    // 3️⃣ 查詢全部收款（分頁版）
     // ------------------------------------------------------
     @Operation(
-            summary = "取得所有收款清單",
-            description = "查詢所有收款資料，包含自動帶入的金額與會計期間。"
+            summary = "分頁取得收款清單",
+            description = """
+                    支援 page / size / sort，自動與 React-Admin 分頁整合。
+                    例如：/api/receipts?page=0&size=10&sort=id,asc
+                    """
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "查詢成功",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ReceiptResponseDto.class)))),
+            @ApiResponse(responseCode = "200", description = "成功取得收款列表"),
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
+    @PageableAsQueryParam
     @GetMapping
-    public ResponseEntity<ApiResponseDto<List<ReceiptResponseDto>>> getAll() {
-        return ResponseEntity.ok(ApiResponseDto.ok(service.findAll()));
+    public ResponseEntity<ApiResponseDto<Page<ReceiptResponseDto>>> getAll(
+            @ParameterObject Pageable pageable
+    ) {
+        Page<ReceiptResponseDto> page = service.findAll(pageable);
+        return ResponseEntity.ok(ApiResponseDto.ok(page));
     }
     
     // ------------------------------------------------------
@@ -147,5 +157,32 @@ public class ReceiptController {
     public ResponseEntity<ApiResponseDto<Void>> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.ok(ApiResponseDto.ok(null));
+    }
+
+    /* ============================================================
+     * 📌 收款紀錄搜尋（支援模糊搜尋 + 分頁 + 動態條件）
+     * ============================================================ */
+    @Operation(
+            summary = "搜尋收款紀錄（支援模糊搜尋與分頁）",
+            description = """
+                可依客戶名稱、訂單編號、收款方式、會計期間、收款日期區間進行搜尋。
+                支援 page / size / sort，自動整合 React-Admin 查詢方式。
+                查詢示例：
+                  /api/receipts/search?filter={...}&page=0&size=10&sort=receivedDate,desc
+                """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "搜尋成功"),
+            @ApiResponse(responseCode = "400", description = "搜尋條件無效"),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤")
+    })
+    @PageableAsQueryParam
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponseDto<Page<ReceiptResponseDto>>> searchReceipts(
+            @ParameterObject ReceiptSearchRequest req,
+            @ParameterObject Pageable pageable
+    ) {
+        Page<ReceiptResponseDto> page = service.searchReceipts(req, pageable);
+        return ResponseEntity.ok(ApiResponseDto.ok(page));
     }
 }

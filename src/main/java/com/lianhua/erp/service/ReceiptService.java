@@ -1,13 +1,27 @@
 package com.lianhua.erp.service;
 
 import com.lianhua.erp.dto.receipt.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 public interface ReceiptService {
     ReceiptResponseDto create(ReceiptRequestDto dto);
     ReceiptResponseDto update(Long id, ReceiptRequestDto dto);
     void delete(Long id);
-    List<ReceiptResponseDto> findAll();
+    
+    /**
+     * React-Admin 收款列表查詢（僅分頁，不含模糊搜尋）
+     */
+    Page<ReceiptResponseDto> findAll(Pageable pageable);
+    
+    /**
+     * 模糊搜尋 + 分頁查詢收款紀錄（支援 customerName、orderNo、method、accountingPeriod、日期區間）
+     */
+    Page<ReceiptResponseDto> searchReceipts(ReceiptSearchRequest req, Pageable pageable);
+    
     List<ReceiptResponseDto> findByOrderId(Long orderId);
     ReceiptResponseDto findById(Long id);
 }
