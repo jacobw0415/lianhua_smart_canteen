@@ -21,9 +21,6 @@ public class ReceiptRequestDto {
     
     @Schema(description = "收款日期", example = "2025-10-30")
     private LocalDate receivedDate;
-
-    @Schema(description = "收款金額（自動帶入）", example = "1200.00")
-    private BigDecimal amount;
     
     @Schema(description = "收款方式", example = "TRANSFER", allowableValues = {"CASH", "TRANSFER", "CARD", "CHECK"})
     private String method;
