@@ -99,8 +99,8 @@ public class OrderSpecifications {
             /* =====================================================
              * status（對應 DB：order_status｜精確）
              * ===================================================== */
-            if (StringUtils.hasText(request.getStatus())) {
-                predicates.add(cb.equal(root.get("orderStatus"), request.getStatus()));
+            if (StringUtils.hasText(request.getOrderStatus())) {
+                predicates.add(cb.equal(root.get("orderStatus"), request.getOrderStatus()));
             }
 
             /* =====================================================
