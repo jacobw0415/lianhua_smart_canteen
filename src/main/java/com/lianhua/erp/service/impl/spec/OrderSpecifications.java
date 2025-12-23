@@ -18,7 +18,23 @@ public class OrderSpecifications {
 
             List<Predicate> predicates = new ArrayList<>();
 
-            // ===== customerName（JOIN customer.name） =====
+            /* =====================================================
+             * id（主鍵｜精確）
+             * ===================================================== */
+            if (request.getId() != null) {
+                predicates.add(cb.equal(root.get("id"), request.getId()));
+            }
+
+            /* =====================================================
+             * customerId（客戶 ID｜精確）
+             * ===================================================== */
+            if (request.getCustomerId() != null) {
+                predicates.add(cb.equal(root.get("customer").get("id"), request.getCustomerId()));
+            }
+
+            /* =====================================================
+             * customerName（JOIN customer.name｜模糊搜尋）
+             * ===================================================== */
             if (StringUtils.hasText(request.getCustomerName())) {
                 predicates.add(
                         cb.like(
@@ -28,7 +44,9 @@ public class OrderSpecifications {
                 );
             }
 
-            // ===== note（模糊） =====
+            /* =====================================================
+             * note（備註｜模糊搜尋）
+             * ===================================================== */
             if (StringUtils.hasText(request.getNote())) {
                 predicates.add(
                         cb.like(
@@ -38,7 +56,9 @@ public class OrderSpecifications {
                 );
             }
 
-            // ===== orderDate 範圍 =====
+            /* =====================================================
+             * orderDate 範圍
+             * ===================================================== */
             if (request.getOrderDateFrom() != null) {
                 predicates.add(
                         cb.greaterThanOrEqualTo(
@@ -56,7 +76,9 @@ public class OrderSpecifications {
                 );
             }
 
-            // ===== deliveryDate 範圍 =====
+            /* =====================================================
+             * deliveryDate 範圍
+             * ===================================================== */
             if (request.getDeliveryDateFrom() != null) {
                 predicates.add(
                         cb.greaterThanOrEqualTo(
@@ -74,21 +96,28 @@ public class OrderSpecifications {
                 );
             }
 
-            // ===== status =====
+            /* =====================================================
+             * status（對應 DB：order_status｜精確）
+             * ===================================================== */
             if (StringUtils.hasText(request.getStatus())) {
-                predicates.add(
-                        cb.equal(root.get("status"), request.getStatus())
-                );
+                predicates.add(cb.equal(root.get("orderStatus"), request.getStatus()));
             }
 
-            // ===== accountingPeriod =====
+            /* =====================================================
+             * accountingPeriod（精確）
+             * ===================================================== */
             if (StringUtils.hasText(request.getAccountingPeriod())) {
                 predicates.add(
-                        cb.equal(root.get("accountingPeriod"), request.getAccountingPeriod())
+                        cb.equal(
+                                root.get("accountingPeriod"),
+                                request.getAccountingPeriod()
+                        )
                 );
             }
 
-            // ===== totalAmount 範圍 =====
+            /* =====================================================
+             * totalAmount 範圍
+             * ===================================================== */
             if (request.getTotalAmountMin() != null) {
                 predicates.add(
                         cb.greaterThanOrEqualTo(

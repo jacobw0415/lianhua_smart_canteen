@@ -17,8 +17,11 @@ public class OrderSearchRequest {
      * 🔍 基本識別條件
      * ===================================================== */
 
-    @Schema(description = "訂單 ID", example = "20251028001")
+    @Schema(description = "訂單 ID（內部用，非主要搜尋）", example = "1")
     private Long id;
+
+    @Schema(description = "訂單編號（模糊搜尋）", example = "SO-202510")
+    private String orderNo;
 
     @Schema(description = "客戶 ID", example = "1001")
     private Long customerId;
@@ -43,11 +46,14 @@ public class OrderSearchRequest {
     private LocalDate deliveryDateTo;
 
     /* =====================================================
-     * 📌 狀態 / 期間
+     * 📌 訂單 / 收款狀態
      * ===================================================== */
 
-    @Schema(description = "訂單狀態", example = "PENDING")
-    private String status;
+    @Schema(description = "訂單狀態（order_status）", example = "CONFIRMED")
+    private String orderStatus;
+
+    @Schema(description = "收款狀態（payment_status）", example = "UNPAID")
+    private String paymentStatus;
 
     @Schema(description = "會計期間（YYYY-MM）", example = "2025-10")
     private String accountingPeriod;
