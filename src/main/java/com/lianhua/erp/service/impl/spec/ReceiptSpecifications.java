@@ -8,9 +8,11 @@ import java.time.LocalDate;
 
 public class ReceiptSpecifications {
 
-    /** ----------------------------------------------------------
+    /**
+     * ----------------------------------------------------------
      * ⭐ 主方法：依照搜尋條件動態組合 Specification
-     * ---------------------------------------------------------- */
+     * ----------------------------------------------------------
+     */
     public static Specification<Receipt> build(ReceiptSearchRequest req) {
 
         Specification<Receipt> spec = Specification.allOf();
@@ -34,8 +36,8 @@ public class ReceiptSpecifications {
         return (root, query, cb) -> {
             // 使用 fetch join 確保關聯資料被載入
             if (!query.getResultType().equals(Long.class) && !query.getResultType().equals(long.class)) {
-                jakarta.persistence.criteria.Fetch<Receipt, com.lianhua.erp.domain.Order> orderFetch = 
-                    root.fetch("order", jakarta.persistence.criteria.JoinType.LEFT);
+                jakarta.persistence.criteria.Fetch<Receipt, com.lianhua.erp.domain.Order> orderFetch = root
+                        .fetch("order", jakarta.persistence.criteria.JoinType.LEFT);
                 orderFetch.fetch("customer", jakarta.persistence.criteria.JoinType.LEFT);
             }
             return null; // 這是一個 fetch join，不添加額外的條件
@@ -43,33 +45,32 @@ public class ReceiptSpecifications {
     }
 
     private static Specification<Receipt> byCustomerName(ReceiptSearchRequest req) {
-        if (isEmpty(req.getCustomerName())) return null;
+        if (isEmpty(req.getCustomerName()))
+            return null;
 
         String keyword = "%" + req.getCustomerName().trim() + "%";
 
-        return (root, query, cb) ->
-                cb.like(
-                        root.join("order").join("customer").get("name"),
-                        keyword
-                );
+        return (root, query, cb) -> cb.like(
+                root.join("order").join("customer").get("name"),
+                keyword);
     }
 
     private static Specification<Receipt> byOrderNo(ReceiptSearchRequest req) {
-        if (isEmpty(req.getOrderNo())) return null;
+        if (isEmpty(req.getOrderNo()))
+            return null;
 
         String keyword = "%" + req.getOrderNo().trim() + "%";
 
-        return (root, query, cb) ->
-                cb.like(root.join("order").get("orderNo"), keyword);
+        return (root, query, cb) -> cb.like(root.join("order").get("orderNo"), keyword);
     }
 
     private static Specification<Receipt> byMethod(ReceiptSearchRequest req) {
-        if (isEmpty(req.getMethod())) return null;
+        if (isEmpty(req.getMethod()))
+            return null;
 
         try {
             Receipt.PaymentMethod method = Receipt.PaymentMethod.valueOf(req.getMethod());
-            return (root, query, cb) ->
-                    cb.equal(root.get("method"), method);
+            return (root, query, cb) -> cb.equal(root.get("method"), method);
         } catch (IllegalArgumentException e) {
             // 如果傳入的 method 值無效，返回 null（不加入搜尋條件）
             return null;
@@ -77,10 +78,10 @@ public class ReceiptSpecifications {
     }
 
     private static Specification<Receipt> byAccountingPeriod(ReceiptSearchRequest req) {
-        if (isEmpty(req.getAccountingPeriod())) return null;
+        if (isEmpty(req.getAccountingPeriod()))
+            return null;
 
-        return (root, query, cb) ->
-                cb.equal(root.get("accountingPeriod"), req.getAccountingPeriod());
+        return (root, query, cb) -> cb.equal(root.get("accountingPeriod"), req.getAccountingPeriod());
     }
 
     private static Specification<Receipt> byDateRange(ReceiptSearchRequest req) {
@@ -89,15 +90,13 @@ public class ReceiptSpecifications {
         if (!isEmpty(req.getFromDate())) {
             LocalDate from = LocalDate.parse(req.getFromDate());
             spec = spec.and(
-                    (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("receivedDate"), from)
-            );
+                    (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("receivedDate"), from));
         }
 
         if (!isEmpty(req.getToDate())) {
             LocalDate to = LocalDate.parse(req.getToDate());
             spec = spec.and(
-                    (root, query, cb) -> cb.lessThanOrEqualTo(root.get("receivedDate"), to)
-            );
+                    (root, query, cb) -> cb.lessThanOrEqualTo(root.get("receivedDate"), to));
         }
 
         return spec;
@@ -107,4 +106,3 @@ public class ReceiptSpecifications {
         return s == null || s.trim().isEmpty();
     }
 }
-

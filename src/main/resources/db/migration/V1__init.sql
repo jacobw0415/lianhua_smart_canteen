@@ -275,10 +275,9 @@ CREATE TABLE orders (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY(customer_id) REFERENCES order_customers(id)
     ON DELETE CASCADE ON UPDATE CASCADE,
-  UNIQUE (order_no, customer_id, order_date)
+  UNIQUE (order_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE INDEX idx_orders_order_no ON orders(order_no);
 CREATE INDEX idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX idx_orders_accounting_period ON orders(accounting_period);
 

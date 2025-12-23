@@ -11,13 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(
-        name = "orders",
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"customer_id", "order_date"}),
-                @UniqueConstraint(name = "uk_orders_order_no", columnNames = {"order_no"})
-        }
-)
+@Table(name = "orders", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_orders_order_no", columnNames = { "order_no" })
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -51,7 +47,7 @@ public class Order {
     @Column(name = "order_status", nullable = false, length = 20)
     private OrderStatus orderStatus = OrderStatus.PENDING;
 
-    //付款狀態（由 receipts 計算）
+    // 付款狀態（由 receipts 計算）
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", nullable = false, length = 20)
     private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
@@ -75,8 +71,7 @@ public class Order {
 
         if (this.accountingPeriod == null && this.deliveryDate != null) {
             this.accountingPeriod = this.deliveryDate.format(
-                    DateTimeFormatter.ofPattern("yyyy-MM")
-            );
+                    DateTimeFormatter.ofPattern("yyyy-MM"));
         }
     }
 

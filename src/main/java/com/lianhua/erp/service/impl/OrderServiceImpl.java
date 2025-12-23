@@ -11,7 +11,6 @@ import com.lianhua.erp.numbering.OrderNoGenerator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -22,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -54,8 +54,8 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public Page<OrderResponseDto> search(
             OrderSearchRequest searchRequest,
-            Pageable pageable
-    ) {
+            Pageable pageable) {
+
         Specification<Order> spec =
                 OrderSpecifications.bySearchRequest(searchRequest);
 
@@ -70,7 +70,8 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public OrderResponseDto findById(Long id) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("找不到訂單 ID: " + id));
+                .orElseThrow(() ->
+                        new EntityNotFoundException("找不到訂單 ID: " + id));
 
         return orderMapper.toResponseDto(order, itemMapper);
     }
@@ -81,55 +82,95 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponseDto create(OrderRequestDto dto) {
 
+        // 🔒 強化 1：訂單必須包含至少一項商品
+        List<OrderItemRequestDto> items = dto.getItems();
+        if (items == null || items.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "訂單至少需包含一項商品"
+            );
+        }
+
         // 1️⃣ 驗證客戶
         OrderCustomer customer = customerRepository.findById(dto.getCustomerId())
                 .orElseThrow(() ->
-                        new EntityNotFoundException("找不到客戶 ID: " + dto.getCustomerId())
-                );
+                        new EntityNotFoundException(
+                                "找不到客戶 ID: " + dto.getCustomerId()));
 
         // 2️⃣ 驗證建單狀態
         if (dto.getOrderStatus() != OrderStatus.PENDING &&
                 dto.getOrderStatus() != OrderStatus.CONFIRMED) {
 
-            throw new IllegalArgumentException("建單時僅允許 PENDING 或 CONFIRMED 狀態");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "建單時僅允許 PENDING 或 CONFIRMED 狀態"
+            );
         }
 
-        // 3️⃣ 防止重複建單
-        if (orderRepository.existsByCustomer_IdAndOrderDate(
-                dto.getCustomerId(), dto.getOrderDate())) {
+        // 3️⃣ 防止重複建單：
+        // 同一客戶 + 同一天 + 同商品 不允許
+        for (OrderItemRequestDto itemDto : items) {
 
-            throw new DataIntegrityViolationException("該客戶於該日期已有訂單，請勿重複建立。");
+            boolean hasDuplicate =
+                    itemRepository
+                            .existsByOrder_Customer_IdAndOrder_OrderDateAndProduct_Id(
+                                    dto.getCustomerId(),
+                                    dto.getOrderDate(),
+                                    itemDto.getProductId()
+                            );
+
+            if (hasDuplicate) {
+                Product product =
+                        productRepository.findById(itemDto.getProductId())
+                                .orElse(null);
+
+                String productName =
+                        product != null
+                                ? product.getName()
+                                : "商品 ID: " + itemDto.getProductId();
+
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        String.format(
+                                "該客戶於 %s 已下訂商品「%s」，請勿重複建立相同商品的訂單",
+                                dto.getOrderDate(),
+                                productName
+                        )
+                );
+            }
         }
 
-        // 4️⃣ 建立主檔
+        // 4️⃣ 建立訂單主檔
         Order order = orderMapper.toEntity(dto);
         order.setCustomer(customer);
         order.setOrderStatus(dto.getOrderStatus());
         order.setPaymentStatus(PaymentStatus.UNPAID);
         order.setAccountingPeriod(
-                dto.getOrderDate().format(DateTimeFormatter.ofPattern("yyyy-MM"))
-        );
+                dto.getOrderDate()
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM")));
         order.setTotalAmount(BigDecimal.ZERO);
 
         // 5️⃣ 產生訂單編號
-        String orderNo = orderNoGenerator.generate(dto.getOrderDate());
+        String orderNo =
+                orderNoGenerator.generate(dto.getOrderDate());
         order.setOrderNo(orderNo);
 
         orderRepository.save(order);
 
-        // 6️⃣ 處理明細
+        // 6️⃣ 建立訂單明細並計算總金額
         BigDecimal total = BigDecimal.ZERO;
 
-        for (OrderItemRequestDto itemDto : dto.getItems()) {
+        for (OrderItemRequestDto itemDto : items) {
 
             Product product = productRepository.findById(itemDto.getProductId())
                     .orElseThrow(() ->
-                            new EntityNotFoundException("找不到商品 ID: " + itemDto.getProductId())
-                    );
+                            new EntityNotFoundException(
+                                    "找不到商品 ID: " + itemDto.getProductId()));
 
             BigDecimal unitPrice = product.getUnitPrice();
             BigDecimal subtotal =
-                    unitPrice.multiply(BigDecimal.valueOf(itemDto.getQty()));
+                    unitPrice.multiply(
+                            BigDecimal.valueOf(itemDto.getQty()));
 
             OrderItem item = new OrderItem();
             item.setOrder(order);
@@ -156,15 +197,15 @@ public class OrderServiceImpl implements OrderService {
     }
 
     // ================================
-    // 更新訂單
+    // 更新訂單（僅允許流程欄位）
     // ================================
     @Override
     public OrderResponseDto update(Long id, OrderRequestDto dto) {
 
         Order order = orderRepository.findById(id)
                 .orElseThrow(() ->
-                        new EntityNotFoundException("找不到訂單 ID: " + id)
-                );
+                        new EntityNotFoundException(
+                                "找不到訂單 ID: " + id));
 
         // ❌ 已交付或取消不可修改
         if (order.getOrderStatus() == OrderStatus.DELIVERED ||
@@ -176,17 +217,29 @@ public class OrderServiceImpl implements OrderService {
             );
         }
 
-        // ⚠️ 如果要改為取消狀態，需檢查付款狀態
-        if (dto.getOrderStatus() == OrderStatus.CANCELLED) {
-            if (order.getPaymentStatus() != PaymentStatus.UNPAID) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "已有收款紀錄的訂單不可取消，請先處理退款後再取消訂單"
-                );
-            }
+        // ⚠️ 取消訂單前必須未收款
+        if (dto.getOrderStatus() == OrderStatus.CANCELLED &&
+                order.getPaymentStatus() != PaymentStatus.UNPAID) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "已有收款紀錄的訂單不可取消，請先處理退款"
+            );
         }
 
-        orderMapper.updateEntityFromDto(dto, order);
+        /*
+         * 🔒 強化 2：
+         * update 僅允許修改「流程性欄位」
+         * 不允許修改：
+         * - orderNo
+         * - customer
+         * - orderDate
+         * - totalAmount
+         * - items
+         */
+        order.setOrderStatus(dto.getOrderStatus());
+        order.setNote(dto.getNote());
+        order.setDeliveryDate(dto.getDeliveryDate());
 
         orderRepository.save(order);
 
@@ -201,8 +254,8 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = orderRepository.findById(id)
                 .orElseThrow(() ->
-                        new EntityNotFoundException("找不到訂單 ID: " + id)
-                );
+                        new EntityNotFoundException(
+                                "找不到訂單 ID: " + id));
 
         if (order.getPaymentStatus() != PaymentStatus.UNPAID) {
             throw new ResponseStatusException(
