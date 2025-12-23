@@ -43,7 +43,7 @@ public class PurchaseServiceImpl implements PurchaseService {
     private final PurchaseMapper purchaseMapper;
     private final PaymentMapper paymentMapper;
     private final com.lianhua.erp.numbering.PurchaseNoGenerator purchaseNoGenerator;
-    
+
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
 
     // ================================
@@ -108,7 +108,6 @@ public class PurchaseServiceImpl implements PurchaseService {
         String normalizedItem = dto.getItem() != null ? dto.getItem().trim() : null;
         dto.setItem(normalizedItem);
 
-
         // =============================================
         // 1️⃣ 基本欄位完整性檢查（主體欄位）
         // =============================================
@@ -124,13 +123,13 @@ public class PurchaseServiceImpl implements PurchaseService {
         if (dto.getQty() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（數量）為必填欄位");
         }
-        
-        if (dto.getUnit() == null || dto.getUnit().isBlank()){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"（單位）為必填欄位");
+
+        if (dto.getUnit() == null || dto.getUnit().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（單位）為必填欄位");
         }
 
         if (dto.getQty() <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"數量必須大於 0");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "數量必須大於 0");
         }
 
         if (dto.getUnitPrice() == null) {
@@ -149,16 +148,13 @@ public class PurchaseServiceImpl implements PurchaseService {
         // =============================================
         Supplier supplier = supplierRepository.findById(dto.getSupplierId())
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "找不到供應商 ID：" + dto.getSupplierId()
-                ));
+                        HttpStatus.BAD_REQUEST, "找不到供應商 ID：" + dto.getSupplierId()));
 
         if (!Boolean.TRUE.equals(supplier.getActive())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "SUPPLIER_DISABLED: 此供應商已被停用，無法建立進貨單"
-            );
+                    "SUPPLIER_DISABLED: 此供應商已被停用，無法建立進貨單");
         }
-
 
         // =============================================
         // 3️⃣ 同供應商 + 日期 + 品項 不可重複
@@ -166,27 +162,22 @@ public class PurchaseServiceImpl implements PurchaseService {
         if (purchaseRepository.existsBySupplierIdAndPurchaseDateAndItem(
                 dto.getSupplierId(),
                 dto.getPurchaseDate(),
-                normalizedItem
-        )) {
+                normalizedItem)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "該供應商於此日期的相同品項已存在，請勿重複建立。"
-            );
+                    "該供應商於此日期的相同品項已存在，請勿重複建立。");
         }
 
         // =============================================
-        //  移除空白付款資訊
+        // 移除空白付款資訊
         // =============================================
         if (dto.getPayments() != null) {
             dto.setPayments(
                     dto.getPayments().stream()
-                            .filter(p ->
-                                    p.getAmount() != null ||
-                                            p.getPayDate() != null ||
-                                            (p.getMethod() != null && !p.getMethod().isBlank())
-                            )
-                            .toList()
-            );
+                            .filter(p -> p.getAmount() != null ||
+                                    p.getPayDate() != null ||
+                                    (p.getMethod() != null && !p.getMethod().isBlank()))
+                            .toList());
         }
 
         // =============================================
@@ -206,8 +197,7 @@ public class PurchaseServiceImpl implements PurchaseService {
 
                     throw new ResponseStatusException(
                             HttpStatus.BAD_REQUEST,
-                            "付款資訊不完整：金額、付款日期與付款方式需同時填寫"
-                    );
+                            "付款資訊不完整：金額、付款日期與付款方式需同時填寫");
                 }
 
                 // 金額 > 0
@@ -222,18 +212,17 @@ public class PurchaseServiceImpl implements PurchaseService {
             });
         }
 
-
         // =============================================
         // 5️⃣ 建立 Purchase Entity
         // =============================================
         Purchase purchase = purchaseMapper.toEntity(dto);
         purchase.setSupplier(supplier);
         purchase.setItem(normalizedItem);
-        
+
         // ⭐ 產生進貨單編號（商業單號）
         String purchaseNo = purchaseNoGenerator.generate(dto.getPurchaseDate());
         purchase.setPurchaseNo(purchaseNo);
-        
+
         // 設定會計期間
         if (purchase.getPurchaseDate() != null) {
             purchase.setAccountingPeriod(purchase.getPurchaseDate().format(PERIOD_FORMAT));
@@ -242,7 +231,6 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
 
         computeAmounts(purchase);
-
 
         // =============================================
         // 6️⃣ 付款資料：日期不得早於進貨日 + 會計期間設定
@@ -265,8 +253,7 @@ public class PurchaseServiceImpl implements PurchaseService {
 
                                 throw new ResponseStatusException(
                                         HttpStatus.BAD_REQUEST,
-                                        "付款日期不得早於進貨日期 (" + purchase.getPurchaseDate() + ")"
-                                );
+                                        "付款日期不得早於進貨日期 (" + purchase.getPurchaseDate() + ")");
                             }
 
                             p.setAccountingPeriod(p.getPayDate().format(PERIOD_FORMAT));
@@ -285,8 +272,7 @@ public class PurchaseServiceImpl implements PurchaseService {
             if (paidTotal.compareTo(purchase.getTotalAmount()) > 0) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "首筆付款金額不可超過進貨應付總額 (" + purchase.getTotalAmount() + ")"
-                );
+                        "首筆付款金額不可超過進貨應付總額 (" + purchase.getTotalAmount() + ")");
             }
 
             purchase.setPayments(payments);
@@ -301,14 +287,13 @@ public class PurchaseServiceImpl implements PurchaseService {
 
         updatePurchaseStatus(purchase);
 
-
         // =============================================
         // 7️⃣ 儲存
         // =============================================
         try {
             log.info("建立進貨單：supplierId={}, item={}, totalAmount={}, paidAmount={}",
                     dto.getSupplierId(), normalizedItem, purchase.getTotalAmount(), paidTotal);
-            
+
             Purchase saved = purchaseRepository.save(purchase);
             // Cascade 會自動保存 payments，不需要手動保存
 
@@ -318,8 +303,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         } catch (DataIntegrityViolationException e) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "資料重複：該供應商於此日期的相同品項已存在。"
-            );
+                    "資料重複：該供應商於此日期的相同品項已存在。");
         }
     }
 
@@ -342,8 +326,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         if (purchase.getStatus() == Purchase.Status.PAID) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "此進貨單已全額付清，不可新增或修改付款"
-            );
+                    "此進貨單已全額付清，不可新增或修改付款");
         }
 
         // ========================================
@@ -353,8 +336,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         if (!Boolean.TRUE.equals(supplier.getActive())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "SUPPLIER_DISABLED: 此供應商已被停用，無法新增付款"
-            );
+                    "SUPPLIER_DISABLED: 此供應商已被停用，無法新增付款");
         }
 
         // ========================================
@@ -379,31 +361,26 @@ public class PurchaseServiceImpl implements PurchaseService {
         if (dto.getPayments() == null || dto.getPayments().isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "請至少新增 1 筆付款紀錄，包含完整欄位必填資訊"
-            );
+                    "請至少新增 1 筆付款紀錄，包含完整欄位必填資訊");
         }
 
         // ========================================
         // 5️⃣ 付款不可全為空白欄位
         // ========================================
-        boolean emptyPayment = dto.getPayments().stream().allMatch(p ->
-                (p.getAmount() == null) &&
-                        p.getPayDate() == null &&
-                        (p.getMethod() == null || p.getMethod().isBlank())
-        );
+        boolean emptyPayment = dto.getPayments().stream().allMatch(p -> (p.getAmount() == null) &&
+                p.getPayDate() == null &&
+                (p.getMethod() == null || p.getMethod().isBlank()));
 
         if (emptyPayment) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "付款資訊不可全為空"
-            );
+                    "付款資訊不可全為空");
         }
 
         // ========================================
         // 6️⃣ 現有付款資料
         // ========================================
-        Set<Payment> existingPayments =
-                purchase.getPayments() != null ? purchase.getPayments() : new HashSet<>();
+        Set<Payment> existingPayments = purchase.getPayments() != null ? purchase.getPayments() : new HashSet<>();
 
         BigDecimal totalAmount = purchase.getTotalAmount();
 
@@ -416,21 +393,18 @@ public class PurchaseServiceImpl implements PurchaseService {
         // ========================================
         for (var pDto : dto.getPayments()) {
 
-            boolean hasAny =
-                    pDto.getAmount() != null ||
-                            pDto.getPayDate() != null ||
-                            (pDto.getMethod() != null && !pDto.getMethod().isBlank());
+            boolean hasAny = pDto.getAmount() != null ||
+                    pDto.getPayDate() != null ||
+                    (pDto.getMethod() != null && !pDto.getMethod().isBlank());
 
-            boolean hasAll =
-                    pDto.getAmount() != null &&
-                            pDto.getPayDate() != null &&
-                            (pDto.getMethod() != null && !pDto.getMethod().isBlank());
+            boolean hasAll = pDto.getAmount() != null &&
+                    pDto.getPayDate() != null &&
+                    (pDto.getMethod() != null && !pDto.getMethod().isBlank());
 
             if (hasAny && !hasAll) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "付款資訊不完整：金額、付款日期、付款方式需同時填寫"
-                );
+                        "付款資訊不完整：金額、付款日期、付款方式需同時填寫");
             }
 
             // 付款日期不可早於進貨日期
@@ -438,8 +412,7 @@ public class PurchaseServiceImpl implements PurchaseService {
                     pDto.getPayDate().isBefore(purchase.getPurchaseDate())) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "付款日期不得早於進貨日期 (" + purchase.getPurchaseDate() + ")"
-                );
+                        "付款日期不得早於進貨日期 (" + purchase.getPurchaseDate() + ")");
             }
         }
 
@@ -460,8 +433,7 @@ public class PurchaseServiceImpl implements PurchaseService {
             newPayment.setAccountingPeriod(
                     (newPayment.getPayDate() != null)
                             ? newPayment.getPayDate().format(PERIOD_FORMAT)
-                            : LocalDate.now().format(PERIOD_FORMAT)
-            );
+                            : LocalDate.now().format(PERIOD_FORMAT));
 
             Optional<Payment> existing = existingPayments.stream()
                     .filter(p -> p.getReferenceNo() != null &&
@@ -479,8 +451,7 @@ public class PurchaseServiceImpl implements PurchaseService {
                 if (newTotal.compareTo(totalAmount) > 0) {
                     throw new ResponseStatusException(
                             HttpStatus.BAD_REQUEST,
-                            "更新後將超出應付總額 (" + totalAmount + ")"
-                    );
+                            "更新後將超出應付總額 (" + totalAmount + ")");
                 }
 
                 old.setAmount(newPayment.getAmount());
@@ -498,8 +469,7 @@ public class PurchaseServiceImpl implements PurchaseService {
                 if (newTotal.compareTo(totalAmount) > 0) {
                     throw new ResponseStatusException(
                             HttpStatus.BAD_REQUEST,
-                            "新增付款金額不得超過應付總額 (" + totalAmount + ")"
-                    );
+                            "新增付款金額不得超過應付總額 (" + totalAmount + ")");
                 }
 
                 existingPayments.add(newPayment);
@@ -517,8 +487,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         if (totalPaid.compareTo(totalAmount) > 0) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "總付款金額不可超過應付總額 (" + totalAmount + ")"
-            );
+                    "總付款金額不可超過應付總額 (" + totalAmount + ")");
         }
 
         // ========================================
@@ -531,10 +500,10 @@ public class PurchaseServiceImpl implements PurchaseService {
 
         log.info("更新進貨單付款：purchaseId={}, totalPaid={}, balance={}, status={}",
                 id, totalPaid, purchase.getBalance(), purchase.getStatus());
-        
+
         Purchase saved = purchaseRepository.save(purchase);
         // Cascade 會自動處理 payments 的新增、更新、刪除
-        
+
         return purchaseMapper.toDto(saved);
     }
 
@@ -557,25 +526,30 @@ public class PurchaseServiceImpl implements PurchaseService {
 
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "無效的狀態: " + status
-            );
+                    HttpStatus.BAD_REQUEST,
+                    "無效的狀態: " + status);
         }
     }
 
     // ================================
-    // 刪除進貨單
+    // 刪除進貨單（嚴格限制）
     // ================================
     @Override
     @Transactional
     public void deletePurchase(Long id) {
-        if (!purchaseRepository.existsById(id)) {
-            throw new EntityNotFoundException("找不到進貨單 (ID: " + id + ")");
+        Purchase purchase = purchaseRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 (ID: " + id + ")"));
+
+        // ⚠️ 已有付款紀錄的進貨單不可刪除
+        if (purchase.getStatus() != Purchase.Status.PENDING) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "已有付款紀錄的進貨單不可刪除");
         }
 
         log.info("刪除進貨單：purchaseId={}", id);
         purchaseRepository.deleteById(id);
-        // orphanRemoval = true 會自動刪除關聯的 payments
+        // orphanRemoval = true 會自動刪除關聯的 payments（但只有在 PENDING 狀態時才會執行到這裡）
     }
 
     // ================================
@@ -645,20 +619,18 @@ public class PurchaseServiceImpl implements PurchaseService {
         // =======================================================
         // ★ 1. 檢查搜尋條件是否全為空（後端防呆）
         // =======================================================
-        boolean empty =
-                isEmpty(req.getSupplierName()) &&
-                        req.getSupplierId() == null &&
-                        isEmpty(req.getItem()) &&
-                        isEmpty(req.getStatus()) &&
-                        isEmpty(req.getAccountingPeriod()) &&
-                        isEmpty(req.getFromDate()) &&
-                        isEmpty(req.getToDate());
+        boolean empty = isEmpty(req.getSupplierName()) &&
+                req.getSupplierId() == null &&
+                isEmpty(req.getItem()) &&
+                isEmpty(req.getStatus()) &&
+                isEmpty(req.getAccountingPeriod()) &&
+                isEmpty(req.getFromDate()) &&
+                isEmpty(req.getToDate());
 
         if (empty) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "搜尋條件不可全為空，至少需提供一項搜尋欄位"
-            );
+                    "搜尋條件不可全為空，至少需提供一項搜尋欄位");
         }
 
         // =======================================================
@@ -673,8 +645,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         } catch (PropertyReferenceException ex) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "無效排序欄位：" + ex.getPropertyName()
-            );
+                    "無效排序欄位：" + ex.getPropertyName());
         }
 
         return result.map(purchaseMapper::toResponseDto);

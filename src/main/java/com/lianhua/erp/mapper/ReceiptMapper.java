@@ -22,7 +22,11 @@ public interface ReceiptMapper {
     /**
      * Entity → Response DTO
      */
-    @Mapping(source = "order.id", target = "orderId")
+    @Mappings({
+            @Mapping(source = "order.id", target = "orderId"),
+            @Mapping(source = "order.orderNo", target = "orderNo"),
+            @Mapping(source = "order.customer.name", target = "customerName")
+    })
     ReceiptResponseDto toDto(Receipt entity);
 
     /**

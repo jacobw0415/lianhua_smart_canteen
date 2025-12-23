@@ -15,6 +15,9 @@ public class ReceiptSpecifications {
 
         Specification<Receipt> spec = Specification.allOf();
 
+        // 確保關聯資料被載入（用於映射 orderNo 和 customerName）
+        spec = spec.and(fetchOrderAndCustomer());
+
         spec = spec.and(byCustomerName(req));
         spec = spec.and(byOrderNo(req));
         spec = spec.and(byMethod(req));
@@ -22,6 +25,21 @@ public class ReceiptSpecifications {
         spec = spec.and(byDateRange(req));
 
         return spec;
+    }
+
+    /**
+     * 確保載入 Order 和 Customer 關聯（用於映射到 DTO）
+     */
+    private static Specification<Receipt> fetchOrderAndCustomer() {
+        return (root, query, cb) -> {
+            // 使用 fetch join 確保關聯資料被載入
+            if (!query.getResultType().equals(Long.class) && !query.getResultType().equals(long.class)) {
+                jakarta.persistence.criteria.Fetch<Receipt, com.lianhua.erp.domain.Order> orderFetch = 
+                    root.fetch("order", jakarta.persistence.criteria.JoinType.LEFT);
+                orderFetch.fetch("customer", jakarta.persistence.criteria.JoinType.LEFT);
+            }
+            return null; // 這是一個 fetch join，不添加額外的條件
+        };
     }
 
     private static Specification<Receipt> byCustomerName(ReceiptSearchRequest req) {
