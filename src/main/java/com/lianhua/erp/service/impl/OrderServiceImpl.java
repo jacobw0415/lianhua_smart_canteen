@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -89,6 +90,26 @@ public class OrderServiceImpl implements OrderService {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "訂單至少需包含一項商品"
+            );
+        }
+
+        // 🔒 驗證日期：交貨日期不能為空且必須晚於或等於訂單日期
+        if (dto.getDeliveryDate() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "交貨日期不可為空"
+            );
+        }
+        if (dto.getOrderDate() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "訂單日期不可為空"
+            );
+        }
+        if (dto.getDeliveryDate().isBefore(dto.getOrderDate())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "交貨日期不可早於訂單日期"
             );
         }
 
@@ -229,6 +250,22 @@ public class OrderServiceImpl implements OrderService {
                                         "已有收款紀錄的訂單不可取消，請先處理退款"
                         );
                 }
+        }
+
+        // 🔒 驗證日期：交貨日期不能為空且必須晚於或等於訂單日期
+        if (dto.getDeliveryDate() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "交貨日期不可為空"
+            );
+        }
+        // 使用訂單原有的 orderDate 進行驗證（因為 update 不允許修改 orderDate）
+        LocalDate orderDateToCheck = order.getOrderDate();
+        if (dto.getDeliveryDate().isBefore(orderDateToCheck)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "交貨日期不可早於訂單日期"
+            );
         }
 
         /*
