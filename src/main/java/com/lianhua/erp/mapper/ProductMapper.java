@@ -26,7 +26,15 @@ public interface ProductMapper {
     ProductResponseDto toDto(Product entity);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "category", expression = "java(fromCategoryId(dto.getCategoryId()))")
+    @Mappings({
+            @Mapping(target = "name", ignore = true),  // 名稱由 Service 層手動處理（包含 trim 和唯一性檢查）
+            @Mapping(target = "category", ignore = true),  // 分類由 Service 層手動處理（包含存在性檢查）
+            @Mapping(target = "id", ignore = true),
+            @Mapping(target = "createdAt", ignore = true),
+            @Mapping(target = "updatedAt", ignore = true),
+            @Mapping(target = "sales", ignore = true),
+            @Mapping(target = "orderItems", ignore = true)
+    })
     void updateEntityFromDto(ProductRequestDto dto, @MappingTarget Product entity);
 
     default List<Long> mapSaleIds(Product entity) {

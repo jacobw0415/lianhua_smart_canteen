@@ -107,15 +107,19 @@ public class ProductServiceImpl implements ProductService {
         // === 商品名稱變更檢查 ===
         if (StringUtils.hasText(dto.getName())) {
             String newName = dto.getName().trim();
+            String existingName = existing.getName();
             
-            if (!newName.equalsIgnoreCase(existing.getName())
-                    && repository.existsByName(newName)) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "相同商品名稱已存在，請重新輸入商品名稱。"
-                );
+            // 只有在名稱實際變更時才檢查唯一性（使用精確比較，因為資料庫 UNIQUE 約束是區分大小寫的）
+            if (!newName.equals(existingName)) {
+                // 檢查是否有其他商品使用相同名稱（排除當前商品）
+                if (repository.existsByNameAndIdNot(newName, id)) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "相同商品名稱已存在，請重新輸入商品名稱。"
+                    );
+                }
+                existing.setName(newName);
             }
-            existing.setName(newName);
         }
         
         // === 分類更新檢查 ===
@@ -128,7 +132,7 @@ public class ProductServiceImpl implements ProductService {
             existing.setCategory(category);
         }
         
-        // === 套用其餘可更新欄位 ===
+        // === 套用其餘可更新欄位（name 和 category 已在 Mapper 中排除，由上面手動處理） ===
         mapper.updateEntityFromDto(dto, existing);
         
         try {
@@ -136,7 +140,7 @@ public class ProductServiceImpl implements ProductService {
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "資料重複或違反資料完整性限制，請確認商品資料"
+                    "資料重複或違反資料完整性限制，請確認商品名稱是否已存在"
             );
         }
     }
