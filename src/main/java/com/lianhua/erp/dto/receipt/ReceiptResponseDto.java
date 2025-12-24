@@ -53,4 +53,14 @@ public class ReceiptResponseDto {
     @Schema(description = "更新時間")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Taipei")
     private LocalDateTime updatedAt;
+
+    @Schema(description = "狀態：ACTIVE（正常收款）, VOIDED（已作廢）", example = "ACTIVE")
+    private String status;
+
+    @Schema(description = "作廢時間")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Taipei")
+    private LocalDateTime voidedAt;
+
+    @Schema(description = "作廢原因", example = "重複建單，需作廢")
+    private String voidReason;
 }

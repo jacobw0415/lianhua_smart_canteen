@@ -21,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -94,6 +95,13 @@ public class ReceiptServiceImpl implements ReceiptService {
                 Receipt receipt = receiptRepository.findById(id)
                                 .orElseThrow(() -> new EntityNotFoundException("找不到收款 ID：" + id));
 
+                // ⚠️ 已作廢的收款單不可修改
+                if (receipt.getStatus() == ReceiptStatus.VOIDED) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "已作廢的收款單不可修改");
+                }
+
                 BigDecimal originalAmount = receipt.getAmount(); // 🔒 鎖金額
 
                 mapper.updateEntityFromDto(dto, receipt);
@@ -131,6 +139,13 @@ public class ReceiptServiceImpl implements ReceiptService {
                 Receipt receipt = receiptRepository.findById(id)
                                 .orElseThrow(() -> new EntityNotFoundException("找不到收款 ID：" + id));
 
+                // ⚠️ 已作廢的收款單不可刪除（應保留記錄）
+                if (receipt.getStatus() == ReceiptStatus.VOIDED) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "已作廢的收款單不可刪除");
+                }
+
                 Order order = receipt.getOrder();
 
                 if (order.getPaymentStatus() == PaymentStatus.PAID) {
@@ -149,12 +164,51 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
 
         // =====================================================
+        // 作廢收款單
+        // =====================================================
+        @Override
+        public ReceiptResponseDto voidReceipt(Long id, String reason) {
+                Receipt receipt = receiptRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException("找不到收款 ID：" + id));
+
+                // 檢查是否已作廢
+                if (receipt.getStatus() == ReceiptStatus.VOIDED) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "此收款單已經作廢");
+                }
+
+                // ⭐ 任何狀態都可以作廢（不需要檢查付款狀態）
+                receipt.setStatus(ReceiptStatus.VOIDED);
+                receipt.setVoidedAt(LocalDateTime.now());
+                receipt.setVoidReason(reason);
+
+                receiptRepository.save(receipt);
+
+                // ⭐ 重新計算關聯訂單的付款狀態（自動排除已作廢的收款）
+                Order order = receipt.getOrder();
+                recalcPaymentStatus(order);
+                advanceOrderStatusIfNeeded(order);
+
+                log.info("✅ 作廢收款：receiptId={}, orderId={}, reason={}",
+                                id, order.getId(), reason);
+                
+                // ⭐ 重新查詢以確保關聯資料被載入（用於映射 orderNo 和 customerName）
+                Receipt savedReceipt = receiptRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException("找不到收款 ID：" + id));
+                
+                // 返回更新後的收款單 DTO（滿足 React Admin 的要求）
+                return mapper.toDto(savedReceipt);
+        }
+
+        // =====================================================
         // 查詢
         // =====================================================
         @Override
         @Transactional(readOnly = true)
         public Page<ReceiptResponseDto> findAll(Pageable pageable) {
                 // 使用 Specification 確保關聯資料被載入（用於映射 orderNo 和 customerName）
+                // 顯示所有收款（包括已作廢的），前端可透過 status 欄位區分
                 Specification<Receipt> fetchSpec = (root, query, cb) -> {
                         if (!query.getResultType().equals(Long.class) && !query.getResultType().equals(long.class)) {
                                 root.fetch("order", jakarta.persistence.criteria.JoinType.LEFT);
@@ -163,6 +217,8 @@ public class ReceiptServiceImpl implements ReceiptService {
                         }
                         return null;
                 };
+                
+                // 顯示所有收款（包括已作廢的）
                 return receiptRepository.findAll(fetchSpec, pageable)
                                 .map(mapper::toDto);
         }
@@ -193,12 +249,17 @@ public class ReceiptServiceImpl implements ReceiptService {
                         ReceiptSearchRequest req,
                         Pageable pageable) {
 
-                boolean empty = isEmpty(req.getCustomerName()) &&
+                // 檢查是否至少有一項搜尋條件（includeVoided 和 status 不計入搜尋條件）
+                boolean empty = req.getId() == null &&
+                                isEmpty(req.getCustomerName()) &&
                                 isEmpty(req.getOrderNo()) &&
                                 isEmpty(req.getMethod()) &&
                                 isEmpty(req.getAccountingPeriod()) &&
                                 isEmpty(req.getFromDate()) &&
-                                isEmpty(req.getToDate());
+                                isEmpty(req.getToDate()) &&
+                                req.getReceivedDateFrom() == null &&
+                                req.getReceivedDateTo() == null &&
+                                isEmpty(req.getStatus());
 
                 if (empty) {
                         throw new ResponseStatusException(
@@ -231,8 +292,17 @@ public class ReceiptServiceImpl implements ReceiptService {
 
                 BigDecimal totalAmount = order.getTotalAmount();
 
+                // ⭐ 如果订单曾经有收款记录（包括已作废的），即使现在有效收款为0，也应该保持 PAID 状态
+                // 这样可以防止已收款的订单在收款单被作废后变成 UNPAID，从而被错误地取消或删除
+                boolean hasAnyReceipt = receiptRepository.hasAnyReceiptByOrderId(order.getId());
+
                 if (paidAmount.compareTo(BigDecimal.ZERO) == 0) {
-                        order.setPaymentStatus(PaymentStatus.UNPAID);
+                        // 如果曾经有收款记录，即使现在都被作废了，也应该保持 PAID 状态
+                        if (hasAnyReceipt) {
+                                order.setPaymentStatus(PaymentStatus.PAID);
+                        } else {
+                                order.setPaymentStatus(PaymentStatus.UNPAID);
+                        }
                 } else if (paidAmount.compareTo(totalAmount) < 0) {
                         order.setPaymentStatus(PaymentStatus.PARTIAL);
                 } else {

@@ -8,9 +8,10 @@ import java.time.format.DateTimeFormatter;
 
 @Entity
 @Table(name = "receipts",
-        uniqueConstraints = @UniqueConstraint(name = "uk_receipts_order_id", columnNames = "order_id"),
         indexes = {
-                @Index(name = "idx_receipts_accounting_period", columnList = "accounting_period")
+                @Index(name = "idx_receipts_accounting_period", columnList = "accounting_period"),
+                @Index(name = "idx_receipts_status", columnList = "status"),
+                @Index(name = "idx_receipts_order_id", columnList = "order_id")
         })
 @Getter
 @Setter
@@ -46,6 +47,19 @@ public class Receipt {
     
     @Column(length = 255)
     private String note;
+    
+    // 狀態欄位
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    @Builder.Default
+    private ReceiptStatus status = ReceiptStatus.ACTIVE;
+    
+    // 作廢相關欄位（保留作廢時間和原因）
+    @Column(name = "voided_at")
+    private LocalDateTime voidedAt;
+    
+    @Column(name = "void_reason", length = 500)
+    private String voidReason;
     
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

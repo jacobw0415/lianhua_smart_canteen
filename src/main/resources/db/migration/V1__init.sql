@@ -320,15 +320,21 @@ CREATE TABLE receipts (
   method ENUM('CASH','TRANSFER','CARD','CHECK') DEFAULT 'CASH',
   reference_no VARCHAR(100),
   note VARCHAR(255),
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '狀態：ACTIVE（正常收款）, VOIDED（已作廢）',
+  voided_at TIMESTAMP NULL COMMENT '作廢時間',
+  void_reason VARCHAR(500) NULL COMMENT '作廢原因',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (order_id) REFERENCES orders(id)
-    ON DELETE CASCADE ON UPDATE CASCADE
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT uk_receipts_order_id UNIQUE (order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_receipts_order_id ON receipts(order_id);
 CREATE INDEX idx_receipts_accounting_period ON receipts(accounting_period);
 CREATE INDEX idx_receipts_received_date ON receipts(received_date);
+CREATE INDEX idx_receipts_status ON receipts(status);
+CREATE INDEX idx_receipts_voided_at ON receipts(voided_at);
 
 -- ============================================================
 --    Schema v2.5 完成：

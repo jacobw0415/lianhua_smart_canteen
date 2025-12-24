@@ -43,4 +43,7 @@ public class PaymentSearchRequest {
             example = "2025-01-31"
     )
     private String toDate;
+
+    @Schema(description = "是否包含已作廢的付款（預設 false）", example = "false")
+    private Boolean includeVoided = false;
 }

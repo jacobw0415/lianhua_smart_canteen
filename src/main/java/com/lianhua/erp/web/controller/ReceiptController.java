@@ -1,6 +1,7 @@
 package com.lianhua.erp.web.controller;
 
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
+import com.lianhua.erp.dto.error.BadRequestResponse;
 import com.lianhua.erp.dto.error.ConflictResponse;
 import com.lianhua.erp.dto.error.InternalServerErrorResponse;
 import com.lianhua.erp.dto.error.NotFoundResponse;
@@ -157,6 +158,32 @@ public class ReceiptController {
     public ResponseEntity<ApiResponseDto<Void>> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.ok(ApiResponseDto.ok(null));
+    }
+
+    // ------------------------------------------------------
+    // 7️⃣ 作廢收款單
+    // ------------------------------------------------------
+    @Operation(
+            summary = "作廢收款單",
+            description = "將收款單標記為作廢。作廢後會重新計算訂單的付款狀態。任何狀態的收款單都可以作廢。"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "作廢成功"),
+            @ApiResponse(responseCode = "400", description = "收款單已經作廢",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "404", description = "找不到收款單",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
+    @PostMapping("/{id}/void")
+    public ResponseEntity<ApiResponseDto<ReceiptResponseDto>> voidReceipt(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> request) {
+        
+        String reason = request != null ? request.get("reason") : null;
+        ReceiptResponseDto result = service.voidReceipt(id, reason);
+        return ResponseEntity.ok(ApiResponseDto.ok(result));
     }
 
     /* ============================================================

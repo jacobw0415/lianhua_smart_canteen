@@ -1,6 +1,7 @@
 package com.lianhua.erp.mapper;
 
 import com.lianhua.erp.domain.Receipt;
+import com.lianhua.erp.domain.ReceiptStatus;
 import com.lianhua.erp.dto.receipt.*;
 import org.mapstruct.*;
 
@@ -25,9 +26,19 @@ public interface ReceiptMapper {
     @Mappings({
             @Mapping(source = "order.id", target = "orderId"),
             @Mapping(source = "order.orderNo", target = "orderNo"),
-            @Mapping(source = "order.customer.name", target = "customerName")
+            @Mapping(source = "order.customer.name", target = "customerName"),
+            @Mapping(target = "status", expression = "java(mapStatus(entity.getStatus()))"),
+            @Mapping(source = "voidedAt", target = "voidedAt"),
+            @Mapping(source = "voidReason", target = "voidReason")
     })
     ReceiptResponseDto toDto(Receipt entity);
+    
+    /**
+     * ReceiptStatus enum → String
+     */
+    default String mapStatus(ReceiptStatus status) {
+        return status != null ? status.name() : null;
+    }
 
     /**
      * 更新收款時使用（部分更新）

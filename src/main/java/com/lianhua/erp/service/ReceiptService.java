@@ -24,4 +24,12 @@ public interface ReceiptService {
     
     List<ReceiptResponseDto> findByOrderId(Long orderId);
     ReceiptResponseDto findById(Long id);
+    
+    /**
+     * 作廢收款單
+     * @param id 收款單 ID
+     * @param reason 作廢原因（可選）
+     * @return 更新後的收款單 DTO
+     */
+    ReceiptResponseDto voidReceipt(Long id, String reason);
 }

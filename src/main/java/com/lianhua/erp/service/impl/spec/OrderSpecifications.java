@@ -22,14 +22,33 @@ public class OrderSpecifications {
              * id（主鍵｜精確）
              * ===================================================== */
             if (request.getId() != null) {
-                predicates.add(cb.equal(root.get("id"), request.getId()));
+                predicates.add(
+                        cb.equal(root.get("id"), request.getId())
+                );
+            }
+
+            /* =====================================================
+             * orderNo（訂單編號｜模糊搜尋） ✅【補上】
+             * ===================================================== */
+            if (StringUtils.hasText(request.getOrderNo())) {
+                predicates.add(
+                        cb.like(
+                                cb.lower(root.get("orderNo")),
+                                "%" + request.getOrderNo().trim().toLowerCase() + "%"
+                        )
+                );
             }
 
             /* =====================================================
              * customerId（客戶 ID｜精確）
              * ===================================================== */
             if (request.getCustomerId() != null) {
-                predicates.add(cb.equal(root.get("customer").get("id"), request.getCustomerId()));
+                predicates.add(
+                        cb.equal(
+                                root.get("customer").get("id"),
+                                request.getCustomerId()
+                        )
+                );
             }
 
             /* =====================================================
@@ -97,14 +116,31 @@ public class OrderSpecifications {
             }
 
             /* =====================================================
-             * status（對應 DB：order_status｜精確）
+             * orderStatus（訂單狀態｜精確）
              * ===================================================== */
             if (StringUtils.hasText(request.getOrderStatus())) {
-                predicates.add(cb.equal(root.get("orderStatus"), request.getOrderStatus()));
+                predicates.add(
+                        cb.equal(
+                                root.get("orderStatus"),
+                                request.getOrderStatus()
+                        )
+                );
             }
 
             /* =====================================================
-             * accountingPeriod（精確）
+             * paymentStatus（付款狀態｜精確） ✅【補上】
+             * ===================================================== */
+            if (StringUtils.hasText(request.getPaymentStatus())) {
+                predicates.add(
+                        cb.equal(
+                                root.get("paymentStatus"),
+                                request.getPaymentStatus()
+                        )
+                );
+            }
+
+            /* =====================================================
+             * accountingPeriod（會計期間｜精確）
              * ===================================================== */
             if (StringUtils.hasText(request.getAccountingPeriod())) {
                 predicates.add(

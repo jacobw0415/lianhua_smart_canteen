@@ -1,108 +1,155 @@
 package com.lianhua.erp.service.impl.spec;
 
 import com.lianhua.erp.domain.Receipt;
+import com.lianhua.erp.domain.ReceiptStatus;
 import com.lianhua.erp.dto.receipt.ReceiptSearchRequest;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ReceiptSpecifications {
 
     /**
-     * ----------------------------------------------------------
-     * ⭐ 主方法：依照搜尋條件動態組合 Specification
-     * ----------------------------------------------------------
+     * 主方法：依照搜尋條件動態組合 Specification
+     * 支援方法名稱：bySearchRequest（新）或 build（向後相容）
      */
-    public static Specification<Receipt> build(ReceiptSearchRequest req) {
-
-        Specification<Receipt> spec = Specification.allOf();
-
-        // 確保關聯資料被載入（用於映射 orderNo 和 customerName）
-        spec = spec.and(fetchOrderAndCustomer());
-
-        spec = spec.and(byCustomerName(req));
-        spec = spec.and(byOrderNo(req));
-        spec = spec.and(byMethod(req));
-        spec = spec.and(byAccountingPeriod(req));
-        spec = spec.and(byDateRange(req));
-
-        return spec;
+    public static Specification<Receipt> bySearchRequest(ReceiptSearchRequest request) {
+        return build(request);
     }
 
     /**
-     * 確保載入 Order 和 Customer 關聯（用於映射到 DTO）
+     * 向後相容的方法名稱
      */
-    private static Specification<Receipt> fetchOrderAndCustomer() {
+    public static Specification<Receipt> build(ReceiptSearchRequest request) {
         return (root, query, cb) -> {
-            // 使用 fetch join 確保關聯資料被載入
+
+            List<Predicate> predicates = new ArrayList<>();
+
+            // 使用 distinct 避免 join 造成重複筆數
+            query.distinct(true);
+
+            // 確保關聯資料被載入（用於映射 orderNo 和 customerName）
             if (!query.getResultType().equals(Long.class) && !query.getResultType().equals(long.class)) {
-                jakarta.persistence.criteria.Fetch<Receipt, com.lianhua.erp.domain.Order> orderFetch = root
-                        .fetch("order", jakarta.persistence.criteria.JoinType.LEFT);
-                orderFetch.fetch("customer", jakarta.persistence.criteria.JoinType.LEFT);
+                root.fetch("order", jakarta.persistence.criteria.JoinType.LEFT)
+                        .fetch("customer", jakarta.persistence.criteria.JoinType.LEFT);
             }
-            return null; // 這是一個 fetch join，不添加額外的條件
+
+            /* =====================================================
+             * id（主鍵｜精確）
+             * ===================================================== */
+            if (request.getId() != null) {
+                predicates.add(cb.equal(root.get("id"), request.getId()));
+            }
+
+            /* =====================================================
+             * orderNo（訂單編號｜模糊搜尋）
+             * JOIN order.orderNo
+             * ===================================================== */
+            if (StringUtils.hasText(request.getOrderNo())) {
+                predicates.add(
+                        cb.like(
+                                cb.upper(root.join("order").get("orderNo")),
+                                "%" + request.getOrderNo().trim().toUpperCase() + "%"
+                        )
+                );
+            }
+
+            /* =====================================================
+             * customerName（客戶名稱｜模糊搜尋）
+             * JOIN order.customer.name
+             * ===================================================== */
+            if (StringUtils.hasText(request.getCustomerName())) {
+                predicates.add(
+                        cb.like(
+                                cb.lower(
+                                        root.join("order")
+                                                .join("customer")
+                                                .get("name")
+                                ),
+                                "%" + request.getCustomerName().trim().toLowerCase() + "%"
+                        )
+                );
+            }
+
+            /* =====================================================
+             * method（收款方式｜精確，需轉換為 enum）
+             * ===================================================== */
+            if (StringUtils.hasText(request.getMethod())) {
+                try {
+                    Receipt.PaymentMethod method = Receipt.PaymentMethod.valueOf(request.getMethod().toUpperCase());
+                    predicates.add(cb.equal(root.get("method"), method));
+                } catch (IllegalArgumentException e) {
+                    // 如果傳入的 method 值無效，忽略此條件
+                }
+            }
+
+            /* =====================================================
+             * status（狀態：有效 / 作廢｜精確，需轉換為 enum）
+             * 優先使用 status 參數，如果沒有則使用 includeVoided（向後相容）
+             * ===================================================== */
+            if (StringUtils.hasText(request.getStatus())) {
+                try {
+                    ReceiptStatus status = ReceiptStatus.valueOf(request.getStatus().toUpperCase());
+                    predicates.add(cb.equal(root.get("status"), status));
+                } catch (IllegalArgumentException e) {
+                    // 如果傳入的 status 值無效，忽略此條件
+                }
+            } else {
+                // 向後相容：使用 includeVoided 參數
+                // 預設排除已作廢的收款（除非明確要求包含）
+                if (!Boolean.TRUE.equals(request.getIncludeVoided())) {
+                    predicates.add(cb.equal(root.get("status"), ReceiptStatus.ACTIVE));
+                }
+            }
+
+            /* =====================================================
+             * accountingPeriod（會計期間｜精確）
+             * ===================================================== */
+            if (StringUtils.hasText(request.getAccountingPeriod())) {
+                predicates.add(cb.equal(root.get("accountingPeriod"), request.getAccountingPeriod()));
+            }
+
+            /* =====================================================
+             * receivedDate（收款日期）範圍
+             * 支援 receivedDateFrom/receivedDateTo（LocalDate）或 fromDate/toDate（String）
+             * ===================================================== */
+            LocalDate fromDate = null;
+            LocalDate toDate = null;
+
+            // 優先使用 LocalDate 欄位
+            if (request.getReceivedDateFrom() != null) {
+                fromDate = request.getReceivedDateFrom();
+            } else if (StringUtils.hasText(request.getFromDate())) {
+                try {
+                    fromDate = LocalDate.parse(request.getFromDate());
+                } catch (Exception e) {
+                    // 日期格式錯誤，忽略
+                }
+            }
+
+            if (request.getReceivedDateTo() != null) {
+                toDate = request.getReceivedDateTo();
+            } else if (StringUtils.hasText(request.getToDate())) {
+                try {
+                    toDate = LocalDate.parse(request.getToDate());
+                } catch (Exception e) {
+                    // 日期格式錯誤，忽略
+                }
+            }
+
+            if (fromDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("receivedDate"), fromDate));
+            }
+
+            if (toDate != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("receivedDate"), toDate));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
         };
-    }
-
-    private static Specification<Receipt> byCustomerName(ReceiptSearchRequest req) {
-        if (isEmpty(req.getCustomerName()))
-            return null;
-
-        String keyword = "%" + req.getCustomerName().trim() + "%";
-
-        return (root, query, cb) -> cb.like(
-                root.join("order").join("customer").get("name"),
-                keyword);
-    }
-
-    private static Specification<Receipt> byOrderNo(ReceiptSearchRequest req) {
-        if (isEmpty(req.getOrderNo()))
-            return null;
-
-        String keyword = "%" + req.getOrderNo().trim() + "%";
-
-        return (root, query, cb) -> cb.like(root.join("order").get("orderNo"), keyword);
-    }
-
-    private static Specification<Receipt> byMethod(ReceiptSearchRequest req) {
-        if (isEmpty(req.getMethod()))
-            return null;
-
-        try {
-            Receipt.PaymentMethod method = Receipt.PaymentMethod.valueOf(req.getMethod());
-            return (root, query, cb) -> cb.equal(root.get("method"), method);
-        } catch (IllegalArgumentException e) {
-            // 如果傳入的 method 值無效，返回 null（不加入搜尋條件）
-            return null;
-        }
-    }
-
-    private static Specification<Receipt> byAccountingPeriod(ReceiptSearchRequest req) {
-        if (isEmpty(req.getAccountingPeriod()))
-            return null;
-
-        return (root, query, cb) -> cb.equal(root.get("accountingPeriod"), req.getAccountingPeriod());
-    }
-
-    private static Specification<Receipt> byDateRange(ReceiptSearchRequest req) {
-        Specification<Receipt> spec = Specification.allOf();
-
-        if (!isEmpty(req.getFromDate())) {
-            LocalDate from = LocalDate.parse(req.getFromDate());
-            spec = spec.and(
-                    (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("receivedDate"), from));
-        }
-
-        if (!isEmpty(req.getToDate())) {
-            LocalDate to = LocalDate.parse(req.getToDate());
-            spec = spec.and(
-                    (root, query, cb) -> cb.lessThanOrEqualTo(root.get("receivedDate"), to));
-        }
-
-        return spec;
-    }
-
-    private static boolean isEmpty(String s) {
-        return s == null || s.trim().isEmpty();
     }
 }

@@ -68,6 +68,7 @@ public class PaymentServiceImpl implements PaymentService {
     public Page<PaymentResponseDto> searchPayments(PaymentSearchRequest req, Pageable pageable) {
 
         // ===== 1. 搜尋條件不可全為空 =====
+        // includeVoided 不計入搜尋條件（只是過濾選項）
         boolean empty =
                 isEmpty(req.getSupplierName()) &&
                         isEmpty(req.getItem()) &&

@@ -36,6 +36,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final OrderItemMapper itemMapper;
     private final OrderNoGenerator orderNoGenerator;
+    private final ReceiptRepository receiptRepository;
 
     // ================================
     // 查詢（分頁）
@@ -217,14 +218,17 @@ public class OrderServiceImpl implements OrderService {
             );
         }
 
-        // ⚠️ 取消訂單前必須未收款
-        if (dto.getOrderStatus() == OrderStatus.CANCELLED &&
-                order.getPaymentStatus() != PaymentStatus.UNPAID) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "已有收款紀錄的訂單不可取消，請先處理退款"
-            );
+        // ⚠️ 取消訂單前必須未收款（檢查是否有任何收款記錄，包括已作廢的）
+        if (dto.getOrderStatus() == OrderStatus.CANCELLED) {
+                // 檢查是否有任何收款記錄（包括已作廢的）
+                boolean hasAnyReceipt = receiptRepository.hasAnyReceiptByOrderId(order.getId());
+                
+                if (hasAnyReceipt) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "已有收款紀錄的訂單不可取消，請先處理退款"
+                        );
+                }
         }
 
         /*
@@ -257,7 +261,10 @@ public class OrderServiceImpl implements OrderService {
                         new EntityNotFoundException(
                                 "找不到訂單 ID: " + id));
 
-        if (order.getPaymentStatus() != PaymentStatus.UNPAID) {
+        // ⚠️ 檢查是否有任何收款記錄（包括已作廢的），如果有則不可刪除
+        boolean hasAnyReceipt = receiptRepository.hasAnyReceiptByOrderId(order.getId());
+        
+        if (hasAnyReceipt) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "已有收款紀錄的訂單不可刪除"
