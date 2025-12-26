@@ -1,6 +1,8 @@
 package com.lianhua.erp.web.controller;
 
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
+import com.lianhua.erp.dto.error.BadRequestResponse;
+import com.lianhua.erp.dto.error.InternalServerErrorResponse;
 import com.lianhua.erp.dto.error.NotFoundResponse;
 import com.lianhua.erp.dto.payment.PaymentResponseDto;
 import com.lianhua.erp.dto.payment.PaymentSearchRequest;
@@ -117,5 +119,34 @@ public class PaymentController {
     ) {
         Page<PaymentResponseDto> page = paymentService.searchPayments(req, pageable);
         return ResponseEntity.ok(ApiResponseDto.ok(page));
+    }
+
+    /* ============================================================
+     * 📌 作廢付款單
+     * ============================================================ */
+    @Operation(
+            summary = "作廢付款單",
+            description = "將付款單標記為作廢。作廢後會重新計算進貨單的付款狀態。任何狀態的付款單都可以作廢。"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "作廢成功"),
+            @ApiResponse(responseCode = "400", description = "付款單已經作廢",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "404", description = "找不到付款單",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
+    @PostMapping("/{id}/void")
+    public ResponseEntity<ApiResponseDto<PaymentResponseDto>> voidPayment(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> request) {
+        
+        String reason = request != null ? request.get("reason") : null;
+        PaymentResponseDto result = paymentService.voidPayment(id, reason);
+        return ResponseEntity.ok(ApiResponseDto.ok(result));
     }
 }

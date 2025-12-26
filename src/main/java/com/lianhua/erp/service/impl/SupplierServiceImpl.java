@@ -117,7 +117,7 @@ public class SupplierServiceImpl implements SupplierService {
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    STR."更新供應商失敗，名稱可能已存在：\{dto.getName()}",
+                    String.format("更新供應商失敗，名稱可能已存在：%s", dto.getName()),
                     ex
             );
         }
@@ -170,7 +170,7 @@ public class SupplierServiceImpl implements SupplierService {
         if (purchaseRepository.existsBySupplierId(id)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    STR."無法刪除供應商：「\{supplier.getName()}」，因已存在相關進貨單紀錄。請改為停用供應商。"
+                    String.format("無法刪除供應商：「%s」，因已存在相關進貨單紀錄。請改為停用供應商。", supplier.getName())
             );
         }
 
@@ -201,7 +201,7 @@ public class SupplierServiceImpl implements SupplierService {
         } catch (PropertyReferenceException ex) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    STR."無效排序欄位：\{ex.getPropertyName()}"
+                    String.format("無效排序欄位：%s", ex.getPropertyName())
             );
         }
 
@@ -227,21 +227,21 @@ public class SupplierServiceImpl implements SupplierService {
             if (hasText(req.getSupplierName())) {
                 predicates.add(cb.like(
                         cb.lower(root.get("name")),
-                        STR."%\{req.getSupplierName().toLowerCase()}%"
+                        String.format("%%%s%%", req.getSupplierName().toLowerCase())
                 ));
             }
 
             if (hasText(req.getContact())) {
                 predicates.add(cb.like(
                         cb.lower(root.get("contact")),
-                        STR."%\{req.getContact().toLowerCase()}%"
+                        String.format("%%%s%%", req.getContact().toLowerCase())
                 ));
             }
 
             if (hasText(req.getPhone())) {
                 predicates.add(cb.like(
                         cb.lower(root.get("phone")),
-                        STR."%\{req.getPhone().toLowerCase()}%"
+                        String.format("%%%s%%", req.getPhone().toLowerCase())
                 ));
             }
 
@@ -255,7 +255,7 @@ public class SupplierServiceImpl implements SupplierService {
             if (hasText(req.getNote())) {
                 predicates.add(cb.like(
                         cb.lower(root.get("note")),
-                        STR."%\{req.getNote().toLowerCase()}%"
+                        String.format("%%%s%%", req.getNote().toLowerCase())
                 ));
             }
 

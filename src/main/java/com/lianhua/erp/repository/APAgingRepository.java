@@ -32,7 +32,7 @@ public class APAgingRepository {
      * ============================================================= */
     public List<APAgingSummaryDto> findAgingSummary() {
         String sql = baseSummarySql()
-                + " HAVING SUM(p.balance) > 0 "
+                + " HAVING SUM(p.total_amount - COALESCE(paid_summary.paid_amount, 0)) > 0 "
                 + " ORDER BY balance DESC ";
         return jdbcTemplate.query(sql, this::mapSummaryRow);
     }
@@ -83,15 +83,15 @@ public class APAgingRepository {
             switch (filter.getAgingBucket()) {
                 case "DAYS_0_30" -> havingConditions.add("""
                             SUM(CASE WHEN DATEDIFF(CURDATE(), p.purchase_date) <= 30
-                            THEN p.balance ELSE 0 END) > 0
+                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0)) ELSE 0 END) > 0
                         """);
                 case "DAYS_31_60" -> havingConditions.add("""
                             SUM(CASE WHEN DATEDIFF(CURDATE(), p.purchase_date) BETWEEN 31 AND 60
-                            THEN p.balance ELSE 0 END) > 0
+                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0)) ELSE 0 END) > 0
                         """);
                 case "DAYS_60_PLUS" -> havingConditions.add("""
                             SUM(CASE WHEN DATEDIFF(CURDATE(), p.purchase_date) > 60
-                            THEN p.balance ELSE 0 END) > 0
+                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0)) ELSE 0 END) > 0
                         """);
                 default -> {
                 }
@@ -99,7 +99,7 @@ public class APAgingRepository {
         }
 
         if (filter == null || filter.getOnlyUnpaid() == null || Boolean.TRUE.equals(filter.getOnlyUnpaid())) {
-            havingConditions.add(" SUM(p.balance) > 0 ");
+            havingConditions.add(" SUM(p.total_amount - COALESCE(paid_summary.paid_amount, 0)) > 0 ");
         }
 
         if (!havingConditions.isEmpty()) {
@@ -152,7 +152,7 @@ public class APAgingRepository {
                     SUM(
                         CASE 
                             WHEN DATEDIFF(CURDATE(), p.purchase_date) <= 30 
-                            THEN p.balance
+                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0))
                             ELSE 0 
                         END
                     ) AS aging_0_30,
@@ -160,7 +160,7 @@ public class APAgingRepository {
                     SUM(
                         CASE 
                             WHEN DATEDIFF(CURDATE(), p.purchase_date) BETWEEN 31 AND 60
-                            THEN p.balance
+                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0))
                             ELSE 0 
                         END
                     ) AS aging_31_60,
@@ -168,20 +168,28 @@ public class APAgingRepository {
                     SUM(
                         CASE 
                             WHEN DATEDIFF(CURDATE(), p.purchase_date) > 60
-                            THEN p.balance
+                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0))
                             ELSE 0 
                         END
                     ) AS aging_60_plus,
                 
                     /* ---- 應付總額、已付、未付 ---- */
                     SUM(p.total_amount) AS total_amount,
-                    SUM(p.paid_amount) AS paid_amount,
-                    SUM(p.balance) AS balance
+                    SUM(COALESCE(paid_summary.paid_amount, 0)) AS paid_amount,
+                    SUM(p.total_amount - COALESCE(paid_summary.paid_amount, 0)) AS balance
                 
                 FROM purchases p
                 JOIN suppliers s ON s.id = p.supplier_id
+                LEFT JOIN (
+                    SELECT 
+                        purchase_id,
+                        SUM(amount) AS paid_amount
+                    FROM payments
+                    WHERE status = 'ACTIVE'
+                    GROUP BY purchase_id
+                ) paid_summary ON p.id = paid_summary.purchase_id
                 
-                WHERE 1=1
+                WHERE p.record_status = 'ACTIVE'
                 
                 GROUP BY s.id, s.name
                 """;
@@ -212,8 +220,8 @@ public class APAgingRepository {
                     p.purchase_no,
                     p.purchase_date,
                     p.total_amount,
-                    p.paid_amount,
-                    p.balance,
+                    COALESCE(paid_summary.paid_amount, 0) AS paid_amount,
+                    (p.total_amount - COALESCE(paid_summary.paid_amount, 0)) AS balance,
                     p.status,
                 
                     CASE
@@ -223,8 +231,17 @@ public class APAgingRepository {
                     END AS aging_bucket
                 
                 FROM purchases p
+                LEFT JOIN (
+                    SELECT 
+                        purchase_id,
+                        SUM(amount) AS paid_amount
+                    FROM payments
+                    WHERE status = 'ACTIVE'
+                    GROUP BY purchase_id
+                ) paid_summary ON p.id = paid_summary.purchase_id
                 WHERE p.supplier_id = ?
-                  AND p.balance > 0
+                  AND p.record_status = 'ACTIVE'
+                  AND (p.total_amount - COALESCE(paid_summary.paid_amount, 0)) > 0
                 ORDER BY p.purchase_date DESC
                 """;
 

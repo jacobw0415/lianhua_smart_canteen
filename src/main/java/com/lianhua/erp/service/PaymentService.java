@@ -27,4 +27,12 @@ public interface PaymentService {
      * 刪除某進貨單下的所有付款紀錄
      */
     void deleteByPurchaseId(Long purchaseId);
+
+    /**
+     * 作廢付款單
+     * @param id 付款單 ID
+     * @param reason 作廢原因（可選）
+     * @return 更新後的付款單 DTO
+     */
+    PaymentResponseDto voidPayment(Long id, String reason);
 }

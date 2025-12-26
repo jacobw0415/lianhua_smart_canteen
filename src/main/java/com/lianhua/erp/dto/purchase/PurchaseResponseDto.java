@@ -61,4 +61,18 @@ public class PurchaseResponseDto {
     
     @Schema(description = "對應的付款明細列表")
     private List<PaymentResponseDto> payments;
+
+    /* =============================
+     * 📌 作廢相關欄位
+     * ============================= */
+
+    @Schema(description = "記錄狀態：ACTIVE（正常進貨）, VOIDED（已作廢）", example = "ACTIVE")
+    private String recordStatus;
+
+    @Schema(description = "作廢時間")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Taipei")
+    private java.time.LocalDateTime voidedAt;
+
+    @Schema(description = "作廢原因", example = "進貨單錯誤，需作廢")
+    private String voidReason;
 }

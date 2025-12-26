@@ -69,8 +69,8 @@ public class BalanceSheetReportRepository {
                     (SUM(COALESCE(p.total_amount, 0)) - SUM(COALESCE(pay.amount, 0))) AS accounts_payable,
                     0 AS cash
                 FROM purchases p
-                LEFT JOIN payments pay ON p.id = pay.purchase_id
-                WHERE 1=1
+                LEFT JOIN payments pay ON p.id = pay.purchase_id AND pay.status = 'ACTIVE'
+                WHERE p.record_status = 'ACTIVE'
         """);
 
         if (period != null && !period.isBlank()) {

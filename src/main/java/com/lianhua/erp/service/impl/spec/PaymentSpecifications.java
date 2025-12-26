@@ -1,8 +1,10 @@
 package com.lianhua.erp.service.impl.spec;
 
 import com.lianhua.erp.domain.Payment;
+import com.lianhua.erp.domain.PaymentRecordStatus;
 import com.lianhua.erp.dto.payment.PaymentSearchRequest;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 
@@ -15,13 +17,23 @@ public class PaymentSpecifications {
 
         Specification<Payment> spec = Specification.allOf();
 
-        // ⭐ 預設排除已作廢的付款（除非明確要求包含）
-        // 注意：此功能需要 Payment 實體有 status 欄位（PaymentStatus enum: ACTIVE, VOIDED）
-        if (!Boolean.TRUE.equals(req.getIncludeVoided())) {
-            // TODO: 當 Payment 實體添加 status 欄位後，取消註解以下邏輯
-            // spec = spec.and((root, query, cb) -> 
-            //     cb.equal(root.get("status"), com.lianhua.erp.domain.PaymentStatus.ACTIVE)
-            // );
+        // ⭐ 狀態過濾
+        if (StringUtils.hasText(req.getStatus())) {
+            try {
+                PaymentRecordStatus status = PaymentRecordStatus.valueOf(req.getStatus().toUpperCase());
+                spec = spec.and((root, query, cb) -> 
+                    cb.equal(root.get("status"), status)
+                );
+            } catch (IllegalArgumentException e) {
+                // 忽略無效的狀態值
+            }
+        } else {
+            // 預設排除已作廢的付款（除非明確要求包含）
+            if (!Boolean.TRUE.equals(req.getIncludeVoided())) {
+                spec = spec.and((root, query, cb) -> 
+                    cb.equal(root.get("status"), PaymentRecordStatus.ACTIVE)
+                );
+            }
         }
 
         spec = spec.and(bySupplierName(req));

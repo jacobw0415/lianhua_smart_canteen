@@ -56,6 +56,9 @@ CREATE TABLE purchases (
   paid_amount DECIMAL(10,2) DEFAULT 0.00,
   balance DECIMAL(10,2) GENERATED ALWAYS AS (total_amount - paid_amount) STORED,
   status ENUM('PENDING','PARTIAL','PAID') DEFAULT 'PENDING',
+  record_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '記錄狀態：ACTIVE（正常進貨）, VOIDED（已作廢）',
+  voided_at TIMESTAMP NULL COMMENT '作廢時間',
+  void_reason VARCHAR(500) NULL COMMENT '作廢原因',
   note VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -71,6 +74,8 @@ CREATE TABLE purchases (
 
 CREATE INDEX idx_purchases_supplier_id ON purchases(supplier_id);
 CREATE INDEX idx_purchases_accounting_period ON purchases(accounting_period);
+CREATE INDEX idx_purchases_record_status ON purchases(record_status);
+CREATE INDEX idx_purchases_voided_at ON purchases(voided_at);
 
 -- ------------------------------------------------------------
 -- 4. 付款表 (含會計期間)
@@ -84,6 +89,9 @@ CREATE TABLE payments (
   method ENUM('CASH','TRANSFER','CARD','CHECK') DEFAULT 'CASH',
   reference_no VARCHAR(100),
   note VARCHAR(255),
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '狀態：ACTIVE（正常付款）, VOIDED（已作廢）',
+  voided_at TIMESTAMP NULL COMMENT '作廢時間',
+  void_reason VARCHAR(500) NULL COMMENT '作廢原因',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (purchase_id) REFERENCES purchases(id)
@@ -93,6 +101,8 @@ CREATE TABLE payments (
 
 CREATE INDEX idx_payments_purchase_id ON payments(purchase_id);
 CREATE INDEX idx_payments_accounting_period ON payments(accounting_period);
+CREATE INDEX idx_payments_status ON payments(status);
+CREATE INDEX idx_payments_voided_at ON payments(voided_at);
 
 -- ------------------------------------------------------------
 -- 5. 商品分類表

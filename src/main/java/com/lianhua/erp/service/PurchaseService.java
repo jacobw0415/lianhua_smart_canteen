@@ -18,5 +18,20 @@ public interface PurchaseService {
     PurchaseResponseDto updateStatus(Long id, String status);
     void deletePurchase(Long id);
     Page<PurchaseResponseDto> searchPurchases(PurchaseSearchRequest req, Pageable pageable);
+    
+    /**
+     * 作廢進貨單
+     * 
+     * 業務邏輯：
+     * 1. 檢查進貨單是否存在且未作廢
+     * 2. 自動作廢所有相關的有效付款單
+     * 3. 標記進貨單為已作廢
+     * 4. 更新進貨單狀態、作廢時間、作廢原因
+     * 
+     * @param id 進貨單 ID
+     * @param reason 作廢原因
+     * @return 作廢後的進貨單 DTO
+     */
+    PurchaseResponseDto voidPurchase(Long id, String reason);
 
 }

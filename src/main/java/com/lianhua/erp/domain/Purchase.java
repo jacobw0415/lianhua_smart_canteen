@@ -101,6 +101,22 @@ public class Purchase {
     @Schema(description = "狀態：PENDING, PARTIAL, PAID")
     private Status status = Status.PENDING;
 
+    // 作廢相關欄位（記錄狀態）
+    @Enumerated(EnumType.STRING)
+    @Column(name = "record_status", length = 20, nullable = false)
+    @Builder.Default
+    @Schema(description = "記錄狀態：ACTIVE（正常進貨）, VOIDED（已作廢）")
+    private PurchaseStatus recordStatus = PurchaseStatus.ACTIVE;
+
+    // 作廢相關欄位（保留作廢時間和原因）
+    @Column(name = "voided_at")
+    @Schema(description = "作廢時間")
+    private LocalDateTime voidedAt;
+
+    @Column(name = "void_reason", length = 500)
+    @Schema(description = "作廢原因")
+    private String voidReason;
+
     @Column(length = 255)
     @Schema(description = "備註")
     private String note;

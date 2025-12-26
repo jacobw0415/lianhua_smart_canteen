@@ -50,7 +50,8 @@ public class CashFlowReportRepository {
 
                 SELECT accounting_period, 0 AS total_sales, 0 AS total_receipts, SUM(amount) AS total_payments, 0 AS total_expenses
                   FROM payments
-                 WHERE (? IS NULL OR pay_date >= ?) AND (? IS NULL OR pay_date <= ?)
+                 WHERE status = 'ACTIVE'
+                   AND (? IS NULL OR pay_date >= ?) AND (? IS NULL OR pay_date <= ?)
                  GROUP BY accounting_period
 
                 UNION ALL

@@ -13,6 +13,10 @@ import java.time.format.DateTimeFormatter;
         name = "payments",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_payment_reference_no", columnNames = {"reference_no"})
+        },
+        indexes = {
+                @Index(name = "idx_payments_status", columnList = "status"),
+                @Index(name = "idx_payments_voided_at", columnList = "voided_at")
         }
 )
 @Getter
@@ -48,6 +52,19 @@ public class Payment {
 
     @Column(length = 255)
     private String note;
+
+    // 狀態欄位
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    @Builder.Default
+    private PaymentRecordStatus status = PaymentRecordStatus.ACTIVE;
+
+    // 作廢相關欄位（保留作廢時間和原因）
+    @Column(name = "voided_at")
+    private LocalDateTime voidedAt;
+
+    @Column(name = "void_reason", length = 500)
+    private String voidReason;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -33,9 +33,9 @@ public class CashFlowReportServiceImpl implements CashFlowReportService {
         // 📅 自動標籤邏輯
         String label = "合計";
         if (startDate != null && endDate != null) {
-            label += STR." (\{startDate} ~ \{endDate})";
+            label += String.format(" (%s ~ %s)", startDate, endDate);
         } else if (period != null && !period.isBlank()) {
-            label += STR." (\{period})";
+            label += String.format(" (%s)", period);
         }
         total.setAccountingPeriod(label);
 

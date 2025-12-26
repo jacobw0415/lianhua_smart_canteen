@@ -2,6 +2,7 @@ package com.lianhua.erp.mapper;
 
 import com.lianhua.erp.domain.Payment;
 import com.lianhua.erp.domain.Purchase;
+import com.lianhua.erp.domain.PurchaseStatus;
 import com.lianhua.erp.dto.purchase.PurchaseRequestDto;
 import com.lianhua.erp.dto.purchase.PurchaseResponseDto;
 import org.mapstruct.*;
@@ -25,6 +26,9 @@ public interface PurchaseMapper {
     @Mapping(target = "totalAmount", expression = "java(calcTotal(entity))")
     @Mapping(target = "paidAmount", expression = "java(calcPaid(entity))")
     @Mapping(target = "balance", expression = "java(calcTotal(entity).subtract(calcPaid(entity)).setScale(2, java.math.RoundingMode.HALF_UP))")
+    @Mapping(target = "recordStatus", expression = "java(mapRecordStatus(entity.getRecordStatus()))")
+    @Mapping(source = "voidedAt", target = "voidedAt")
+    @Mapping(source = "voidReason", target = "voidReason")
     PurchaseResponseDto toDto(Purchase entity);
     
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
@@ -50,6 +54,7 @@ public interface PurchaseMapper {
         return Optional.ofNullable(p.getPayments())
                 .orElse(Collections.emptySet())
                 .stream()
+                .filter(payment -> payment.getStatus() == com.lianhua.erp.domain.PaymentRecordStatus.ACTIVE)
                 .map(Payment::getAmount)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -58,5 +63,12 @@ public interface PurchaseMapper {
 
     default PurchaseResponseDto toResponseDto(Purchase entity) {
         return toDto(entity);
+    }
+
+    /**
+     * PurchaseStatus enum → String
+     */
+    default String mapRecordStatus(PurchaseStatus status) {
+        return status != null ? status.name() : null;
     }
 }

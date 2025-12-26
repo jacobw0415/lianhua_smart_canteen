@@ -44,6 +44,10 @@ public class PaymentSearchRequest {
     )
     private String toDate;
 
-    @Schema(description = "是否包含已作廢的付款（預設 false）", example = "false")
+    @Schema(description = "是否包含已作廢的付款（預設 false，向後相容）", example = "false")
     private Boolean includeVoided = false;
+
+    @Schema(description = "狀態過濾：ACTIVE（只搜尋有效的）, VOIDED（只搜尋作廢的）, 或不指定（搜尋全部）", 
+            example = "ACTIVE", allowableValues = {"ACTIVE", "VOIDED"})
+    private String status;
 }

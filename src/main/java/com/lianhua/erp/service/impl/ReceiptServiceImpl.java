@@ -304,8 +304,10 @@ public class ReceiptServiceImpl implements ReceiptService {
                                 order.setPaymentStatus(PaymentStatus.UNPAID);
                         }
                 } else if (paidAmount.compareTo(totalAmount) < 0) {
-                        order.setPaymentStatus(PaymentStatus.PARTIAL);
+                        // 部分收款：由於 PaymentStatus 只有 UNPAID 和 PAID，部分收款也視為 PAID
+                        order.setPaymentStatus(PaymentStatus.PAID);
                 } else {
+                        // 已全額收款
                         order.setPaymentStatus(PaymentStatus.PAID);
                 }
 

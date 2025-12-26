@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @Schema(description = "付款紀錄回應資料")
@@ -53,4 +54,18 @@ public class PaymentResponseDto {
 
     @Schema(description = "會計期間 (YYYY-MM)", example = "2025-12")
     private String accountingPeriod; // 用於月份報表與查詢
+
+    /* =============================
+     * 📌 作廢相關欄位
+     * ============================= */
+
+    @Schema(description = "狀態：ACTIVE（正常付款）, VOIDED（已作廢）", example = "ACTIVE")
+    private String status;
+
+    @Schema(description = "作廢時間")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Taipei")
+    private LocalDateTime voidedAt;
+
+    @Schema(description = "作廢原因", example = "重複付款，需作廢")
+    private String voidReason;
 }

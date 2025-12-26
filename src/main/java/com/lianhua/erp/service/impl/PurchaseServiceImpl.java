@@ -1,6 +1,8 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.*;
+import com.lianhua.erp.domain.PaymentRecordStatus;
+import com.lianhua.erp.domain.PurchaseStatus;
 import com.lianhua.erp.dto.purchase.*;
 import com.lianhua.erp.mapper.PurchaseMapper;
 import com.lianhua.erp.mapper.PaymentMapper;
@@ -27,6 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -321,7 +324,16 @@ public class PurchaseServiceImpl implements PurchaseService {
                 .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 (ID: " + id + ")"));
 
         // ========================================
-        // 1️⃣ 若進貨單已付清 → 禁止新增或修改付款
+        // 1️⃣ 檢查進貨單是否已作廢
+        // ========================================
+        if (purchase.getRecordStatus() == PurchaseStatus.VOIDED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "已作廢的進貨單不可修改");
+        }
+
+        // ========================================
+        // 2️⃣ 若進貨單已付清 → 禁止新增或修改付款
         // ========================================
         if (purchase.getStatus() == Purchase.Status.PAID) {
             throw new ResponseStatusException(
@@ -384,7 +396,9 @@ public class PurchaseServiceImpl implements PurchaseService {
 
         BigDecimal totalAmount = purchase.getTotalAmount();
 
+        // ⭐ 只計算有效付款（排除已作廢的）
         BigDecimal totalPaidBefore = existingPayments.stream()
+                .filter(p -> p.getStatus() == PaymentRecordStatus.ACTIVE)
                 .map(p -> p.getAmount() == null ? BigDecimal.ZERO : p.getAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -444,6 +458,13 @@ public class PurchaseServiceImpl implements PurchaseService {
                 // ===== 更新既有付款 =====
                 Payment old = existing.get();
 
+                // ⚠️ 已作廢的付款單不可修改
+                if (old.getStatus() == PaymentRecordStatus.VOIDED) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "已作廢的付款單不可修改");
+                }
+
                 BigDecimal newTotal = totalPaidBefore
                         .subtract(old.getAmount())
                         .add(newPayment.getAmount());
@@ -478,9 +499,10 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
 
         // ========================================
-        // 9️⃣ 最終安全驗證：總額不可超付
+        // 9️⃣ 最終安全驗證：總額不可超付（只計算有效付款）
         // ========================================
         BigDecimal totalPaid = existingPayments.stream()
+                .filter(p -> p.getStatus() == PaymentRecordStatus.ACTIVE)
                 .map(p -> p.getAmount() == null ? BigDecimal.ZERO : p.getAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -540,6 +562,13 @@ public class PurchaseServiceImpl implements PurchaseService {
         Purchase purchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 (ID: " + id + ")"));
 
+        // ⚠️ 已作廢的進貨單不可刪除（應保留記錄）
+        if (purchase.getRecordStatus() == PurchaseStatus.VOIDED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "已作廢的進貨單不可刪除");
+        }
+
         // ⚠️ 已有付款紀錄的進貨單不可刪除
         if (purchase.getStatus() != Purchase.Status.PENDING) {
             throw new ResponseStatusException(
@@ -550,6 +579,60 @@ public class PurchaseServiceImpl implements PurchaseService {
         log.info("刪除進貨單：purchaseId={}", id);
         purchaseRepository.deleteById(id);
         // orphanRemoval = true 會自動刪除關聯的 payments（但只有在 PENDING 狀態時才會執行到這裡）
+    }
+
+    /* =======================================================
+     * 📌 作廢進貨單
+     * ======================================================= */
+    @Override
+    @Transactional
+    public PurchaseResponseDto voidPurchase(Long id, String reason) {
+        Purchase purchase = purchaseRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 ID：" + id));
+
+        // 檢查是否已作廢
+        if (purchase.getRecordStatus() == PurchaseStatus.VOIDED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "此進貨單已經作廢");
+        }
+
+        // ⭐ 核心邏輯：自動作廢所有相關的有效付款單
+        Set<Payment> payments = purchase.getPayments();
+        if (payments != null && !payments.isEmpty()) {
+            for (Payment payment : payments) {
+                // 只作廢有效的付款單（跳過已作廢的）
+                if (payment.getStatus() == PaymentRecordStatus.ACTIVE) {
+                    payment.setStatus(PaymentRecordStatus.VOIDED);
+                    payment.setVoidedAt(LocalDateTime.now());
+                    payment.setVoidReason("進貨單已作廢，自動作廢相關付款單");
+                    paymentRepository.save(payment);
+                    log.info("✅ 自動作廢付款單：paymentId={}, purchaseId={}",
+                            payment.getId(), id);
+                }
+            }
+        }
+
+        // 標記進貨單為已作廢
+        purchase.setRecordStatus(PurchaseStatus.VOIDED);
+        purchase.setVoidedAt(LocalDateTime.now());
+        purchase.setVoidReason(reason);
+
+        // 更新付款金額（所有付款都已作廢，所以有效付款金額 = 0）
+        purchase.setPaidAmount(BigDecimal.ZERO);
+        // balance 是計算欄位，會自動更新
+        // ⭐ 保留原有的付款狀態（PARTIAL / PAID），不自動變更為 PENDING
+        // 這樣可以反映作廢前的付款記錄狀態
+
+        purchaseRepository.save(purchase);
+
+        log.info("✅ 作廢進貨單：purchaseId={}, reason={}", id, reason);
+
+        // 重新查詢以確保關聯資料被載入
+        Purchase savedPurchase = purchaseRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 ID：" + id));
+
+        return purchaseMapper.toDto(savedPurchase);
     }
 
     // ================================

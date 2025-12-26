@@ -162,6 +162,35 @@ public class PurchaseController {
     }
 
     // ============================================================
+    // 作廢進貨單
+    // ============================================================
+    @Operation(
+            summary = "作廢進貨單",
+            description = """
+                    將進貨單標記為作廢。作廢後會自動作廢所有相關的有效付款單。
+                    任何狀態的進貨單都可以作廢（PENDING / PARTIAL / PAID）。
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "作廢成功"),
+            @ApiResponse(responseCode = "400", description = "進貨單已經作廢",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "404", description = "找不到進貨單",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
+    @PostMapping("/{id}/void")
+    public ResponseEntity<ApiResponseDto<PurchaseResponseDto>> voidPurchase(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> request) {
+        
+        String reason = request != null ? request.get("reason") : null;
+        PurchaseResponseDto result = purchaseService.voidPurchase(id, reason);
+        return ResponseEntity.ok(ApiResponseDto.ok(result));
+    }
+
+    // ============================================================
     // 🔍 搜尋進貨單
     // ============================================================
     @Operation(

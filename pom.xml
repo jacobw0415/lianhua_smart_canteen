@@ -139,7 +139,6 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>com.lianhua.erp.ErpApplication</mainClass>
-                    <jvmArguments>--enable-preview</jvmArguments>
                 </configuration>
             </plugin>
 
@@ -152,7 +151,6 @@
                     <release>21</release>
                     <source>21</source>
                     <target>21</target>
-                    <compilerArgs>--enable-preview</compilerArgs>
                 </configuration>
             </plugin>
 
