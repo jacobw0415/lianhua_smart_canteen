@@ -46,7 +46,7 @@ public class BalanceSheetReportRepository {
                     0 AS accounts_payable,
                     0 AS cash
                 FROM orders o
-                LEFT JOIN receipts r ON o.id = r.order_id
+                LEFT JOIN receipts r ON o.id = r.order_id AND r.status = 'ACTIVE'
                 WHERE 1=1
         """);
 
@@ -111,7 +111,7 @@ public class BalanceSheetReportRepository {
                     0 AS accounts_payable,
                     SUM(COALESCE(r.amount, 0)) AS cash
                 FROM receipts r
-                WHERE 1=1
+                WHERE r.status = 'ACTIVE'
         """);
 
         if (period != null && !period.isBlank()) {

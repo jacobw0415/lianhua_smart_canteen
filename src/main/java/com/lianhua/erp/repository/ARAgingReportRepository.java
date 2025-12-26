@@ -44,10 +44,10 @@ public class ARAgingReportRepository {
                 END AS aging_bucket
             FROM orders o
             JOIN order_customers c ON o.customer_id = c.id
-            LEFT JOIN receipts r ON o.id = r.order_id
+            LEFT JOIN receipts r ON o.id = r.order_id AND r.status = 'ACTIVE'
             WHERE (o.total_amount - COALESCE((SELECT SUM(r2.amount) 
                                              FROM receipts r2 
-                                             WHERE r2.order_id = o.id), 0)) > 0
+                                             WHERE r2.order_id = o.id AND r2.status = 'ACTIVE'), 0)) > 0
         """);
 
         // ✅ 動態條件組合

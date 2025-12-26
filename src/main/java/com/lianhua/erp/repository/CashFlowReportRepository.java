@@ -42,7 +42,8 @@ public class CashFlowReportRepository {
 
                 SELECT accounting_period, 0 AS total_sales, SUM(amount) AS total_receipts, 0 AS total_payments, 0 AS total_expenses
                   FROM receipts
-                 WHERE (? IS NULL OR received_date >= ?) AND (? IS NULL OR received_date <= ?)
+                 WHERE status = 'ACTIVE'
+                   AND (? IS NULL OR received_date >= ?) AND (? IS NULL OR received_date <= ?)
                  GROUP BY accounting_period
 
                 UNION ALL
