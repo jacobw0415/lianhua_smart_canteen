@@ -46,7 +46,11 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public Page<OrderResponseDto> page(Pageable pageable) {
         return orderRepository.findAll(pageable)
-                .map(order -> orderMapper.toResponseDto(order, itemMapper));
+                .map(order -> {
+                    // ⭐ 後端計算付款狀態（包含作廢收款記錄的邏輯）
+                    calculatePaymentStatus(order);
+                    return orderMapper.toResponseDto(order, itemMapper);
+                });
     }
 
     // ================================
@@ -62,7 +66,11 @@ public class OrderServiceImpl implements OrderService {
                 OrderSpecifications.bySearchRequest(searchRequest);
 
         return orderRepository.findAll(spec, pageable)
-                .map(order -> orderMapper.toResponseDto(order, itemMapper));
+                .map(order -> {
+                    // ⭐ 後端計算付款狀態（包含作廢收款記錄的邏輯）
+                    calculatePaymentStatus(order);
+                    return orderMapper.toResponseDto(order, itemMapper);
+                });
     }
 
     // ================================
@@ -74,6 +82,9 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() ->
                         new EntityNotFoundException("找不到訂單 ID: " + id));
+
+        // ⭐ 後端計算付款狀態（包含作廢收款記錄的邏輯）
+        calculatePaymentStatus(order);
 
         return orderMapper.toResponseDto(order, itemMapper);
     }
@@ -309,5 +320,44 @@ public class OrderServiceImpl implements OrderService {
         }
 
         orderRepository.delete(order);
+    }
+
+    // ================================
+    //  計算付款狀態（包含作廢收款記錄的邏輯）
+    // ================================
+    /**
+     * 計算訂單的付款狀態，包含以下邏輯：
+     * 1. 計算有效收款金額（排除已作廢的收款）
+     * 2. 如果曾經有收款記錄（包括已作廢的），即使現在有效收款為0，也保持 PAID 狀態
+     * 3. 根據已收款金額與總金額比較，決定狀態：UNPAID / PARTIAL / PAID
+     * 
+     * 注意：此方法僅用於查詢時計算狀態，不會保存到資料庫
+     */
+    private void calculatePaymentStatus(Order order) {
+        // 計算有效收款金額（排除已作廢的收款）
+        BigDecimal paidAmount = receiptRepository.sumAmountByOrderId(order.getId());
+        
+        if (paidAmount == null) {
+            paidAmount = BigDecimal.ZERO;
+        }
+        
+        BigDecimal totalAmount = order.getTotalAmount();
+        
+        // ⭐ 如果訂單曾經有收款記錄（包括已作廢的），即使現在有效收款為0，也應該保持 PAID 狀態
+        // 這樣可以防止已收款的訂單在收款單被作廢後變成 UNPAID，從而避免前端顯示錯誤
+        boolean hasAnyReceipt = receiptRepository.hasAnyReceiptByOrderId(order.getId());
+        
+        if (paidAmount.compareTo(BigDecimal.ZERO) == 0) {
+            // 如果曾經有收款記錄，即使現在都被作廢了，也應該保持 PAID 狀態
+            if (hasAnyReceipt) {
+                order.setPaymentStatus(PaymentStatus.PAID);
+            } else {
+                order.setPaymentStatus(PaymentStatus.UNPAID);
+            }
+        } else if (paidAmount.compareTo(totalAmount) < 0) {
+            order.setPaymentStatus(PaymentStatus.PARTIAL);
+        } else {
+            order.setPaymentStatus(PaymentStatus.PAID);
+        }
     }
 }

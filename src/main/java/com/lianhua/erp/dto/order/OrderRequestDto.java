@@ -35,12 +35,10 @@ public class OrderRequestDto {
     @NotNull
     @Schema(description = "訂單業務狀態（僅允許 PENDING / CONFIRMED）", example = "PENDING")
     private OrderStatus orderStatus;
-
-    @NotNull
+    
     @Schema(description = "訂單日期", example = "2025-10-26")
     private LocalDate orderDate;
 
-    @NotNull
     @Schema(description = "交貨日期", example = "2025-10-28")
     private LocalDate deliveryDate;
 
