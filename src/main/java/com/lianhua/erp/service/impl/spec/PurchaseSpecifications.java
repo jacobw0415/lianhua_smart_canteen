@@ -20,6 +20,7 @@ public class PurchaseSpecifications {
         spec = spec.and(byItem(req));
         spec = spec.and(byStatus(req));
         spec = spec.and(byAccountingPeriod(req));
+        spec = spec.and(byPurchaseNo(req));
         spec = spec.and(byDateRange(req));
 
         return spec;
@@ -80,7 +81,19 @@ public class PurchaseSpecifications {
     }
 
     /** ----------------------------------------------------------
-     * 6. 日期區間（fromDate ～ toDate）
+     * 6. purchaseNo（進貨單編號，模糊搜尋）
+     * ---------------------------------------------------------- */
+    private static Specification<Purchase> byPurchaseNo(PurchaseSearchRequest req) {
+        if (isEmpty(req.getPurchaseNo())) return null;
+
+        String keyword = "%" + req.getPurchaseNo().trim() + "%";
+
+        return (root, query, cb) ->
+                cb.like(root.get("purchaseNo"), keyword);
+    }
+
+    /** ----------------------------------------------------------
+     * 7. 日期區間（fromDate ～ toDate）
      * ---------------------------------------------------------- */
     private static Specification<Purchase> byDateRange(PurchaseSearchRequest req) {
         Specification<Purchase> spec = Specification.allOf();

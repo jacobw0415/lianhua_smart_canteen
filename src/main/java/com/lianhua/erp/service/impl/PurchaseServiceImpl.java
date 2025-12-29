@@ -708,6 +708,7 @@ public class PurchaseServiceImpl implements PurchaseService {
                 isEmpty(req.getItem()) &&
                 isEmpty(req.getStatus()) &&
                 isEmpty(req.getAccountingPeriod()) &&
+                isEmpty(req.getPurchaseNo()) &&
                 isEmpty(req.getFromDate()) &&
                 isEmpty(req.getToDate());
 

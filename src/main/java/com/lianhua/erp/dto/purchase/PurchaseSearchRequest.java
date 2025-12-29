@@ -38,6 +38,12 @@ public class PurchaseSearchRequest {
     private Long supplierId;
 
     @Schema(
+            description = "進貨單編號（模糊搜尋）\n例如：'PO-202501-0001'",
+            example = "PO-202501"
+    )
+    private String purchaseNo;
+
+    @Schema(
             description = "進貨日期（起）格式：YYYY-MM-DD\n搜尋 purchaseDate >= fromDate",
             example = "2025-01-01"
     )

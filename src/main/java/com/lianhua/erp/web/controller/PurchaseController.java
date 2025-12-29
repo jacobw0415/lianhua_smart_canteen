@@ -202,6 +202,7 @@ public class PurchaseController {
                     - 狀態（status, 精準）
                     - 會計期間（accountingPeriod, 精準 YYYY-MM）
                     - 供應商 ID（supplierId, 精準）
+                    - 進貨單編號（purchaseNo, 模糊）
                     - 起始日期（fromDate >=）
                     - 結束日期（toDate <=）
                     
