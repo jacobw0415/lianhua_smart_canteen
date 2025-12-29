@@ -605,10 +605,11 @@ public class PurchaseServiceImpl implements PurchaseService {
                 if (payment.getStatus() == PaymentRecordStatus.ACTIVE) {
                     payment.setStatus(PaymentRecordStatus.VOIDED);
                     payment.setVoidedAt(LocalDateTime.now());
-                    payment.setVoidReason("進貨單已作廢，自動作廢相關付款單");
+                    // ⭐ 使用使用者輸入的作廢原因（可選），而非自動填入固定文字
+                    payment.setVoidReason(reason);
                     paymentRepository.save(payment);
-                    log.info("✅ 自動作廢付款單：paymentId={}, purchaseId={}",
-                            payment.getId(), id);
+                    log.info("✅ 自動作廢付款單：paymentId={}, purchaseId={}, reason={}",
+                            payment.getId(), id, reason);
                 }
             }
         }
