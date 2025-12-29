@@ -47,7 +47,7 @@ public class PaymentSearchRequest {
     @Schema(description = "是否包含已作廢的付款（預設 false，向後相容）", example = "false")
     private Boolean includeVoided = false;
 
-    @Schema(description = "狀態過濾：ACTIVE（只搜尋有效的）, VOIDED（只搜尋作廢的）, 或不指定（搜尋全部）", 
-            example = "ACTIVE", allowableValues = {"ACTIVE", "VOIDED"})
+    @Schema(description = "狀態過濾：支援精確匹配（ACTIVE/VOIDED）或模糊搜尋（作廢/有效/正常等關鍵詞）", 
+            example = "作廢", allowableValues = {"ACTIVE", "VOIDED", "作廢", "有效", "正常"})
     private String status;
 }

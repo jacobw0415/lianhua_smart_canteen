@@ -17,21 +17,22 @@ public class PaymentSpecifications {
 
         Specification<Payment> spec = Specification.allOf();
 
-        // ⭐ 狀態過濾
+        // ======================================================
+        // ⭐ 狀態過濾（精確 + 模糊 + 字首推測）
+        // ======================================================
         if (StringUtils.hasText(req.getStatus())) {
-            try {
-                PaymentRecordStatus status = PaymentRecordStatus.valueOf(req.getStatus().toUpperCase());
-                spec = spec.and((root, query, cb) -> 
-                    cb.equal(root.get("status"), status)
+            PaymentRecordStatus targetStatus = resolveStatus(req.getStatus());
+
+            if (targetStatus != null) {
+                spec = spec.and((root, query, cb) ->
+                        cb.equal(root.get("status"), targetStatus)
                 );
-            } catch (IllegalArgumentException e) {
-                // 忽略無效的狀態值
             }
         } else {
-            // 預設排除已作廢的付款（除非明確要求包含）
+            // 預設排除已作廢（除非明確指定）
             if (!Boolean.TRUE.equals(req.getIncludeVoided())) {
-                spec = spec.and((root, query, cb) -> 
-                    cb.equal(root.get("status"), PaymentRecordStatus.ACTIVE)
+                spec = spec.and((root, query, cb) ->
+                        cb.equal(root.get("status"), PaymentRecordStatus.ACTIVE)
                 );
             }
         }
@@ -45,6 +46,53 @@ public class PaymentSpecifications {
         return spec;
     }
 
+    /* ======================================================
+     * ⭐ 狀態解析核心（重點）
+     * ====================================================== */
+    private static PaymentRecordStatus resolveStatus(String input) {
+        if (!StringUtils.hasText(input)) return null;
+
+        String normalized = input.trim().toLowerCase();
+
+        // ---------- 1️⃣ 先嘗試 enum 精確匹配 ----------
+        try {
+            return PaymentRecordStatus.valueOf(normalized.toUpperCase());
+        } catch (IllegalArgumentException ignore) {
+            // 繼續做模糊與字首解析
+        }
+
+        // ---------- 2️⃣ 中文 / 英文模糊關鍵字 ----------
+        if (containsAny(normalized, "作廢", "作废", "void", "voided")) {
+            return PaymentRecordStatus.VOIDED;
+        }
+
+        if (containsAny(normalized, "有效", "正常", "生效", "active")) {
+            return PaymentRecordStatus.ACTIVE;
+        }
+
+        // ---------- 3️⃣ 字首推測（ACT / VOI / VO）----------
+        if (normalized.startsWith("act")) {
+            return PaymentRecordStatus.ACTIVE;
+        }
+
+        if (normalized.startsWith("voi") || normalized.startsWith("vo")) {
+            return PaymentRecordStatus.VOIDED;
+        }
+
+        // 無法解析 → 不加 status 條件
+        return null;
+    }
+
+    private static boolean containsAny(String src, String... keywords) {
+        for (String k : keywords) {
+            if (src.contains(k)) return true;
+        }
+        return false;
+    }
+
+    /* ======================================================
+     * 其餘條件（原封不動）
+     * ====================================================== */
     private static Specification<Payment> bySupplierName(PaymentSearchRequest req) {
         if (isEmpty(req.getSupplierName())) return null;
 

@@ -88,18 +88,20 @@ public class PaymentServiceImpl implements PaymentService {
 
         // ===== 1. 搜尋條件不可全為空 =====
         // includeVoided 不計入搜尋條件（只是過濾選項）
+        // status 可作為獨立搜尋條件，支援只搜尋有效或作廢的付款單
         boolean empty =
                 isEmpty(req.getSupplierName()) &&
                         isEmpty(req.getItem()) &&
                         isEmpty(req.getMethod()) &&
                         isEmpty(req.getAccountingPeriod()) &&
                         isEmpty(req.getFromDate()) &&
-                        isEmpty(req.getToDate());
+                        isEmpty(req.getToDate()) &&
+                        isEmpty(req.getStatus());
 
         if (empty) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "搜尋條件不可全為空，至少需提供一項搜尋欄位"
+                    "搜尋條件不可全為空，至少需提供一項搜尋欄位（包含狀態過濾）"
             );
         }
 
