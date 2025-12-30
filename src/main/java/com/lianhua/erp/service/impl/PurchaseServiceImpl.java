@@ -6,6 +6,7 @@ import com.lianhua.erp.domain.PurchaseStatus;
 import com.lianhua.erp.dto.purchase.*;
 import com.lianhua.erp.mapper.PurchaseMapper;
 import com.lianhua.erp.mapper.PaymentMapper;
+import com.lianhua.erp.mapper.PurchaseItemMapper;
 import com.lianhua.erp.repository.PurchaseRepository;
 import com.lianhua.erp.repository.PaymentRepository;
 import com.lianhua.erp.repository.SupplierRepository;
@@ -33,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +47,7 @@ public class PurchaseServiceImpl implements PurchaseService {
     private final SupplierRepository supplierRepository;
     private final PurchaseMapper purchaseMapper;
     private final PaymentMapper paymentMapper;
+    private final PurchaseItemMapper purchaseItemMapper;
     private final com.lianhua.erp.numbering.PurchaseNoGenerator purchaseNoGenerator;
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -89,8 +92,12 @@ public class PurchaseServiceImpl implements PurchaseService {
     @Override
     @Transactional(readOnly = true)
     public PurchaseResponseDto getPurchaseById(Long id) {
-        Purchase purchase = purchaseRepository.findById(id)
+        Purchase purchase = purchaseRepository.findWithSupplierById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到指定的進貨單 (ID: " + id + ")"));
+        // 確保 items 被載入
+        if (purchase.getItems() != null) {
+            purchase.getItems().size(); // 觸發 lazy loading
+        }
         return purchaseMapper.toDto(purchase);
     }
 
@@ -107,10 +114,6 @@ public class PurchaseServiceImpl implements PurchaseService {
         dto.trimAll();
         dto.validateSelf();
 
-        // 商品名稱正規化
-        String normalizedItem = dto.getItem() != null ? dto.getItem().trim() : null;
-        dto.setItem(normalizedItem);
-
         // =============================================
         // 1️⃣ 基本欄位完整性檢查（主體欄位）
         // =============================================
@@ -119,31 +122,31 @@ public class PurchaseServiceImpl implements PurchaseService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "supplierId 為必填欄位");
         }
 
-        if (normalizedItem == null || normalizedItem.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（品項名稱）為必填欄位");
-        }
-
-        if (dto.getQty() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（數量）為必填欄位");
-        }
-
-        if (dto.getUnit() == null || dto.getUnit().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（單位）為必填欄位");
-        }
-
-        if (dto.getQty() <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "數量必須大於 0");
-        }
-
-        if (dto.getUnitPrice() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（單價）為必填欄位");
-        }
-        if (dto.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "單價必須大於 0");
-        }
-
         if (dto.getPurchaseDate() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（進貨日期）為必填欄位");
+        }
+
+        // =============================================
+        // 1.1️⃣ 檢查明細列表
+        // =============================================
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "至少需要一筆採購明細");
+        }
+
+        // 驗證每筆明細
+        for (PurchaseItemRequestDto itemDto : dto.getItems()) {
+            if (itemDto.getItem() == null || itemDto.getItem().trim().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "明細品項名稱不可為空");
+            }
+            if (itemDto.getUnit() == null || itemDto.getUnit().trim().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "明細單位不可為空");
+            }
+            if (itemDto.getQty() == null || itemDto.getQty() <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "明細數量必須大於 0");
+            }
+            if (itemDto.getUnitPrice() == null || itemDto.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "明細單價必須大於 0");
+            }
         }
 
         // =============================================
@@ -160,16 +163,8 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
 
         // =============================================
-        // 3️⃣ 同供應商 + 日期 + 品項 不可重複
+        // 3️⃣ 移除重複檢查（因為現在支援多明細，不再需要此檢查）
         // =============================================
-        if (purchaseRepository.existsBySupplierIdAndPurchaseDateAndItem(
-                dto.getSupplierId(),
-                dto.getPurchaseDate(),
-                normalizedItem)) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "該供應商於此日期的相同品項已存在，請勿重複建立。");
-        }
 
         // =============================================
         // 移除空白付款資訊
@@ -220,7 +215,6 @@ public class PurchaseServiceImpl implements PurchaseService {
         // =============================================
         Purchase purchase = purchaseMapper.toEntity(dto);
         purchase.setSupplier(supplier);
-        purchase.setItem(normalizedItem);
 
         // ⭐ 產生進貨單編號（商業單號）
         String purchaseNo = purchaseNoGenerator.generate(dto.getPurchaseDate());
@@ -233,7 +227,25 @@ public class PurchaseServiceImpl implements PurchaseService {
             purchase.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
         }
 
-        computeAmounts(purchase);
+        // =============================================
+        // 5.1️⃣ 建立採購明細並計算總金額
+        // =============================================
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<PurchaseItem> items = new ArrayList<>();
+
+        for (PurchaseItemRequestDto itemDto : dto.getItems()) {
+            PurchaseItem item = purchaseItemMapper.toEntity(itemDto);
+            item.setPurchase(purchase);
+
+            // 計算明細金額
+            computeItemAmounts(item);
+            totalAmount = totalAmount.add(item.getSubtotal());
+
+            items.add(item);
+        }
+
+        purchase.setItems(items);
+        purchase.setTotalAmount(totalAmount.setScale(2, RoundingMode.HALF_UP));
 
         // =============================================
         // 6️⃣ 付款資料：日期不得早於進貨日 + 會計期間設定
@@ -271,8 +283,8 @@ public class PurchaseServiceImpl implements PurchaseService {
                     .map(p -> p.getAmount() == null ? BigDecimal.ZERO : p.getAmount())
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            // 首筆付款不得超過應付總額
-            if (paidTotal.compareTo(purchase.getTotalAmount()) > 0) {
+            // 首筆付款不得超過應付總額（允許 0.01 的精度誤差）
+            if (paidTotal.subtract(purchase.getTotalAmount()).compareTo(new BigDecimal("0.01")) > 0) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
                         "首筆付款金額不可超過進貨應付總額 (" + purchase.getTotalAmount() + ")");
@@ -294,8 +306,8 @@ public class PurchaseServiceImpl implements PurchaseService {
         // 7️⃣ 儲存
         // =============================================
         try {
-            log.info("建立進貨單：supplierId={}, item={}, totalAmount={}, paidAmount={}",
-                    dto.getSupplierId(), normalizedItem, purchase.getTotalAmount(), paidTotal);
+            log.info("建立進貨單：supplierId={}, itemsCount={}, totalAmount={}, paidAmount={}",
+                    dto.getSupplierId(), items.size(), purchase.getTotalAmount(), paidTotal);
 
             Purchase saved = purchaseRepository.save(purchase);
             // Cascade 會自動保存 payments，不需要手動保存
@@ -354,17 +366,42 @@ public class PurchaseServiceImpl implements PurchaseService {
         // ========================================
         // 3️⃣ 固定欄位不可修改
         // ========================================
-        if (dto.getItem() != null && !dto.getItem().equals(purchase.getItem())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改品名。");
-        }
-        if (dto.getQty() != null && dto.getQty().compareTo(purchase.getQty()) != 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改數量。");
-        }
-        if (dto.getUnitPrice() != null && dto.getUnitPrice().compareTo(purchase.getUnitPrice()) != 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改單價。");
-        }
         if (dto.getPurchaseDate() != null && !dto.getPurchaseDate().equals(purchase.getPurchaseDate())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改進貨日期。");
+        }
+
+        // 明細不可修改（只能修改付款）
+        // 注意：前端可能會發送完整的 items 數據，需要檢查是否真的被修改
+        if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+            // 載入現有的明細數據
+            List<PurchaseItem> existingItems = purchase.getItems() != null ? purchase.getItems() : new ArrayList<>();
+
+            // 檢查數量是否相同
+            if (dto.getItems().size() != existingItems.size()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改採購明細，僅可修改付款資訊。");
+            }
+
+            // 檢查每個明細是否被修改（比較關鍵字段）
+            for (int i = 0; i < dto.getItems().size(); i++) {
+                PurchaseItemRequestDto dtoItem = dto.getItems().get(i);
+                if (i < existingItems.size()) {
+                    PurchaseItem existingItem = existingItems.get(i);
+
+                    // 比較關鍵字段
+                    boolean itemChanged = !Objects.equals(dtoItem.getItem(), existingItem.getItem()) ||
+                            !Objects.equals(dtoItem.getUnit(), existingItem.getUnit()) ||
+                            !Objects.equals(dtoItem.getQty(), existingItem.getQty()) ||
+                            (dtoItem.getUnitPrice() != null && existingItem.getUnitPrice() != null &&
+                                    dtoItem.getUnitPrice().compareTo(existingItem.getUnitPrice()) != 0);
+
+                    if (itemChanged) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改採購明細，僅可修改付款資訊。");
+                    }
+                } else {
+                    // 如果有新的明細項目，不允許
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不允許修改採購明細，僅可修改付款資訊。");
+                }
+            }
         }
 
         // ========================================
@@ -487,7 +524,8 @@ public class PurchaseServiceImpl implements PurchaseService {
                 // ===== 新增付款 =====
                 BigDecimal newTotal = totalPaidBefore.add(newPayment.getAmount());
 
-                if (newTotal.compareTo(totalAmount) > 0) {
+                // 允許 0.01 的精度誤差（因為金額計算可能有四捨五入誤差）
+                if (newTotal.subtract(totalAmount).compareTo(new BigDecimal("0.01")) > 0) {
                     throw new ResponseStatusException(
                             HttpStatus.BAD_REQUEST,
                             "新增付款金額不得超過應付總額 (" + totalAmount + ")");
@@ -506,7 +544,8 @@ public class PurchaseServiceImpl implements PurchaseService {
                 .map(p -> p.getAmount() == null ? BigDecimal.ZERO : p.getAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        if (totalPaid.compareTo(totalAmount) > 0) {
+        // 允許 0.01 的精度誤差（因為金額計算可能有四捨五入誤差）
+        if (totalPaid.subtract(totalAmount).compareTo(new BigDecimal("0.01")) > 0) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "總付款金額不可超過應付總額 (" + totalAmount + ")");
@@ -581,9 +620,11 @@ public class PurchaseServiceImpl implements PurchaseService {
         // orphanRemoval = true 會自動刪除關聯的 payments（但只有在 PENDING 狀態時才會執行到這裡）
     }
 
-    /* =======================================================
+    /*
+     * =======================================================
      * 📌 作廢進貨單
-     * ======================================================= */
+     * =======================================================
+     */
     @Override
     @Transactional
     public PurchaseResponseDto voidPurchase(Long id, String reason) {
@@ -637,31 +678,21 @@ public class PurchaseServiceImpl implements PurchaseService {
     }
 
     // ================================
-    // 計算稅額與總金額
+    // 計算明細小計（不含稅）
     // ================================
-    private void computeAmounts(Purchase purchase) {
-
-        if (purchase.getQty() == null || purchase.getUnitPrice() == null) {
-            purchase.setTaxAmount(BigDecimal.ZERO);
-            purchase.setTotalAmount(BigDecimal.ZERO);
+    private void computeItemAmounts(PurchaseItem item) {
+        if (item.getQty() == null || item.getUnitPrice() == null) {
+            item.setSubtotal(BigDecimal.ZERO);
             return;
         }
 
-        BigDecimal qty = BigDecimal.valueOf(purchase.getQty());
-        BigDecimal unitPrice = purchase.getUnitPrice();
+        BigDecimal qty = BigDecimal.valueOf(item.getQty());
+        BigDecimal unitPrice = item.getUnitPrice();
 
-        BigDecimal subtotal = unitPrice.multiply(qty);
+        // 小計 = 單價 × 數量（不含稅）
+        BigDecimal subtotal = unitPrice.multiply(qty).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal taxRate = purchase.getTaxRate() != null ? purchase.getTaxRate() : BigDecimal.ZERO;
-
-        BigDecimal taxAmount = taxRate.compareTo(BigDecimal.ZERO) > 0
-                ? subtotal.multiply(taxRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP))
-                : BigDecimal.ZERO;
-
-        BigDecimal totalAmount = subtotal.add(taxAmount).setScale(2, RoundingMode.HALF_UP);
-
-        purchase.setTaxAmount(taxAmount);
-        purchase.setTotalAmount(totalAmount);
+        item.setSubtotal(subtotal);
     }
 
     // ================================

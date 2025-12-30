@@ -200,7 +200,6 @@ public class OrderServiceImpl implements OrderService {
             item.setQty(itemDto.getQty());
             item.setUnitPrice(unitPrice);
             item.setSubtotal(subtotal);
-            item.setAccountingPeriod(order.getAccountingPeriod());
             item.setNote(itemDto.getNote());
 
             itemRepository.save(item);

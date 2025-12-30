@@ -38,7 +38,7 @@ CREATE TABLE suppliers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 3. 採購表 (含會計期間)
+-- 3. 採購主表 (含會計期間)
 -- ------------------------------------------------------------
 CREATE TABLE purchases (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -46,20 +46,14 @@ CREATE TABLE purchases (
   supplier_id BIGINT NOT NULL,
   purchase_date DATE NOT NULL,
   accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
-  item VARCHAR(120) NOT NULL,
-  unit VARCHAR(20) NOT NULL COMMENT '顯示用單位（斤、箱、盒）',
-  qty INT UNSIGNED NOT NULL,
-  unit_price DECIMAL(10,2) UNSIGNED NOT NULL,
-  tax_rate DECIMAL(5,2) DEFAULT 0.00,
-  tax_amount DECIMAL(10,2) DEFAULT 0.00,
-  total_amount DECIMAL(10,2) DEFAULT 0.00,
-  paid_amount DECIMAL(10,2) DEFAULT 0.00,
-  balance DECIMAL(10,2) GENERATED ALWAYS AS (total_amount - paid_amount) STORED,
-  status ENUM('PENDING','PARTIAL','PAID') DEFAULT 'PENDING',
+  total_amount DECIMAL(10,2) DEFAULT 0.00 COMMENT '總金額（由明細表計算）',
+  paid_amount DECIMAL(10,2) DEFAULT 0.00 COMMENT '已付款金額',
+  balance DECIMAL(10,2) GENERATED ALWAYS AS (total_amount - paid_amount) STORED COMMENT '餘額（自動計算）',
+  status ENUM('PENDING','PARTIAL','PAID') DEFAULT 'PENDING' COMMENT '付款狀態',
   record_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '記錄狀態：ACTIVE（正常進貨）, VOIDED（已作廢）',
   voided_at TIMESTAMP NULL COMMENT '作廢時間',
   void_reason VARCHAR(500) NULL COMMENT '作廢原因',
-  note VARCHAR(255),
+  note VARCHAR(255) COMMENT '備註',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -67,15 +61,38 @@ CREATE TABLE purchases (
   CONSTRAINT fk_purchases_supplier
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
     ON DELETE RESTRICT
-    ON UPDATE CASCADE,
-
-  CONSTRAINT uk_purchase_supplier_date_item UNIQUE (supplier_id, purchase_date, item)
+    ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_purchases_supplier_id ON purchases(supplier_id);
 CREATE INDEX idx_purchases_accounting_period ON purchases(accounting_period);
 CREATE INDEX idx_purchases_record_status ON purchases(record_status);
 CREATE INDEX idx_purchases_voided_at ON purchases(voided_at);
+CREATE INDEX idx_purchases_purchase_date ON purchases(purchase_date);
+
+-- ------------------------------------------------------------
+-- 3.1. 採購明細表
+-- ------------------------------------------------------------
+CREATE TABLE purchase_items (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  purchase_id BIGINT NOT NULL COMMENT '採購單ID',
+  item VARCHAR(120) NOT NULL COMMENT '進貨項目',
+  unit VARCHAR(20) NOT NULL COMMENT '顯示用單位（斤、箱、盒）',
+  qty INT UNSIGNED NOT NULL COMMENT '數量',
+  unit_price DECIMAL(10,2) UNSIGNED NOT NULL COMMENT '單價',
+  subtotal DECIMAL(10,2) NOT NULL COMMENT '小計（不含稅）',
+  note VARCHAR(255) COMMENT '備註',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_purchase_items_purchase
+    FOREIGN KEY (purchase_id) REFERENCES purchases(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_purchase_items_purchase_id ON purchase_items(purchase_id);
+CREATE INDEX idx_purchase_items_item ON purchase_items(item);
 
 -- ------------------------------------------------------------
 -- 4. 付款表 (含會計期間)
@@ -292,7 +309,7 @@ CREATE INDEX idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX idx_orders_accounting_period ON orders(accounting_period);
 
 -- ------------------------------------------------------------
--- 14. 訂單明細表 (含會計期間)
+-- 14. 訂單明細表
 -- ------------------------------------------------------------
 CREATE TABLE order_items (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -303,7 +320,6 @@ CREATE TABLE order_items (
   subtotal DECIMAL(10,2) UNSIGNED NOT NULL,
   discount DECIMAL(10,2) UNSIGNED DEFAULT 0,
   tax DECIMAL(10,2) UNSIGNED DEFAULT 0,
-  accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
   note VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -316,7 +332,6 @@ CREATE TABLE order_items (
 
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_order_items_product_id ON order_items(product_id);
-CREATE INDEX idx_order_items_accounting_period ON order_items(accounting_period);
 
 -- ------------------------------------------------------------
 -- 15. 收款表 Receipts

@@ -30,22 +30,13 @@ public class PurchaseDto {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate purchaseDate;
     
-    @Schema(description = "進貨品項", example = "高麗菜")
-    private String item;
-    
-    @Schema(description = "數量", example = "100")
-    private Integer qty;
-    
-    @Schema(description = "單價", example = "15.50")
-    private BigDecimal unitPrice;
-    
-    @Schema(description = "稅金", example = "50")
-    private BigDecimal tax;
+    @Schema(description = "採購明細列表")
+    private List<PurchaseItemDto> items;
     
     @Schema(description = "狀態", example = "PARTIAL")
     private String status;
     
-    @Schema(description = "付款總額（單價×數量+稅）", example = "1600")
+    @Schema(description = "付款總額（由明細計算）", example = "1600")
     private BigDecimal totalAmount;
     
     @Schema(description = "已付款金額", example = "500")

@@ -54,7 +54,6 @@ public class OrderItemServiceImpl implements OrderItemService {
         item.setProduct(product);
         item.setUnitPrice(unitPrice);  // ✅ 使用商品表的單價
         item.setSubtotal(subtotal);
-        item.setAccountingPeriod(order.getAccountingPeriod());
 
         log.info("新增訂單明細：orderId={}, productId={}, qty={}, unitPrice={}, subtotal={}",
                 orderId, dto.getProductId(), dto.getQty(), unitPrice, subtotal);

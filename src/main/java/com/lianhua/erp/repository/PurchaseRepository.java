@@ -7,22 +7,15 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
 import java.util.Optional;
 
 public interface PurchaseRepository
         extends JpaRepository<Purchase, Long>, JpaSpecificationExecutor<Purchase> {
     
-    @EntityGraph(attributePaths = {"supplier"})
+    @EntityGraph(attributePaths = {"supplier", "items"})
     Optional<Purchase> findWithSupplierById(Long id);
     
     boolean existsBySupplierId(Long supplierId);
-    
-    boolean existsBySupplierIdAndPurchaseDateAndItem(
-            Long supplierId, LocalDate purchaseDate, String item);
-    
-    boolean existsBySupplierIdAndPurchaseDateAndItemAndIdNot(
-            Long supplierId, LocalDate purchaseDate, String item, Long id);
     
     Optional<Purchase> findByPurchaseNo(String purchaseNo);
     

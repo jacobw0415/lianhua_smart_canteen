@@ -9,9 +9,11 @@ import java.time.LocalDate;
 
 public class PurchaseSpecifications {
 
-    /** ----------------------------------------------------------
+    /**
+     * ----------------------------------------------------------
      * ⭐ 主方法：依照搜尋條件動態組合 Specification
-     * ---------------------------------------------------------- */
+     * ----------------------------------------------------------
+     */
     public static Specification<Purchase> build(PurchaseSearchRequest req) {
         Specification<Purchase> spec = Specification.allOf();
 
@@ -26,100 +28,117 @@ public class PurchaseSpecifications {
         return spec;
     }
 
-    /** ----------------------------------------------------------
+    /**
+     * ----------------------------------------------------------
      * 1. supplierId（精準）
-     * ---------------------------------------------------------- */
+     * ----------------------------------------------------------
+     */
     private static Specification<Purchase> bySupplierId(PurchaseSearchRequest req) {
-        if (req.getSupplierId() == null) return null;
+        if (req.getSupplierId() == null)
+            return null;
 
-        return (root, query, cb) ->
-                cb.equal(root.get("supplier").get("id"), req.getSupplierId());
+        return (root, query, cb) -> cb.equal(root.get("supplier").get("id"), req.getSupplierId());
     }
 
-    /** ----------------------------------------------------------
+    /**
+     * ----------------------------------------------------------
      * 2. supplierName（模糊搜尋）
-     * ---------------------------------------------------------- */
+     * ----------------------------------------------------------
+     */
     private static Specification<Purchase> bySupplierName(PurchaseSearchRequest req) {
-        if (isEmpty(req.getSupplierName())) return null;
+        if (isEmpty(req.getSupplierName()))
+            return null;
 
         String keyword = "%" + req.getSupplierName().trim() + "%";
 
-        return (root, query, cb) ->
-                cb.like(root.get("supplier").get("name"), keyword);
+        return (root, query, cb) -> cb.like(root.get("supplier").get("name"), keyword);
     }
 
-    /** ----------------------------------------------------------
-     * 3. item（模糊搜尋）
-     * ---------------------------------------------------------- */
+    /**
+     * ----------------------------------------------------------
+     * 3. item（模糊搜尋）- 從明細表查詢
+     * ----------------------------------------------------------
+     */
     private static Specification<Purchase> byItem(PurchaseSearchRequest req) {
-        if (isEmpty(req.getItem())) return null;
+        if (isEmpty(req.getItem()))
+            return null;
 
         String keyword = "%" + req.getItem().trim() + "%";
 
-        return (root, query, cb) ->
-                cb.like(root.get("item"), keyword);
+        return (root, query, cb) -> {
+            query.distinct(true);
+            return cb.like(
+                    root.join("items").get("item"),
+                    keyword);
+        };
     }
 
-    /** ----------------------------------------------------------
+    /**
+     * ----------------------------------------------------------
      * 4. status（精準）
-     * ---------------------------------------------------------- */
+     * ----------------------------------------------------------
+     */
     private static Specification<Purchase> byStatus(PurchaseSearchRequest req) {
-        if (isEmpty(req.getStatus())) return null;
+        if (isEmpty(req.getStatus()))
+            return null;
 
-        return (root, query, cb) ->
-                cb.equal(root.get("status"), req.getStatus());
+        return (root, query, cb) -> cb.equal(root.get("status"), req.getStatus());
     }
 
-    /** ----------------------------------------------------------
+    /**
+     * ----------------------------------------------------------
      * 5. accountingPeriod（YYYY-MM，精準）
-     * ---------------------------------------------------------- */
+     * ----------------------------------------------------------
+     */
     private static Specification<Purchase> byAccountingPeriod(PurchaseSearchRequest req) {
-        if (isEmpty(req.getAccountingPeriod())) return null;
+        if (isEmpty(req.getAccountingPeriod()))
+            return null;
 
-        return (root, query, cb) ->
-                cb.equal(root.get("accountingPeriod"), req.getAccountingPeriod());
+        return (root, query, cb) -> cb.equal(root.get("accountingPeriod"), req.getAccountingPeriod());
     }
 
-    /** ----------------------------------------------------------
+    /**
+     * ----------------------------------------------------------
      * 6. purchaseNo（進貨單編號，模糊搜尋）
-     * ---------------------------------------------------------- */
+     * ----------------------------------------------------------
+     */
     private static Specification<Purchase> byPurchaseNo(PurchaseSearchRequest req) {
-        if (isEmpty(req.getPurchaseNo())) return null;
+        if (isEmpty(req.getPurchaseNo()))
+            return null;
 
         String keyword = "%" + req.getPurchaseNo().trim() + "%";
 
-        return (root, query, cb) ->
-                cb.like(root.get("purchaseNo"), keyword);
+        return (root, query, cb) -> cb.like(root.get("purchaseNo"), keyword);
     }
 
-    /** ----------------------------------------------------------
+    /**
+     * ----------------------------------------------------------
      * 7. 日期區間（fromDate ～ toDate）
-     * ---------------------------------------------------------- */
+     * ----------------------------------------------------------
+     */
     private static Specification<Purchase> byDateRange(PurchaseSearchRequest req) {
         Specification<Purchase> spec = Specification.allOf();
 
         // 起：purchaseDate >= from
         if (!isEmpty(req.getFromDate())) {
             LocalDate from = LocalDate.parse(req.getFromDate());
-            spec = spec.and((root, query, cb) ->
-                    cb.greaterThanOrEqualTo(root.get("purchaseDate"), from)
-            );
+            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("purchaseDate"), from));
         }
 
         // 迄：purchaseDate <= to
         if (!isEmpty(req.getToDate())) {
             LocalDate to = LocalDate.parse(req.getToDate());
-            spec = spec.and((root, query, cb) ->
-                    cb.lessThanOrEqualTo(root.get("purchaseDate"), to)
-            );
+            spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("purchaseDate"), to));
         }
 
         return spec;
     }
 
-    /** ----------------------------------------------------------
+    /**
+     * ----------------------------------------------------------
      * 工具函式：避免 Null / 空白異常
-     * ---------------------------------------------------------- */
+     * ----------------------------------------------------------
+     */
     private static boolean isEmpty(String str) {
         return (str == null || str.trim().isEmpty());
     }

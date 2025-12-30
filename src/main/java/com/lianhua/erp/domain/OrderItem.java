@@ -42,13 +42,12 @@ public class OrderItem {
     private BigDecimal subtotal;
 
     @Column(precision = 10, scale = 2, nullable = false)
+    @Builder.Default
     private BigDecimal discount = BigDecimal.ZERO;
 
     @Column(precision = 10, scale = 2, nullable = false)
+    @Builder.Default
     private BigDecimal tax = BigDecimal.ZERO;
-
-    @Column(name = "accounting_period", length = 7, nullable = false)
-    private String accountingPeriod;
 
     @Column(length = 255)
     private String note;

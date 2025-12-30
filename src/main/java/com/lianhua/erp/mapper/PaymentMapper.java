@@ -20,8 +20,8 @@ public interface PaymentMapper {
             // 新增：供應商名稱
             @Mapping(source = "purchase.supplier.name", target = "supplierName"),
 
-            // 新增：品項摘要
-            @Mapping(source = "purchase.item", target = "item"),
+            // 新增：品項摘要（從明細表取得第一個品項）
+            @Mapping(target = "item", expression = "java(getFirstItemName(entity.getPurchase()))"),
 
             // 新增：會計期間
             @Mapping(source = "accountingPeriod", target = "accountingPeriod"),
@@ -47,7 +47,14 @@ public interface PaymentMapper {
     @Mappings({
             @Mapping(target = "id", ignore = true),          // ID 自動生成
             @Mapping(target = "purchase", ignore = true),    // 由 Service 手動設定
-            @Mapping(target = "method", expression = "java(mapMethod(dto.getMethod()))")
+            @Mapping(target = "method", expression = "java(mapMethod(dto.getMethod()))"),
+            @Mapping(target = "accountingPeriod", ignore = true),  // 由 Service 設定
+            @Mapping(target = "referenceNo", ignore = true),       // 由 Service 設定
+            @Mapping(target = "status", ignore = true),           // 預設值
+            @Mapping(target = "voidedAt", ignore = true),
+            @Mapping(target = "voidReason", ignore = true),
+            @Mapping(target = "createdAt", ignore = true),
+            @Mapping(target = "updatedAt", ignore = true)
     })
     Payment toEntity(PaymentRequestDto dto);
 
@@ -62,5 +69,12 @@ public interface PaymentMapper {
         } catch (IllegalArgumentException e) {
             return Payment.Method.CASH;
         }
+    }
+    
+    default String getFirstItemName(com.lianhua.erp.domain.Purchase purchase) {
+        if (purchase == null || purchase.getItems() == null || purchase.getItems().isEmpty()) {
+            return null;
+        }
+        return purchase.getItems().get(0).getItem();
     }
 }

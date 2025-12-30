@@ -10,23 +10,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
-@Table(
-        name = "purchases",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_purchase_supplier_date_item",
-                        columnNames = {"supplier_id", "purchase_date", "item"}
-                ),
-                @UniqueConstraint(
-                        name = "uk_purchases_purchase_no",
-                        columnNames = {"purchase_no"}
-                )
-        }
-)
+@Table(name = "purchases", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_purchases_purchase_no", columnNames = { "purchase_no" })
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -39,7 +31,7 @@ public class Purchase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Schema(description = "進貨單 ID")
     private Long id;
-    
+
     @Column(name = "purchase_no", nullable = false, length = 20, updatable = false)
     @Schema(description = "進貨單編號（PO-YYYYMM-XXXX）")
     private String purchaseNo;
@@ -53,42 +45,22 @@ public class Purchase {
     @Column(name = "purchase_date", nullable = false)
     @Schema(description = "進貨日期")
     private LocalDate purchaseDate;
-    
+
     @Column(name = "accounting_period", length = 7, nullable = false)
     @Schema(description = "會計期間（YYYY-MM）")
-    private String accountingPeriod = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
-    
-    @Column(nullable = false, length = 120)
-    @Schema(description = "進貨項目")
-    private String item;
+    @Builder.Default
+    private String accountingPeriod = java.time.LocalDate.now()
+            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
 
-    @Column(nullable = false)
-    @Schema(description = "數量")
-    private Integer qty;
-
-    @Column(length = 20, nullable = false)
-    @Schema(description = "數量單位（顯示用，例如：斤、箱、盒）")
-    private String unit;
-
-    @Column(name = "unit_price", precision = 10, scale = 2, nullable = false)
-    @Schema(description = "單價")
-    private BigDecimal unitPrice;
-
-    @Column(name = "tax_rate", precision = 5, scale = 2)
-    @Schema(description = "稅率（百分比）")
-    private BigDecimal taxRate;
-
-    @Column(name = "tax_amount", precision = 10, scale = 2)
-    @Schema(description = "稅額")
-    private BigDecimal taxAmount;
-
-    @Column(name = "total_amount", precision = 10, scale = 2)
-    @Schema(description = "總金額（含稅）")
-    private BigDecimal totalAmount;
+    @Column(name = "total_amount", precision = 10, scale = 2, nullable = false)
+    @Schema(description = "總金額（由明細表計算）")
+    @Builder.Default
+    private BigDecimal totalAmount = BigDecimal.ZERO;
 
     // ✅ 新增欄位：已付款金額
     @Column(name = "paid_amount", precision = 10, scale = 2, nullable = false)
     @Schema(description = "已付款金額")
+    @Builder.Default
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
     // ✅ 新增欄位：餘額 (由資料庫計算，不直接寫入)
@@ -97,8 +69,9 @@ public class Purchase {
     private BigDecimal balance;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 10,nullable = false)
+    @Column(length = 10, nullable = false)
     @Schema(description = "狀態：PENDING, PARTIAL, PAID")
+    @Builder.Default
     private Status status = Status.PENDING;
 
     // 作廢相關欄位（記錄狀態）
@@ -124,13 +97,21 @@ public class Purchase {
     @OneToMany(mappedBy = "purchase", cascade = CascadeType.ALL, orphanRemoval = true)
     @Schema(description = "付款紀錄清單")
     @OrderBy("id ASC")
+    @Builder.Default
     private Set<Payment> payments = new HashSet<>();
+
+    @OneToMany(mappedBy = "purchase", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Schema(description = "採購明細清單")
+    @OrderBy("id ASC")
+    @Builder.Default
+    private List<PurchaseItem> items = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
@@ -138,10 +119,10 @@ public class Purchase {
 
         if (this.accountingPeriod == null && this.purchaseDate != null) {
             this.accountingPeriod = this.purchaseDate.format(
-                    DateTimeFormatter.ofPattern("yyyy-MM")
-            );
+                    DateTimeFormatter.ofPattern("yyyy-MM"));
         }
     }
+
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
