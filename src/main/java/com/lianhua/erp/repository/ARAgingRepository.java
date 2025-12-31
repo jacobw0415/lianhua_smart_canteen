@@ -1,8 +1,8 @@
 package com.lianhua.erp.repository;
 
-import com.lianhua.erp.dto.ap.APAgingFilterDto;
-import com.lianhua.erp.dto.ap.APAgingSummaryDto;
-import com.lianhua.erp.dto.ap.APAgingPurchaseDetailDto;
+import com.lianhua.erp.dto.ar.ARAgingFilterDto;
+import com.lianhua.erp.dto.ar.ARAgingOrderDetailDto;
+import com.lianhua.erp.dto.ar.ARAgingSummaryDto;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,16 +23,16 @@ import java.util.List;
 @Repository
 @RequiredArgsConstructor
 @Slf4j
-public class APAgingRepository {
+public class ARAgingRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
     /* =============================================================
      * ① Summary（不分頁）
      * ============================================================= */
-    public List<APAgingSummaryDto> findAgingSummary() {
+    public List<ARAgingSummaryDto> findAgingSummary() {
         String sql = baseSummarySql()
-                + " HAVING SUM(p.total_amount - COALESCE(paid_summary.paid_amount, 0)) > 0 "
+                + " HAVING SUM(o.total_amount - COALESCE(received_summary.received_amount, 0)) > 0 "
                 + " ORDER BY balance DESC ";
         return jdbcTemplate.query(sql, this::mapSummaryRow);
     }
@@ -40,8 +40,8 @@ public class APAgingRepository {
     /* =============================================================
      * ② Summary（分頁 + 搜尋）
      * ============================================================= */
-    public Page<APAgingSummaryDto> findAgingSummaryPaged(
-            APAgingFilterDto filter,
+    public Page<ARAgingSummaryDto> findAgingSummaryPaged(
+            ARAgingFilterDto filter,
             int page,
             int size
     ) {
@@ -62,9 +62,9 @@ public class APAgingRepository {
             /* ===============================
              * WHERE（非聚合條件）
              * =============================== */
-            if (filter != null && StringUtils.hasText(filter.getSupplierName())) {
-                sql.append(" AND s.name LIKE ? ");
-                params.add("%" + filter.getSupplierName().trim() + "%");
+            if (filter != null && StringUtils.hasText(filter.getCustomerName())) {
+                sql.append(" AND c.name LIKE ? ");
+                params.add("%" + filter.getCustomerName().trim() + "%");
             }
 
             // 接回 GROUP BY
@@ -82,16 +82,16 @@ public class APAgingRepository {
         if (filter != null && filter.getAgingBucket() != null) {
             switch (filter.getAgingBucket()) {
                 case "DAYS_0_30" -> havingConditions.add("""
-                            SUM(CASE WHEN DATEDIFF(CURDATE(), p.purchase_date) <= 30
-                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0)) ELSE 0 END) > 0
+                            SUM(CASE WHEN DATEDIFF(CURDATE(), o.delivery_date) <= 30
+                            THEN (o.total_amount - COALESCE(received_summary.received_amount, 0)) ELSE 0 END) > 0
                         """);
                 case "DAYS_31_60" -> havingConditions.add("""
-                            SUM(CASE WHEN DATEDIFF(CURDATE(), p.purchase_date) BETWEEN 31 AND 60
-                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0)) ELSE 0 END) > 0
+                            SUM(CASE WHEN DATEDIFF(CURDATE(), o.delivery_date) BETWEEN 31 AND 60
+                            THEN (o.total_amount - COALESCE(received_summary.received_amount, 0)) ELSE 0 END) > 0
                         """);
                 case "DAYS_60_PLUS" -> havingConditions.add("""
-                            SUM(CASE WHEN DATEDIFF(CURDATE(), p.purchase_date) > 60
-                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0)) ELSE 0 END) > 0
+                            SUM(CASE WHEN DATEDIFF(CURDATE(), o.delivery_date) > 60
+                            THEN (o.total_amount - COALESCE(received_summary.received_amount, 0)) ELSE 0 END) > 0
                         """);
                 default -> {
                 }
@@ -99,7 +99,7 @@ public class APAgingRepository {
         }
 
         if (filter == null || filter.getOnlyUnpaid() == null || Boolean.TRUE.equals(filter.getOnlyUnpaid())) {
-            havingConditions.add(" SUM(p.total_amount - COALESCE(paid_summary.paid_amount, 0)) > 0 ");
+            havingConditions.add(" SUM(o.total_amount - COALESCE(received_summary.received_amount, 0)) > 0 ");
         }
 
         if (!havingConditions.isEmpty()) {
@@ -117,7 +117,7 @@ public class APAgingRepository {
         params.add(size);
         params.add(offset);
 
-        List<APAgingSummaryDto> content =
+        List<ARAgingSummaryDto> content =
                 jdbcTemplate.query(sql.toString(), this::mapSummaryRow, params.toArray());
 
         /* ===============================
@@ -145,122 +145,125 @@ public class APAgingRepository {
 
         return """
                 SELECT 
-                    s.id AS supplier_id,
-                    s.name AS supplier_name,
+                    c.id AS customer_id,
+                    c.name AS customer_name,
                 
                     /* ---- Aging bucket 計算 ---- */
                     SUM(
                         CASE 
-                            WHEN DATEDIFF(CURDATE(), p.purchase_date) <= 30 
-                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0))
+                            WHEN DATEDIFF(CURDATE(), o.delivery_date) <= 30 
+                            THEN (o.total_amount - COALESCE(received_summary.received_amount, 0))
                             ELSE 0 
                         END
                     ) AS aging_0_30,
                 
                     SUM(
                         CASE 
-                            WHEN DATEDIFF(CURDATE(), p.purchase_date) BETWEEN 31 AND 60
-                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0))
+                            WHEN DATEDIFF(CURDATE(), o.delivery_date) BETWEEN 31 AND 60
+                            THEN (o.total_amount - COALESCE(received_summary.received_amount, 0))
                             ELSE 0 
                         END
                     ) AS aging_31_60,
                 
                     SUM(
                         CASE 
-                            WHEN DATEDIFF(CURDATE(), p.purchase_date) > 60
-                            THEN (p.total_amount - COALESCE(paid_summary.paid_amount, 0))
+                            WHEN DATEDIFF(CURDATE(), o.delivery_date) > 60
+                            THEN (o.total_amount - COALESCE(received_summary.received_amount, 0))
                             ELSE 0 
                         END
                     ) AS aging_60_plus,
                 
-                    /* ---- 應付總額、已付、未付 ---- */
-                    SUM(p.total_amount) AS total_amount,
-                    SUM(COALESCE(paid_summary.paid_amount, 0)) AS paid_amount,
-                    SUM(p.total_amount - COALESCE(paid_summary.paid_amount, 0)) AS balance
+                    /* ---- 應收總額、已收、未收 ---- */
+                    SUM(o.total_amount) AS total_amount,
+                    SUM(COALESCE(received_summary.received_amount, 0)) AS received_amount,
+                    SUM(o.total_amount - COALESCE(received_summary.received_amount, 0)) AS balance
                 
-                FROM purchases p
-                JOIN suppliers s ON s.id = p.supplier_id
+                FROM orders o
+                JOIN order_customers c ON c.id = o.customer_id
                 LEFT JOIN (
                     SELECT 
-                        purchase_id,
-                        SUM(amount) AS paid_amount
-                    FROM payments
+                        order_id,
+                        SUM(amount) AS received_amount
+                    FROM receipts
                     WHERE status = 'ACTIVE'
-                    GROUP BY purchase_id
-                ) paid_summary ON p.id = paid_summary.purchase_id
+                    GROUP BY order_id
+                ) received_summary ON o.id = received_summary.order_id
                 
-                WHERE p.record_status = 'ACTIVE'
-                  AND NOT (p.status = 'PAID' AND COALESCE(paid_summary.paid_amount, 0) = 0)
+                WHERE o.order_status != 'CANCELLED'
+                  AND NOT (o.payment_status = 'PAID' AND COALESCE(received_summary.received_amount, 0) = 0)
                 
-                GROUP BY s.id, s.name
+                GROUP BY c.id, c.name
                 """;
     }
 
-    private APAgingSummaryDto mapSummaryRow(ResultSet rs, int rowNum) throws SQLException {
-        return APAgingSummaryDto.builder()
-                .id(rs.getLong("supplier_id"))
-                .supplierId(rs.getLong("supplier_id"))
-                .supplierName(rs.getString("supplier_name"))
+    private ARAgingSummaryDto mapSummaryRow(ResultSet rs, int rowNum) throws SQLException {
+        return ARAgingSummaryDto.builder()
+                .id(rs.getLong("customer_id"))
+                .customerId(rs.getLong("customer_id"))
+                .customerName(rs.getString("customer_name"))
                 .aging0to30(getDecimal(rs, "aging_0_30"))
                 .aging31to60(getDecimal(rs, "aging_31_60"))
                 .aging60plus(getDecimal(rs, "aging_60_plus"))
                 .totalAmount(getDecimal(rs, "total_amount"))
-                .paidAmount(getDecimal(rs, "paid_amount"))
+                .receivedAmount(getDecimal(rs, "received_amount"))
                 .balance(getDecimal(rs, "balance"))
                 .build();
     }
 
     /* =============================================================
-     * ③ Detail — 指定供應商未付進貨明細（未動）
+     * ③ Detail — 指定客戶未收訂單明細
      * ============================================================= */
-    public List<APAgingPurchaseDetailDto> findPurchasesBySupplierId(Long supplierId) {
+    public List<ARAgingOrderDetailDto> findOrdersByCustomerId(Long customerId) {
 
         String sql = """
                 SELECT
-                    p.id AS purchase_id,
-                    p.purchase_no,
-                    p.purchase_date,
-                    p.total_amount,
-                    COALESCE(paid_summary.paid_amount, 0) AS paid_amount,
-                    (p.total_amount - COALESCE(paid_summary.paid_amount, 0)) AS balance,
-                    p.status,
+                    o.id AS order_id,
+                    o.order_no,
+                    o.order_date,
+                    o.delivery_date,
+                    o.total_amount,
+                    COALESCE(received_summary.received_amount, 0) AS received_amount,
+                    (o.total_amount - COALESCE(received_summary.received_amount, 0)) AS balance,
                 
                     CASE
-                        WHEN DATEDIFF(CURDATE(), p.purchase_date) <= 30 THEN '0–30'
-                        WHEN DATEDIFF(CURDATE(), p.purchase_date) BETWEEN 31 AND 60 THEN '31–60'
+                        WHEN DATEDIFF(CURDATE(), o.delivery_date) <= 30 THEN '0–30'
+                        WHEN DATEDIFF(CURDATE(), o.delivery_date) BETWEEN 31 AND 60 THEN '31–60'
                         ELSE '>60'
-                    END AS aging_bucket
+                    END AS aging_bucket,
+                    
+                    DATEDIFF(CURDATE(), o.delivery_date) AS days_overdue
                 
-                FROM purchases p
+                FROM orders o
                 LEFT JOIN (
                     SELECT 
-                        purchase_id,
-                        SUM(amount) AS paid_amount
-                    FROM payments
+                        order_id,
+                        SUM(amount) AS received_amount
+                    FROM receipts
                     WHERE status = 'ACTIVE'
-                    GROUP BY purchase_id
-                ) paid_summary ON p.id = paid_summary.purchase_id
-                WHERE p.supplier_id = ?
-                  AND p.record_status = 'ACTIVE'
-                  AND NOT (p.status = 'PAID' AND COALESCE(paid_summary.paid_amount, 0) = 0)
-                  AND (p.total_amount - COALESCE(paid_summary.paid_amount, 0)) > 0
-                ORDER BY p.purchase_date DESC
+                    GROUP BY order_id
+                ) received_summary ON o.id = received_summary.order_id
+                WHERE o.customer_id = ?
+                  AND o.order_status != 'CANCELLED'
+                  AND NOT (o.payment_status = 'PAID' AND COALESCE(received_summary.received_amount, 0) = 0)
+                  AND (o.total_amount - COALESCE(received_summary.received_amount, 0)) > 0
+                ORDER BY o.delivery_date DESC
                 """;
 
-        return jdbcTemplate.query(sql, this::mapDetailRow, supplierId);
+        return jdbcTemplate.query(sql, this::mapDetailRow, customerId);
     }
 
-    private APAgingPurchaseDetailDto mapDetailRow(ResultSet rs, int rowNum) throws SQLException {
-        return APAgingPurchaseDetailDto.builder()
-                .id(rs.getLong("purchase_id"))
-                .purchaseId(rs.getLong("purchase_id"))
-                .purchaseNo(rs.getString("purchase_no"))
-                .purchaseDate(rs.getDate("purchase_date").toLocalDate())
+    private ARAgingOrderDetailDto mapDetailRow(ResultSet rs, int rowNum) throws SQLException {
+        return ARAgingOrderDetailDto.builder()
+                .id(rs.getLong("order_id"))
+                .orderId(rs.getLong("order_id"))
+                .orderNo(rs.getString("order_no"))
+                .orderDate(rs.getDate("order_date") != null ? rs.getDate("order_date").toLocalDate() : null)
+                .deliveryDate(rs.getDate("delivery_date") != null ? rs.getDate("delivery_date").toLocalDate() : null)
                 .totalAmount(getDecimal(rs, "total_amount"))
-                .paidAmount(getDecimal(rs, "paid_amount"))
+                .receivedAmount(getDecimal(rs, "received_amount"))
                 .balance(getDecimal(rs, "balance"))
                 .agingBucket(rs.getString("aging_bucket"))
-                .status(rs.getString("status"))
+                .daysOverdue(rs.getInt("days_overdue"))
                 .build();
     }
 
@@ -272,3 +275,4 @@ public class APAgingRepository {
         return val != null ? val : BigDecimal.ZERO;
     }
 }
+
