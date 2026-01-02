@@ -182,18 +182,16 @@ CREATE INDEX idx_sales_accounting_period ON sales(accounting_period);
 CREATE TABLE expense_categories (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(100) NOT NULL UNIQUE,
-  account_code VARCHAR(20) NOT NULL,
-  parent_id BIGINT NULL,
+  account_code VARCHAR(20) NOT NULL UNIQUE,
   description VARCHAR(255),
   active BOOLEAN DEFAULT TRUE,
+  is_salary BOOLEAN DEFAULT FALSE COMMENT '是否為薪資類別',
+  frequency_type ENUM('DAILY','WEEKLY','BIWEEKLY','MONTHLY','UNLIMITED') DEFAULT 'DAILY' COMMENT '費用頻率類型',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (parent_id) REFERENCES expense_categories(id)
-    ON DELETE SET NULL ON UPDATE CASCADE
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_expense_categories_account_code ON expense_categories(account_code);
-CREATE INDEX idx_expense_categories_parent_id ON expense_categories(parent_id);
 
 -- ------------------------------------------------------------
 -- 8. 開支表 (含會計期間)
@@ -206,6 +204,9 @@ CREATE TABLE expenses (
   amount DECIMAL(10,2) UNSIGNED NOT NULL,
   note VARCHAR(255),
   employee_id BIGINT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '狀態：ACTIVE（正常支出）, VOIDED（已作廢）',
+  voided_at TIMESTAMP NULL COMMENT '作廢時間',
+  void_reason VARCHAR(500) NULL COMMENT '作廢原因',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (category_id) REFERENCES expense_categories(id)
@@ -219,6 +220,8 @@ CREATE INDEX idx_expenses_category_id ON expenses(category_id);
 CREATE INDEX idx_expenses_employee_id ON expenses(employee_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date);
 CREATE INDEX idx_expenses_accounting_period ON expenses(accounting_period);
+CREATE INDEX idx_expenses_status ON expenses(status);
+CREATE INDEX idx_expenses_voided_at ON expenses(voided_at);
 
 -- ------------------------------------------------------------
 -- 9. 使用者表
@@ -362,6 +365,8 @@ CREATE INDEX idx_receipts_status ON receipts(status);
 CREATE INDEX idx_receipts_voided_at ON receipts(voided_at);
 
 -- ============================================================
---    Schema v2.5 完成：
---    加入 Product Categories 模組，強化分類與報表彈性
+--    Schema v2.6 完成：
+--    1. 更新 expense_categories：移除 parent_id，新增 is_salary 和 frequency_type
+--    2. 更新 expenses：新增 status, voided_at, void_reason 欄位
+--    3. 確保所有表結構與 Entity 對齊
 -- ============================================================
