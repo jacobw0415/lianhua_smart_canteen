@@ -117,7 +117,7 @@ public class ReportRepository {
                     0 AS total_purchase,
                     SUM(e.amount) AS total_expense
                 FROM expenses e
-                WHERE 1=1
+                WHERE e.status = 'ACTIVE'
         """);
 
         // 動態條件 - 費用

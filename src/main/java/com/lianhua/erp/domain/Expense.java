@@ -31,6 +31,7 @@ public class Expense {
     
     @Column(name = "accounting_period", length = 7, nullable = false)
     @Schema(description = "會計期間（YYYY-MM）")
+    @Builder.Default
     private String accountingPeriod = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
     
     @ManyToOne(fetch = FetchType.LAZY)
@@ -50,6 +51,20 @@ public class Expense {
     @JoinColumn(name = "employee_id")
     @Schema(description = "對應員工（如為薪資支出）")
     private Employee employee;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20, nullable = false)
+    @Builder.Default
+    @Schema(description = "狀態：ACTIVE（正常支出）, VOIDED（已作廢）")
+    private ExpenseStatus status = ExpenseStatus.ACTIVE;
+
+    @Column(name = "voided_at")
+    @Schema(description = "作廢時間")
+    private LocalDateTime voidedAt;
+
+    @Column(name = "void_reason", length = 500)
+    @Schema(description = "作廢原因")
+    private String voidReason;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

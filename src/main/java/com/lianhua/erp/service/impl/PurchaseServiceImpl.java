@@ -123,7 +123,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
 
         if (dto.getPurchaseDate() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "（進貨日期）為必填欄位");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "進貨日期為必填欄位");
         }
 
         // =============================================
@@ -354,7 +354,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
 
         // ========================================
-        // 2️⃣ 停用供應商不可新增付款
+        // 2.1️⃣ 停用供應商不可新增付款
         // ========================================
         Supplier supplier = purchase.getSupplier();
         if (!Boolean.TRUE.equals(supplier.getActive())) {

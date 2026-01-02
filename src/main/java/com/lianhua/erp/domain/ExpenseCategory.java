@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Schema(description = "費用類別主檔（支援階層式分類與自動會計代碼）")
+@Schema(description = "費用類別主檔（平鋪式設計，支援自動會計代碼）")
 public class ExpenseCategory {
     
     @Id
@@ -33,11 +33,6 @@ public class ExpenseCategory {
     @Schema(description = "系統自動產生的會計科目代碼（唯讀）", example = "EXP-003", accessMode = Schema.AccessMode.READ_ONLY)
     private String accountCode;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_id")
-    @Schema(description = "上層分類（可為空）")
-    private ExpenseCategory parent;
-    
     @Column(length = 255)
     @Schema(description = "說明", example = "此分類屬於食材相關成本")
     private String description;
@@ -46,6 +41,17 @@ public class ExpenseCategory {
     @Builder.Default
     @Schema(description = "是否啟用", example = "true")
     private Boolean active = true;
+
+    @Column(name = "is_salary", nullable = false)
+    @Builder.Default
+    @Schema(description = "是否為薪資類別", example = "false")
+    private Boolean isSalary = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "frequency_type", nullable = false, length = 20)
+    @Builder.Default
+    @Schema(description = "費用頻率類型：DAILY（每日一次）、WEEKLY（每週一次）、BIWEEKLY（每兩週一次）、MONTHLY（每月一次）、UNLIMITED（無限制）", example = "DAILY")
+    private ExpenseFrequency frequencyType = ExpenseFrequency.DAILY;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

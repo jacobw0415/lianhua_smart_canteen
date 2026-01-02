@@ -58,7 +58,8 @@ public class CashFlowReportRepository {
 
                 SELECT accounting_period, 0 AS total_sales, 0 AS total_receipts, 0 AS total_payments, SUM(amount) AS total_expenses
                   FROM expenses
-                 WHERE (? IS NULL OR expense_date >= ?) AND (? IS NULL OR expense_date <= ?)
+                 WHERE status = 'ACTIVE'
+                   AND (? IS NULL OR expense_date >= ?) AND (? IS NULL OR expense_date <= ?)
                  GROUP BY accounting_period
             ) AS combined
         """);

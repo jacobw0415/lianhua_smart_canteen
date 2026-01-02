@@ -1,5 +1,7 @@
 package com.lianhua.erp.dto.expense;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.lianhua.erp.domain.ExpenseFrequency;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -12,21 +14,33 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @Schema(description = "費用類別建立／更新請求 DTO")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ExpenseCategoryRequestDto {
     
-    @NotBlank
-    @Schema(description = "費用類別名稱", example = "水電費")
+    @NotBlank(message = "費用類別名稱不可為空")
+    @Schema(
+        description = "費用類別名稱（必填，需唯一）", 
+        example = "水電費",
+        requiredMode = Schema.RequiredMode.REQUIRED
+    )
     private String name;
     
-    @Schema(description = "系統自動生成之會計科目代碼（EXP-001 形式）", example = "EXP-001", accessMode = Schema.AccessMode.READ_ONLY)
-    private String accountCode;
-    
-    @Schema(description = "費用說明或備註", example = "包含電費與自來水費用")
+    @Schema(description = "費用說明或備註（選填）", example = "包含電費與自來水費用")
     private String description;
     
-    @Schema(description = "是否啟用此類別", example = "true")
+    @Builder.Default
+    @Schema(description = "是否啟用此類別（選填，預設為 true）", example = "true")
     private Boolean active = true;
     
-    @Schema(description = "上層類別 ID（可選）", example = "1")
-    private Long parentId;
+    @Builder.Default
+    @Schema(description = "是否為薪資類別（選填，預設為 false）", example = "false")
+    private Boolean isSalary = false;
+    
+    @Builder.Default
+    @Schema(description = "費用頻率類型（選填，預設為 DAILY）", 
+            example = "MONTHLY",
+            allowableValues = {"DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY", "UNLIMITED"})
+    private ExpenseFrequency frequencyType = ExpenseFrequency.DAILY;
+    
+    // 注意：accountCode 由系統自動生成，不需要在此 DTO 中提供
 }

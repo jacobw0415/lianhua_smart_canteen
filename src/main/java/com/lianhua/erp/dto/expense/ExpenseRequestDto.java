@@ -15,22 +15,20 @@ import java.time.LocalDate;
 @Builder
 @Schema(description = "支出建立／更新請求 DTO")
 public class ExpenseRequestDto {
-    
+
     @NotNull
     @Schema(description = "支出日期", example = "2025-10-15")
     private LocalDate expenseDate;
-    
-    @NotNull
-    @Schema(description = "費用類別 ID", example = "3")
+
+    @Schema(description = "費用類別 ID（選擇員工時可選，系統會自動選擇薪資類別）", example = "3")
     private Long categoryId;
-    
-    @NotNull
-    @Schema(description = "支出金額（新台幣）", example = "1200.50")
+
+    @Schema(description = "支出金額（新台幣，選擇員工時會自動填入員工薪資）", example = "1200.50")
     private BigDecimal amount;
-    
+
     @Schema(description = "支出備註", example = "支付外送燃料費")
     private String note;
-    
+
     @Schema(description = "對應員工 ID（若為薪資或個別費用）", example = "5")
     private Long employeeId;
 }

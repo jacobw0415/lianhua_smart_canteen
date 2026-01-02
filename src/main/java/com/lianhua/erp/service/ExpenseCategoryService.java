@@ -1,24 +1,36 @@
 package com.lianhua.erp.service;
 
-import com.lianhua.erp.dto.expense.ExpenseCategoryDto;
 import com.lianhua.erp.dto.expense.ExpenseCategoryRequestDto;
+import com.lianhua.erp.dto.expense.ExpenseCategoryResponseDto;
+import com.lianhua.erp.dto.expense.ExpenseCategorySearchRequest;
 
 import java.util.List;
 
 public interface ExpenseCategoryService {
     
-    ExpenseCategoryDto create(ExpenseCategoryRequestDto dto);
+    ExpenseCategoryResponseDto create(ExpenseCategoryRequestDto dto);
     
-    ExpenseCategoryDto update(Long id, ExpenseCategoryRequestDto dto);
+    ExpenseCategoryResponseDto update(Long id, ExpenseCategoryRequestDto dto);
     
     /**
      * 查詢所有費用類別
-     * @param activeOnly 是否僅查詢啟用中項目
      * @return 費用類別清單
      */
-    List<ExpenseCategoryDto> findAll(boolean activeOnly);
+    List<ExpenseCategoryResponseDto> getAll();
     
-    ExpenseCategoryDto findById(Long id);
+    /**
+     * 查詢啟用中的費用類別
+     * @return 啟用中的費用類別清單
+     */
+    List<ExpenseCategoryResponseDto> getActive();
+    
+    ExpenseCategoryResponseDto getById(Long id);
+    
+    ExpenseCategoryResponseDto activate(Long id);
+    
+    ExpenseCategoryResponseDto deactivate(Long id);
+    
+    List<ExpenseCategoryResponseDto> search(ExpenseCategorySearchRequest search);
     
     void delete(Long id);
 }
