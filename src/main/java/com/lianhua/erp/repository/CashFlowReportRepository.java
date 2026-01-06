@@ -43,10 +43,10 @@ public class CashFlowReportRepository {
                 ((COALESCE(SUM(total_sales), 0) + COALESCE(SUM(total_receipts), 0))
                  - (COALESCE(SUM(total_payments), 0) + COALESCE(SUM(total_expenses), 0))) AS net_cash_flow
             FROM (
-                -- 🟩 零售現金收入 (Sales)
+                -- 🟩 零售現金收入 (Sales) - 只計算現金支付方式
                 SELECT accounting_period, SUM(amount) AS total_sales, 0 AS total_receipts, 0 AS total_payments, 0 AS total_expenses
                   FROM sales
-                 WHERE 1=1
+                 WHERE pay_method IN ('CASH', 'CARD', 'MOBILE')
         """);
 
         // 動態添加 Sales 表的過濾條件
@@ -61,10 +61,11 @@ public class CashFlowReportRepository {
 
                 UNION ALL
 
-                -- 🟦 訂單收款收入 (Receipts)
+                -- 🟦 訂單收款收入 (Receipts) - 只計算現金支付方式
                 SELECT accounting_period, 0 AS total_sales, SUM(amount) AS total_receipts, 0 AS total_payments, 0 AS total_expenses
                   FROM receipts
                  WHERE status = 'ACTIVE'
+                   AND method IN ('CASH','TRANSFER','CARD','CHECK')
         """);
 
         // 動態添加 Receipts 表的過濾條件
@@ -79,10 +80,11 @@ public class CashFlowReportRepository {
 
                 UNION ALL
 
-                -- 🟧 採購付款支出 (Payments)
+                -- 🟧 採購付款支出 (Payments) - 只計算現金支付方式
                 SELECT accounting_period, 0 AS total_sales, 0 AS total_receipts, SUM(amount) AS total_payments, 0 AS total_expenses
                   FROM payments
                  WHERE status = 'ACTIVE'
+                   AND method IN ('CASH','TRANSFER','CARD','CHECK')
         """);
 
         // 動態添加 Payments 表的過濾條件
@@ -117,10 +119,12 @@ public class CashFlowReportRepository {
 
         // 🔹 外層條件（如果需要進一步過濾 accounting_period）
         if (usePeriod) {
+            // 使用 period 查詢時，需要在外層過濾 accounting_period
             sql.append(" WHERE accounting_period = ? ");
-        } else if (useDateRange) {
-            sql.append(" WHERE accounting_period BETWEEN DATE_FORMAT(?, '%Y-%m') AND DATE_FORMAT(?, '%Y-%m') ");
         }
+        // ⚠️ 注意：使用日期範圍查詢時，不需要外層 accounting_period 過濾
+        // 因為內層已經用具體日期字段（sale_date, received_date等）過濾了
+        // 外層只需要按 accounting_period 分組即可
 
         // 🔹 最後再 group by + order
         sql.append(" GROUP BY accounting_period ORDER BY accounting_period ");
@@ -135,13 +139,13 @@ public class CashFlowReportRepository {
                     period,  // expenses
                     period); // 外層
         } else if (useDateRange) {
-            // 使用日期區間查詢：每個子查詢都需要 startDate 和 endDate，外層也需要
+            // 使用日期區間查詢：每個子查詢都需要 startDate 和 endDate
+            // 注意：外層不再需要日期參數，因為已經用具體日期字段過濾了
             return jdbcTemplate.query(sql.toString(), this::mapRowToDto,
                     startDate, endDate,  // sales
                     startDate, endDate,  // receipts
                     startDate, endDate,  // payments
-                    startDate, endDate,  // expenses
-                    startDate, endDate); // 外層
+                    startDate, endDate); // expenses
         } else {
             // 查詢全部資料：不需要任何參數
             return jdbcTemplate.query(sql.toString(), this::mapRowToDto);
