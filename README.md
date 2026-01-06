@@ -137,7 +137,7 @@ Open:
 | `/api/receipts` | Receipts and collections |
 | `/api/reports/ar-aging` | Accounts receivable aging |
 | `/api/reports/ap-aging` | Accounts payable aging |
-| `/api/reports/cash-flow` | Cash flow report |
+| `/api/cash_flow_reports` | Cash flow report |
 | `/api/reports/balance-sheet` | Balance sheet |
 | `/api/reports/profit-loss` | Profit & loss report |
 
