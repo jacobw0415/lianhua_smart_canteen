@@ -33,28 +33,24 @@ import java.util.List;
  */
 @Repository
 @RequiredArgsConstructor
-public class BalanceSheetReportRepository {
+public class BalanceSheetSnapshotRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
     /**
      * 📊 查詢資產負債表（Snapshot）
      *
-     * @param period  YYYY-MM（例如：2025-03），表示截至該月底
-     * @param endDate yyyy-MM-dd（例如：2025-12-31），表示截至該日期（可選）
+     * @param period YYYY-MM（例如：2025-03），表示截至該月底
      */
-    public BalanceSheetReportDto getBalanceSheet(String period, String endDate) {
+    public BalanceSheetReportDto getBalanceSheet(String period) {
 
         if (period == null || period.isBlank()) {
             throw new IllegalArgumentException("period (YYYY-MM) 不可為空，資產負債表必須指定截至月份");
         }
 
-        // 確定顯示期間
-        String displayPeriod = (endDate != null && !endDate.isBlank()) ? endDate : period;
-
-        String sql = String.format("""
+        String sql = """
                     SELECT
-                        :displayPeriod AS accounting_period,
+                        :period AS accounting_period,
 
                         ar.accounts_receivable,
                         ap.accounts_payable,
@@ -79,13 +75,12 @@ public class BalanceSheetReportRepository {
                                 SELECT
                                     order_id,
                                     SUM(amount) AS received_amount
-                                FROM receipts rec
-                                WHERE rec.status = 'ACTIVE'
-                                  %s
+                                FROM receipts
+                                WHERE status = 'ACTIVE'
                                 GROUP BY order_id
                             ) r ON r.order_id = o.id
                             WHERE o.order_status != 'CANCELLED'
-                              %s
+                              AND o.accounting_period <= :period
                         ) ar,
 
                         (
@@ -103,13 +98,12 @@ public class BalanceSheetReportRepository {
                                 SELECT
                                     purchase_id,
                                     SUM(amount) AS paid_amount
-                                FROM payments paym
-                                WHERE paym.status = 'ACTIVE'
-                                  %s
+                                FROM payments
+                                WHERE status = 'ACTIVE'
                                 GROUP BY purchase_id
                             ) pay ON pay.purchase_id = p.id
                             WHERE p.record_status = 'ACTIVE'
-                              %s
+                              AND p.accounting_period <= :period
                         ) ap,
 
                         (
@@ -123,7 +117,7 @@ public class BalanceSheetReportRepository {
                                     0 AS outflow
                                 FROM sales s
                                 WHERE s.pay_method IN ('CASH', 'CARD', 'MOBILE')
-                                  %s
+                                  AND s.accounting_period <= :period
 
                                 UNION ALL
 
@@ -134,7 +128,7 @@ public class BalanceSheetReportRepository {
                                 FROM receipts r
                                 WHERE r.status = 'ACTIVE'
                                   AND r.method IN ('CASH','TRANSFER','CARD','CHECK')
-                                  %s
+                                  AND r.accounting_period <= :period
 
                                 UNION ALL
 
@@ -144,7 +138,7 @@ public class BalanceSheetReportRepository {
                                     e.amount AS outflow
                                 FROM expenses e
                                 WHERE e.status = 'ACTIVE'
-                                  %s
+                                  AND e.accounting_period <= :period
 
                                 UNION ALL
 
@@ -155,122 +149,19 @@ public class BalanceSheetReportRepository {
                                 FROM payments p
                                 WHERE p.status = 'ACTIVE'
                                   AND p.method IN ('CASH','TRANSFER','CARD','CHECK')
-                                  %s
+                                  AND p.accounting_period <= :period
                             ) cash_flow
                         ) cash
-                """,
-                buildReceiptDateFilter(endDate, period), // receipts 子查詢（使用 rec 別名）
-                buildOrderDateFilter(endDate, period),
-                buildPaymentDateFilter(endDate, period), // payments 子查詢（使用 paym 別名）
-                buildPurchaseDateFilter(endDate, period),
-                buildSalesDateFilter(endDate, period),
-                buildReceiptDateFilterForCash(endDate, period), // 現金查詢中的 receipts（使用 r 別名）
-                buildExpenseDateFilter(endDate, period),
-                buildPaymentDateFilterForCash(endDate, period)); // 現金查詢中的 payments（使用 p 別名）
+                """;
 
         NamedParameterJdbcTemplate namedJdbc = new NamedParameterJdbcTemplate(jdbcTemplate);
 
-        MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("period", period);
-        params.addValue("displayPeriod", displayPeriod);
-        if (endDate != null && !endDate.isBlank()) {
-            params.addValue("endDate", endDate);
-        }
+        MapSqlParameterSource params = new MapSqlParameterSource("period", period);
 
         return namedJdbc.queryForObject(
                 sql,
                 params,
                 this::mapRowToDto);
-    }
-
-    /**
-     * 構建訂單日期過濾條件
-     */
-    private String buildOrderDateFilter(String endDate, String period) {
-        if (endDate != null && !endDate.isBlank()) {
-            return "AND o.order_date <= :endDate";
-        } else {
-            return "AND o.order_date <= LAST_DAY(STR_TO_DATE(CONCAT(:period, '-01'), '%Y-%m-%d'))";
-        }
-    }
-
-    /**
-     * 構建採購日期過濾條件
-     */
-    private String buildPurchaseDateFilter(String endDate, String period) {
-        if (endDate != null && !endDate.isBlank()) {
-            return "AND p.purchase_date <= :endDate";
-        } else {
-            return "AND p.purchase_date <= LAST_DAY(STR_TO_DATE(CONCAT(:period, '-01'), '%Y-%m-%d'))";
-        }
-    }
-
-    /**
-     * 構建銷售日期過濾條件
-     */
-    private String buildSalesDateFilter(String endDate, String period) {
-        if (endDate != null && !endDate.isBlank()) {
-            return "AND s.sale_date <= :endDate";
-        } else {
-            return "AND s.sale_date <= LAST_DAY(STR_TO_DATE(CONCAT(:period, '-01'), '%Y-%m-%d'))";
-        }
-    }
-
-    /**
-     * 構建收款日期過濾條件
-     * 注意：在子查詢中使用 rec 別名，在現金查詢中使用 r 別名
-     */
-    private String buildReceiptDateFilter(String endDate, String period) {
-        if (endDate != null && !endDate.isBlank()) {
-            return "AND rec.received_date <= :endDate";
-        } else {
-            return "AND rec.received_date <= LAST_DAY(STR_TO_DATE(CONCAT(:period, '-01'), '%Y-%m-%d'))";
-        }
-    }
-
-    /**
-     * 構建收款日期過濾條件（用於現金查詢，使用 r 別名）
-     */
-    private String buildReceiptDateFilterForCash(String endDate, String period) {
-        if (endDate != null && !endDate.isBlank()) {
-            return "AND r.received_date <= :endDate";
-        } else {
-            return "AND r.received_date <= LAST_DAY(STR_TO_DATE(CONCAT(:period, '-01'), '%Y-%m-%d'))";
-        }
-    }
-
-    /**
-     * 構建付款日期過濾條件
-     * 注意：在子查詢中使用 paym 別名，在現金查詢中使用 p 別名
-     */
-    private String buildPaymentDateFilter(String endDate, String period) {
-        if (endDate != null && !endDate.isBlank()) {
-            return "AND paym.pay_date <= :endDate";
-        } else {
-            return "AND paym.pay_date <= LAST_DAY(STR_TO_DATE(CONCAT(:period, '-01'), '%Y-%m-%d'))";
-        }
-    }
-
-    /**
-     * 構建付款日期過濾條件（用於現金查詢，使用 p 別名）
-     */
-    private String buildPaymentDateFilterForCash(String endDate, String period) {
-        if (endDate != null && !endDate.isBlank()) {
-            return "AND p.pay_date <= :endDate";
-        } else {
-            return "AND p.pay_date <= LAST_DAY(STR_TO_DATE(CONCAT(:period, '-01'), '%Y-%m-%d'))";
-        }
-    }
-
-    /**
-     * 構建費用日期過濾條件
-     */
-    private String buildExpenseDateFilter(String endDate, String period) {
-        if (endDate != null && !endDate.isBlank()) {
-            return "AND e.expense_date <= :endDate";
-        } else {
-            return "AND e.expense_date <= LAST_DAY(STR_TO_DATE(CONCAT(:period, '-01'), '%Y-%m-%d'))";
-        }
     }
 
     private BalanceSheetReportDto mapRowToDto(ResultSet rs, int rowNum) throws SQLException {
@@ -289,25 +180,23 @@ public class BalanceSheetReportRepository {
      * 📊 查詢資產負債表（支援 period 和 endDate 參數，返回列表）
      *
      * @param period  YYYY-MM（例如：2025-03），表示截至該月底
-     * @param endDate yyyy-MM-dd（例如：2025-12-31），表示截至該日期（可選）
+     * @param endDate yyyy-MM-dd（例如：2025-12-31），表示截至該日期
      * @return 資產負債表報表資料列表
      */
-    public List<BalanceSheetReportDto> getBalanceSheetList(String period, String endDate) {
+    public List<BalanceSheetReportDto> getBalanceSheet(String period, String endDate) {
         List<BalanceSheetReportDto> result = new ArrayList<>();
 
-        // 如果提供了 endDate，使用 endDate 進行日期級別過濾
-        // 如果只提供了 period，使用 period（轉換為該月最後一天）
+        // 如果提供了 endDate，使用 endDate（轉換為 period 格式或使用日期過濾）
+        // 如果只提供了 period，使用 period
         // 如果都沒有提供，返回空列表
         String effectivePeriod = null;
         String effectiveEndDate = null;
 
         if (endDate != null && !endDate.isBlank()) {
+            // 如果有 endDate，提取 YYYY-MM 部分作為 period
             effectiveEndDate = endDate;
-            // 提取 YYYY-MM 部分作為 period（用於向後兼容和顯示）
             if (endDate.length() >= 7) {
-                effectivePeriod = endDate.substring(0, 7);
-            } else {
-                throw new IllegalArgumentException("endDate 格式錯誤，應為 yyyy-MM-dd");
+                effectivePeriod = endDate.substring(0, 7); // 提取 YYYY-MM
             }
         } else if (period != null && !period.isBlank()) {
             effectivePeriod = period;
@@ -316,39 +205,15 @@ public class BalanceSheetReportRepository {
             return result;
         }
 
-        // 使用改進後的查詢方法（支持日期級別過濾）
-        BalanceSheetReportDto dto = getBalanceSheet(effectivePeriod, effectiveEndDate);
+        // 使用 period 查詢（因為現有的 SQL 邏輯基於 accounting_period）
+        BalanceSheetReportDto dto = getBalanceSheet(effectivePeriod);
+
+        // 如果提供了 endDate，更新 accounting_period 顯示為日期格式
+        if (effectiveEndDate != null) {
+            dto.setAccountingPeriod(effectiveEndDate);
+        }
+
         result.add(dto);
-        return result;
-    }
-
-    /**
-     * 📊 查詢多個月份的資產負債表（支援並列比較）
-     *
-     * @param periods 多個會計期間列表（YYYY-MM），例如：["2025-10", "2025-11", "2025-12"]
-     * @return 資產負債表報表資料列表（每個月份一筆）
-     */
-    public List<BalanceSheetReportDto> getBalanceSheetList(List<String> periods) {
-        List<BalanceSheetReportDto> result = new ArrayList<>();
-
-        if (periods == null || periods.isEmpty()) {
-            return result;
-        }
-
-        // 為每個期間查詢資產負債表
-        for (String period : periods) {
-            if (period != null && !period.isBlank()) {
-                try {
-                    BalanceSheetReportDto dto = getBalanceSheet(period, null);
-                    result.add(dto);
-                } catch (Exception e) {
-                    // 如果某個期間查詢失敗，記錄錯誤但繼續處理其他期間
-                    // 可以選擇跳過或添加錯誤標記
-                    System.err.println("查詢期間 " + period + " 失敗: " + e.getMessage());
-                }
-            }
-        }
-
         return result;
     }
 

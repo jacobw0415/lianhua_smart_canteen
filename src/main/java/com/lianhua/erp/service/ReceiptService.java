@@ -3,7 +3,6 @@ package com.lianhua.erp.service;
 import com.lianhua.erp.dto.receipt.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
