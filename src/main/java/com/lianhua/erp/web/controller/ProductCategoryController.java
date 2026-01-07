@@ -1,9 +1,6 @@
 package com.lianhua.erp.web.controller;
 
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
-import com.lianhua.erp.dto.error.ConflictResponse;
-import com.lianhua.erp.dto.error.InternalServerErrorResponse;
-import com.lianhua.erp.dto.error.NotFoundResponse;
 import com.lianhua.erp.dto.product.*;
 import com.lianhua.erp.service.ProductCategoryService;
 import io.swagger.v3.oas.annotations.Operation;
