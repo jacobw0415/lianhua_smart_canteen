@@ -29,12 +29,17 @@ public class PaymentSpecifications {
                 );
             }
         } else {
-            // 預設排除已作廢（除非明確指定）
-            if (!Boolean.TRUE.equals(req.getIncludeVoided())) {
+            // ⭐ 如果使用會計期間選擇，顯示該月份的全部資料（包含作廢）
+            // 否則預設排除已作廢（除非明確指定 includeVoided=true）
+            boolean hasAccountingPeriod = StringUtils.hasText(req.getAccountingPeriod());
+            
+            if (!hasAccountingPeriod && !Boolean.TRUE.equals(req.getIncludeVoided())) {
+                // 沒有會計期間且未明確指定包含作廢 → 只顯示有效付款
                 spec = spec.and((root, query, cb) ->
                         cb.equal(root.get("status"), PaymentRecordStatus.ACTIVE)
                 );
             }
+            // 如果有會計期間，不進行狀態過濾，顯示全部（包括作廢的）
         }
 
         spec = spec.and(bySupplierName(req));
