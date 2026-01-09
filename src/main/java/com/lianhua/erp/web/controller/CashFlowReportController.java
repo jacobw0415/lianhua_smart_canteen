@@ -27,7 +27,7 @@ import java.util.List;
  * - 快速選擇：本週、本月、本季、本年等預設區間
  */
 @RestController
-@RequestMapping("/api/cash_flow_reports")
+@RequestMapping("/api/reports/cash_flow_reports")
 @RequiredArgsConstructor
 @Tag(name = "現金流量表", description = "現金流量報表 API - 統計現金流入與流出")
 public class CashFlowReportController {
