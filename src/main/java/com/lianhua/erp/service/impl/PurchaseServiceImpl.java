@@ -4,6 +4,7 @@ import com.lianhua.erp.domain.*;
 import com.lianhua.erp.domain.PaymentRecordStatus;
 import com.lianhua.erp.domain.PurchaseStatus;
 import com.lianhua.erp.dto.purchase.*;
+import com.lianhua.erp.event.PurchaseEvent;
 import com.lianhua.erp.mapper.PurchaseMapper;
 import com.lianhua.erp.mapper.PaymentMapper;
 import com.lianhua.erp.mapper.PurchaseItemMapper;
@@ -15,6 +16,7 @@ import com.lianhua.erp.service.impl.spec.PurchaseSpecifications;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -49,6 +51,7 @@ public class PurchaseServiceImpl implements PurchaseService {
     private final PaymentMapper paymentMapper;
     private final PurchaseItemMapper purchaseItemMapper;
     private final com.lianhua.erp.numbering.PurchaseNoGenerator purchaseNoGenerator;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
 
@@ -311,6 +314,9 @@ public class PurchaseServiceImpl implements PurchaseService {
 
             Purchase saved = purchaseRepository.save(purchase);
             // Cascade 會自動保存 payments，不需要手動保存
+
+            log.info("🚀 發送新增進貨單事件：{}", saved.getPurchaseNo());
+            eventPublisher.publishEvent(new PurchaseEvent(this, saved, "PURCHASE_CREATED"));
 
             log.info("進貨單建立成功：purchaseId={}, purchaseNo={}", saved.getId(), saved.getPurchaseNo());
             return purchaseMapper.toDto(saved);

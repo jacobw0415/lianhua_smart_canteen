@@ -1,5 +1,5 @@
 -- ============================================================
--- 🌿 Lianhua ERP Schema v2.5
+-- 🌿 Lianhua ERP Schema v2.7 (含通知中心擴展架構)
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS lianhua
@@ -138,7 +138,7 @@ CREATE INDEX idx_product_categories_code ON product_categories(code);
 CREATE INDEX idx_product_categories_active ON product_categories(active);
 
 -- ------------------------------------------------------------
--- 5. 商品表
+-- 5.1 商品表
 -- ------------------------------------------------------------
 CREATE TABLE products (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -363,9 +363,45 @@ CREATE INDEX idx_receipts_received_date ON receipts(received_date);
 CREATE INDEX idx_receipts_status ON receipts(status);
 CREATE INDEX idx_receipts_voided_at ON receipts(voided_at);
 
+-- ------------------------------------------------------------
+-- 16. 通知中心系統 (Notification Center v2.7)
+-- ------------------------------------------------------------
+
+-- A. 通知中心主表 (儲存訊息內容與關聯，支援多型關聯)
+CREATE TABLE notifications (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  template_code VARCHAR(50) NOT NULL COMMENT '用於識別通知類型，如 PURCHASE_VOIDED',
+  actor_id BIGINT COMMENT '觸發通知的用戶 ID (NULL 則代表系統自動發送)',
+  target_type VARCHAR(50) NOT NULL COMMENT '關聯模組類型，如 purchases, orders, expenses',
+  target_id BIGINT NOT NULL COMMENT '關聯單據的 ID',
+  payload JSON NULL COMMENT '儲存動態參數，如 {"no": "PO-001", "reason": "輸入錯誤"}',
+  priority TINYINT DEFAULT 1 COMMENT '1:一般, 2:重要, 3:緊急',
+  action_url VARCHAR(255) NULL COMMENT '點擊後跳轉的前端路徑',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  INDEX idx_notifications_target (target_type, target_id),
+  INDEX idx_notifications_created (created_at DESC),
+  FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- B. 使用者通知關聯表 (儲存每個用戶的閱讀狀態)
+CREATE TABLE user_notifications (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  notification_id BIGINT NOT NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  read_at TIMESTAMP NULL,
+  is_archived BOOLEAN DEFAULT FALSE COMMENT '是否封存 (用戶手動刪除/隱藏)',
+
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_user_notifications_status ON user_notifications(user_id, is_read);
+
 -- ============================================================
---    Schema v2.6 完成：
---    1. 更新 expense_categories：移除 parent_id，新增 is_salary 和 frequency_type
---    2. 更新 expenses：新增 status, voided_at, void_reason 欄位
---    3. 確保所有表結構與 Entity 對齊
+--    Schema v2.7 完成：
+--    1. 整合 v2.6 所有修正（作廢機制、費用類別更新）。
+--    2. 新增通知中心三表架構 (16. A, B)。
+--    3. 支援 JSON Payload 與 Template 解耦，為產品化做準備。
 -- ============================================================
