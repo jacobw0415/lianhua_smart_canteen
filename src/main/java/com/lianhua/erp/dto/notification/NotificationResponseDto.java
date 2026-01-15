@@ -1,6 +1,7 @@
 package com.lianhua.erp.dto.notification;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 public class NotificationResponseDto {
 
     // 對應 user_notifications 表的 ID (用於標記已讀)
+    @JsonProperty("id")
     private Long userNotificationId;
 
     // 渲染後的資訊 (由後端解析 TemplateCode + Payload 產生)
@@ -28,6 +30,8 @@ public class NotificationResponseDto {
 
     // 狀態資訊
     private Integer priority;  // 1:一般, 2:重要, 3:緊急
+
+    @JsonProperty("read")
     private boolean isRead;
 
     @Schema(description = "建立時間", example = "2025-10-25T09:30:00")

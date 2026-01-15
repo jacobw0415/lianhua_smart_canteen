@@ -4,7 +4,7 @@ import com.lianhua.erp.event.PurchaseEvent;
 import com.lianhua.erp.service.NotificationService;
 import com.lianhua.erp.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j; // 🔥 加入 Log
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;

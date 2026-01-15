@@ -1,6 +1,8 @@
 package com.lianhua.erp.repository;
 
 import com.lianhua.erp.domain.UserNotification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -25,4 +27,6 @@ public interface UserNotificationRepository extends JpaRepository<UserNotificati
             "WHERE un.userId = :userId " +
             "ORDER BY un.notification.createdAt DESC")
     List<UserNotification> findAllByUserId(@Param("userId") Long userId);
+
+    Page<UserNotification> findByUserId(Long userId, Pageable pageable);
 }

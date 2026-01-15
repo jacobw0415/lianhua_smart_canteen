@@ -6,12 +6,14 @@ import com.lianhua.erp.dto.notification.NotificationCountDto;
 import com.lianhua.erp.dto.notification.NotificationResponseDto;
 import com.lianhua.erp.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +29,7 @@ import java.util.List;
 @CrossOrigin(
         origins = "http://localhost:5173",
         allowedHeaders = "*",
+        exposedHeaders = "X-Total-Count", // 重要：允許前端讀取自定義 Header
         methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.OPTIONS},
         allowCredentials = "true"
 )
@@ -34,23 +37,34 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
-    // TODO: 串接 SecurityUtils 取得當前使用者 ID，目前暫代為 mockUserId 或從 Header 傳入
     private Long getCurrentUserId() {
-        // 實際開發時請替換為：return SecurityUtils.getCurrentUserId();
+        // TODO: 串接 SecurityUtils 取得當前使用者 ID
         return 1L;
+    }
+
+    // ============================================================
+    // 📜 取得所有通知 (對接 React-Admin NotificationList)
+    // ============================================================
+    @Operation(
+            summary = "取得使用者所有通知歷史 (分頁)",
+            description = "結構與客戶管理模組對齊，回傳包含 content 與分頁資訊的 Page 物件。"
+    )
+    @GetMapping
+    public ResponseEntity<ApiResponseDto<Page<NotificationResponseDto>>> getAllNotifications(
+            @Parameter(hidden = true)
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        // 1. 取得 Page 物件
+        Page<NotificationResponseDto> page = notificationService.getNotificationsPage(getCurrentUserId(), pageable);
+
+        // 2. 直接回傳 ResponseEntity，ApiResponseDto 會包含 page 資訊 (含有 content 陣列)
+        // 這樣前端 dataProvider 的 payload?.content 就能抓到資料
+        return ResponseEntity.ok(ApiResponseDto.ok(page));
     }
 
     // ============================================================
     // 🔔 取得未讀清單 (用於小鈴鐺)
     // ============================================================
-    @Operation(
-            summary = "取得當前使用者的未讀通知列表",
-            description = "回傳經過渲染後的標題與內容，適用於頂欄小鈴鐺快速預覽。"
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "成功取得未讀通知"),
-            @ApiResponse(responseCode = "500", description = "伺服器錯誤")
-    })
     @GetMapping("/unread")
     public ResponseEntity<ApiResponseDto<List<NotificationResponseDto>>> getUnreadNotifications() {
         List<NotificationResponseDto> unread = notificationService.getUnreadList(getCurrentUserId());
@@ -60,7 +74,6 @@ public class NotificationController {
     // ============================================================
     // 🔢 取得未讀總數 (用於 Badge)
     // ============================================================
-    @Operation(summary = "取得未讀通知總數", description = "用於小鈴鐺圖標上的數字標記 (Badge)。")
     @GetMapping("/unread-count")
     public ResponseEntity<ApiResponseDto<NotificationCountDto>> getUnreadCount() {
         long count = notificationService.getUnreadCount(getCurrentUserId());
@@ -70,31 +83,9 @@ public class NotificationController {
     // ============================================================
     // ✅ 標記已讀
     // ============================================================
-    @Operation(summary = "標記特定通知為已讀")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "成功標記為已讀"),
-            @ApiResponse(responseCode = "404",
-                    description = "找不到該通知記錄",
-                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
-    })
     @PatchMapping("/{userNotificationId}/read")
     public ResponseEntity<ApiResponseDto<Void>> markAsRead(@PathVariable Long userNotificationId) {
         notificationService.markAsRead(userNotificationId);
         return ResponseEntity.ok(ApiResponseDto.ok(null));
-    }
-
-    // ============================================================
-    // 📜 取得所有通知 (通知中心分頁頁面)
-    // ============================================================
-    @Operation(
-            summary = "取得使用者所有通知歷史",
-            description = "用於獨立的通知管理頁面，包含已讀與未讀。未來可擴充 Pageable 支持。"
-    )
-    @GetMapping("/all")
-    public ResponseEntity<ApiResponseDto<List<NotificationResponseDto>>> getAllNotifications() {
-        // 這裡可以調用 service.getAllByUserId(userId)
-        // 目前暫用 unreadList 邏輯示意
-        List<NotificationResponseDto> all = notificationService.getUnreadList(getCurrentUserId());
-        return ResponseEntity.ok(ApiResponseDto.ok(all));
     }
 }

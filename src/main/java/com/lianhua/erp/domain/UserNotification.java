@@ -25,4 +25,7 @@ public class UserNotification {
 
     @Column(name = "read_at")
     private LocalDateTime readAt;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 }
