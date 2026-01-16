@@ -315,9 +315,6 @@ public class PurchaseServiceImpl implements PurchaseService {
             Purchase saved = purchaseRepository.save(purchase);
             // Cascade 會自動保存 payments，不需要手動保存
 
-            log.info("🚀 發送新增進貨單事件：{}", saved.getPurchaseNo());
-            eventPublisher.publishEvent(new PurchaseEvent(this, saved, "PURCHASE_CREATED"));
-
             log.info("進貨單建立成功：purchaseId={}, purchaseNo={}", saved.getId(), saved.getPurchaseNo());
             return purchaseMapper.toDto(saved);
 
@@ -679,6 +676,16 @@ public class PurchaseServiceImpl implements PurchaseService {
         // 重新查詢以確保關聯資料被載入
         Purchase savedPurchase = purchaseRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到進貨單 ID：" + id));
+
+        // ✨ 關鍵修正：將 reason 放入 Map 並傳給 Event
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("reason", reason);
+
+        // ======= ⚡ 新增：發送作廢事件通知 =======
+        log.info("🚀 發送進貨單作廢事件：{}", savedPurchase.getPurchaseNo(), reason);
+        // 這裡的 "PURCHASE_VOIDED" 必須對應您 NotificationEventListener 監聽的條件
+        eventPublisher.publishEvent(new PurchaseEvent(this, savedPurchase, "PURCHASE_VOIDED", payload));
+        // =====================================
 
         return purchaseMapper.toDto(savedPurchase);
     }

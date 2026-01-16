@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,9 +29,6 @@ public class NotificationServiceImpl implements NotificationService {
     private final UserNotificationRepository userNotificationRepo;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 發送通知 (保持不變，但建議未來將渲染後的內容直接存入資料庫以利搜尋)
-     */
     @Override
     @Transactional
     public void send(String templateCode, String targetType, Long targetId,
@@ -58,23 +56,13 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
-    /**
-     * ✨ 新增：獲取分頁後的通知列表 (包含已讀與未讀)
-     * 對接 React-Admin 的 List 頁面
-     */
     @Override
     @Transactional(readOnly = true)
     public Page<NotificationResponseDto> getNotificationsPage(Long userId, Pageable pageable) {
-        // 使用 Spring Data JPA 的分頁查詢
         Page<UserNotification> userNotiPage = userNotificationRepo.findByUserId(userId, pageable);
-
-        // 將 Entity 分頁轉換為 DTO 分頁
         return userNotiPage.map(this::convertToDto);
     }
 
-    /**
-     * 獲取未讀列表 (保持用於 Header 小紅點，不分頁)
-     */
     @Override
     @Transactional(readOnly = true)
     public List<NotificationResponseDto> getUnreadList(Long userId) {
@@ -84,21 +72,14 @@ public class NotificationServiceImpl implements NotificationService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 抽取公共轉換邏輯
-     */
     private NotificationResponseDto convertToDto(UserNotification un) {
         Notification n = un.getNotification();
         NotificationResponseDto dto = new NotificationResponseDto();
-
-        // 注意：這裡的 ID 應該回傳 user_notification 的 ID，因為標記已讀是針對「特定使用者的關聯」
         dto.setUserNotificationId(un.getId());
         dto.setTargetType(n.getTargetType());
         dto.setTargetId(n.getTargetId());
         dto.setCreatedAt(n.getCreatedAt());
         dto.setRead(un.getIsRead());
-
-        // 解析 Payload 並渲染文字標題與內容
         renderText(dto, n.getTemplateCode(), n.getPayload());
         return dto;
     }
@@ -118,37 +99,67 @@ public class NotificationServiceImpl implements NotificationService {
         return userNotificationRepo.countByUserIdAndIsReadFalse(userId);
     }
 
+    /**
+     * 修改重點：確保內容分行顯示，金額去小數點並加千分位
+     */
     private void renderText(NotificationResponseDto dto, String code, String payloadJson) {
         try {
             Map<String, Object> payload = objectMapper.readValue(payloadJson, Map.class);
-            String purchaseNo = (String) payload.getOrDefault("purchaseNo", "未知");
+
+            // 1. 取得基礎資料
+            String no = (String) payload.getOrDefault("no", payload.getOrDefault("purchaseNo", "未知"));
+            String reason = (String) payload.getOrDefault("reason", "未提供原因");
+
+            // 2. 格式化金額：去掉小數點並加入千分位
+            String amountRaw = String.valueOf(payload.getOrDefault("amount", "0"));
+            String amountFormatted = "0";
+            try {
+                BigDecimal bd = new BigDecimal(amountRaw);
+                amountFormatted = String.format("%,d", bd.intValue());
+            } catch (Exception e) {
+                amountFormatted = amountRaw;
+            }
 
             switch (code) {
-                case "PURCHASE_CREATED_ALERT":
-                    dto.setTitle("✨ 新進貨單建立");
-                    dto.setContent(String.format("已建立新進貨單 %s，請確認內容與後續付款。", purchaseNo));
+                case "PURCHASE_VOID_ALERT":
+                    dto.setTitle("🚫 進貨單作廢警示");
+                    // 分三行：訂單、金額、原因
+                    dto.setContent(String.format("單號：%s\n金額：NT$ %s\n原因：%s",
+                            no, amountFormatted, reason));
                     break;
-                case "ITEM_ADDED_ALERT":
-                    dto.setTitle("📦 進貨明細更新");
-                    dto.setContent(String.format("單號 %s 已新增明細項目。", purchaseNo));
+
+                case "RECEIPT_VOID_ALERT":
+                    dto.setTitle("🛑 收款紀錄作廢警示");
+                    dto.setContent(String.format("訂單：%s\n金額：NT$ %s\n原因：%s",
+                            no, amountFormatted, reason));
                     break;
-                case "PURCHASE_VOIDED":
-                    dto.setTitle("🚫 採購單已作廢");
-                    dto.setContent(String.format("單號 %s 已被作廢，原因：%s",
-                            purchaseNo, payload.getOrDefault("reason", "無")));
+
+                case "PAYMENT_VOID_ALERT":
+                    dto.setTitle("🛑 付款紀錄作廢警示");
+                    dto.setContent(String.format("單號：%s\n金額：NT$ %s\n原因：%s",
+                            no, amountFormatted, reason));
                     break;
-                case "LARGE_PURCHASE_ALERT":
-                    dto.setTitle("⚠️ 大額採購預警");
-                    dto.setContent(String.format("單號 %s 金額達 %s 需特別注意",
-                            purchaseNo, payload.getOrDefault("amount", "0")));
+
+                case "RECEIPT_CREATED_ALERT":
+                    dto.setTitle("💰 收到款項通知");
+                    dto.setContent(String.format("訂單：%s\n金額：NT$ %s",
+                            no, amountFormatted));
                     break;
+
+                case "MISSING_DAILY_SALES":
+                    dto.setTitle("📝 每日帳務補件提醒");
+                    dto.setContent(String.format("日期：%s\n狀態：尚未記錄任何銷售資料",
+                            payload.getOrDefault("date", "今日")));
+                    break;
+
                 default:
-                    dto.setTitle("系統通知");
-                    dto.setContent("您有一則新的訊息");
+                    dto.setTitle("財務系統通知");
+                    dto.setContent(String.format("單號：%s\n狀態：已更新 (%s)", no, code));
             }
         } catch (Exception e) {
+            log.error("Render text error: {}", e.getMessage());
             dto.setTitle("系統通知");
-            dto.setContent("訊息解析錯誤");
+            dto.setContent("訊息內容解析異常");
         }
     }
 }
