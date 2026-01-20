@@ -37,4 +37,7 @@ public interface OrderService {
     // 刪除訂單
     // ================================
     void delete(Long id);
+
+    void voidOrder(String orderNo, String voidReason);
+
 }

@@ -9,6 +9,7 @@ import com.lianhua.erp.service.impl.spec.ExpenseSpecifications;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +35,7 @@ public class ExpenseServiceImpl implements ExpenseService {
     private final ExpenseCategoryRepository categoryRepository;
     private final EmployeeRepository employeeRepository;
     private final ExpenseMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ✅ 統一格式化器（會計期間）
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -464,6 +467,19 @@ public class ExpenseServiceImpl implements ExpenseService {
         expense.setVoidReason(reason);
 
         Expense saved = repository.save(expense);
+
+        // 🚀 ✨ 新增：發送「費用作廢」通知 (對齊三行格式：單號、金額、原因)
+        Map<String, Object> payload = new java.util.HashMap<>();
+        String categoryName = saved.getCategory() != null ? saved.getCategory().getName() : "未知分類";
+
+        // 這裡的 Key "no", "amount", "reason" 必須與 NotificationServiceImpl 對齊
+        payload.put("no", "EXP-00" + saved.getId() + " (" + categoryName + ")");
+        payload.put("amount", saved.getAmount());
+        payload.put("reason", reason);
+
+        log.info("🚀 發送費用作廢事件：ID {}", saved.getId());
+        eventPublisher.publishEvent(new com.lianhua.erp.event.ExpenseEvent(this, saved, "EXPENSE_VOIDED", payload));
+
         log.info("✅ 作廢支出記錄: expenseId={}, 類別={}, 金額={}, 原因={}",
                 id, saved.getCategory().getName(), saved.getAmount(), reason);
 

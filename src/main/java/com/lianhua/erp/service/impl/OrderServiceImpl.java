@@ -309,4 +309,27 @@ public class OrderServiceImpl implements OrderService {
 
         orderRepository.delete(order);
     }
+
+    // ================================
+    // 🚀 新增：作廢訂單狀態同步
+    // ================================
+    @Transactional
+    public void voidOrder(String orderNo, String voidReason) {
+        log.info("🔄 開始同步訂單作廢狀態：orderNo={}, reason={}", orderNo, voidReason);
+
+        // 1. 查找訂單 (建議在 Repository 新增 findByOrderNo)
+        Order order = orderRepository.findByOrderNo(orderNo)
+                .orElseThrow(() -> new EntityNotFoundException("找不到訂單編號：" + orderNo));
+
+        // 2. 更新作廢欄位 (對接您在 Entity 新增的欄位)
+        order.setRecordStatus("VOIDED");
+        order.setVoidedAt(java.time.LocalDateTime.now());
+        order.setVoidReason(voidReason);
+
+        // 3. 業務邏輯：如果訂單作廢，通常狀態也會轉為 CANCELLED 或保持原樣但鎖定
+        // order.setOrderStatus(OrderStatus.CANCELLED);
+
+        orderRepository.save(order);
+        log.info("✅ 訂單作廢狀態同步完成：orderNo={}", orderNo);
+    }
 }

@@ -17,6 +17,9 @@ public interface OrderMapper {
     @Mapping(target = "customer", ignore = true)
     @Mapping(target = "items", ignore = true)
     @Mapping(target = "paymentStatus", ignore = true)
+    @Mapping(target = "recordStatus", ignore = true)
+    @Mapping(target = "voidedAt", ignore = true)
+    @Mapping(target = "voidReason", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     Order toEntity(OrderRequestDto dto);

@@ -106,9 +106,15 @@ public class NotificationServiceImpl implements NotificationService {
         try {
             Map<String, Object> payload = objectMapper.readValue(payloadJson, Map.class);
 
-            // 1. 取得基礎資料
-            String no = (String) payload.getOrDefault("no", payload.getOrDefault("purchaseNo", "未知"));
-            String reason = (String) payload.getOrDefault("reason", "未提供原因");
+            // 1. 取得基礎資料 (處理單號/費用別)
+            String no = String.valueOf(payload.getOrDefault("no",
+                    payload.getOrDefault("purchaseNo", "未知")));
+
+            // 🚀 關鍵修正：處理原因為 null 或 "null" 的情況
+            Object rawReason = payload.get("reason");
+            String reason = (rawReason == null || "null".equals(String.valueOf(rawReason)) || String.valueOf(rawReason).trim().isEmpty())
+                    ? "未提供原因"
+                    : String.valueOf(rawReason);
 
             // 2. 格式化金額：去掉小數點並加入千分位
             String amountRaw = String.valueOf(payload.getOrDefault("amount", "0"));
@@ -120,36 +126,31 @@ public class NotificationServiceImpl implements NotificationService {
                 amountFormatted = amountRaw;
             }
 
+            // 3. 根據代碼渲染 (改為 \n 多行排版)
             switch (code) {
+                case "EXPENSE_VOID_ALERT":
+                    dto.setTitle("🚫 費用單作廢警示");
+                    // 🚀 格式：費用別、金額、原因 分行
+                    dto.setContent(String.format("費用別：%s\n金額：NT$ %s\n原因：%s",
+                            no, amountFormatted, reason));
+                    break;
+
                 case "PURCHASE_VOID_ALERT":
                     dto.setTitle("🚫 進貨單作廢警示");
-                    // 分三行：訂單、金額、原因
                     dto.setContent(String.format("單號：%s\n金額：NT$ %s\n原因：%s",
                             no, amountFormatted, reason));
                     break;
 
                 case "RECEIPT_VOID_ALERT":
-                    dto.setTitle("🛑 收款紀錄作廢警示");
+                    dto.setTitle("🚫 收款單作廢警示");
                     dto.setContent(String.format("訂單：%s\n金額：NT$ %s\n原因：%s",
                             no, amountFormatted, reason));
                     break;
 
                 case "PAYMENT_VOID_ALERT":
-                    dto.setTitle("🛑 付款紀錄作廢警示");
+                    dto.setTitle("🚫 付款單作廢警示");
                     dto.setContent(String.format("單號：%s\n金額：NT$ %s\n原因：%s",
                             no, amountFormatted, reason));
-                    break;
-
-                case "RECEIPT_CREATED_ALERT":
-                    dto.setTitle("💰 收到款項通知");
-                    dto.setContent(String.format("訂單：%s\n金額：NT$ %s",
-                            no, amountFormatted));
-                    break;
-
-                case "MISSING_DAILY_SALES":
-                    dto.setTitle("📝 每日帳務補件提醒");
-                    dto.setContent(String.format("日期：%s\n狀態：尚未記錄任何銷售資料",
-                            payload.getOrDefault("date", "今日")));
                     break;
 
                 default:

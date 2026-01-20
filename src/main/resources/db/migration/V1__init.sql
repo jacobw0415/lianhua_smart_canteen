@@ -276,7 +276,7 @@ CREATE TABLE order_customers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 13. 訂單表 (含會計期間)
+-- 13. 訂單表 (🚀 v2.8 核心修改：同步作廢欄位以解決閃跳問題)
 -- ------------------------------------------------------------
 CREATE TABLE orders (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -285,31 +285,26 @@ CREATE TABLE orders (
   order_date DATE NOT NULL,
   delivery_date DATE NOT NULL,
   accounting_period VARCHAR(7) NOT NULL DEFAULT (DATE_FORMAT(CURRENT_DATE(), '%Y-%m')),
-  order_status ENUM(
-      'PENDING',     -- 尚未確認
-      'CONFIRMED',   -- 已確認
-      'DELIVERED',   -- 已交付（由收款完成自動推進）
-      'CANCELLED'    -- 已取消
-    ) NOT NULL DEFAULT 'PENDING'
-      COMMENT '業務狀態（物流 / 訂單流程）',
-
-    payment_status ENUM(
-      'UNPAID',      -- 尚未收款
-      'PARTIAL',     -- 部分收款
-      'PAID'         -- 已全額收款
-    ) NOT NULL DEFAULT 'UNPAID'
-      COMMENT '付款狀態（由 receipts 計算）',
+  order_status ENUM('PENDING','CONFIRMED','DELIVERED','CANCELLED') NOT NULL DEFAULT 'PENDING',
+  payment_status ENUM('UNPAID','PARTIAL','PAID') NOT NULL DEFAULT 'UNPAID',
   total_amount DECIMAL(10,2) UNSIGNED NOT NULL,
+
+  -- 🚀 新增同步作廢欄位：直接將收款作廢狀態存入主表
+  record_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '記錄狀態：ACTIVE（正常）, VOIDED（已作廢）',
+  voided_at TIMESTAMP NULL COMMENT '作廢時間',
+  void_reason VARCHAR(500) NULL COMMENT '作廢原因',
+
   note VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY(customer_id) REFERENCES order_customers(id)
-    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY(customer_id) REFERENCES order_customers(id) ON DELETE CASCADE ON UPDATE CASCADE,
   UNIQUE (order_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX idx_orders_accounting_period ON orders(accounting_period);
+CREATE INDEX idx_orders_record_status ON orders(record_status); -- 新增索引
+CREATE INDEX idx_orders_voided_at ON orders(voided_at);         -- 新增索引
 
 -- ------------------------------------------------------------
 -- 14. 訂單明細表
@@ -326,15 +321,10 @@ CREATE TABLE order_items (
   note VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY(order_id) REFERENCES orders(id)
-    ON DELETE CASCADE ON UPDATE CASCADE,
-  FOREIGN KEY(product_id) REFERENCES products(id)
-    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE,
   UNIQUE (order_id, product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE INDEX idx_order_items_order_id ON order_items(order_id);
-CREATE INDEX idx_order_items_product_id ON order_items(product_id);
 
 -- ------------------------------------------------------------
 -- 15. 收款表 Receipts

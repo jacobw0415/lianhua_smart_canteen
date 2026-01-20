@@ -47,10 +47,21 @@ public class Order {
     @Column(name = "order_status", nullable = false, length = 20)
     private OrderStatus orderStatus = OrderStatus.PENDING;
 
-    // 付款狀態（由 receipts 計算）
+    // 付款狀態
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", nullable = false, length = 20)
     private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
+
+    // 🚀 關鍵新增：同步 Schema v2.8 的作廢欄位
+    // 這些欄位讓 Order 一次性帶出作廢資訊，徹底解決前端閃跳
+    @Column(name = "record_status", nullable = false, length = 20)
+    private String recordStatus = "ACTIVE"; // ACTIVE or VOIDED
+
+    @Column(name = "voided_at")
+    private LocalDateTime voidedAt;
+
+    @Column(name = "void_reason", length = 500)
+    private String voidReason;
 
     @Column(name = "total_amount", precision = 10, scale = 2, nullable = false)
     private BigDecimal totalAmount;
@@ -69,6 +80,11 @@ public class Order {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
 
+        // 預設記錄狀態為正常
+        if (this.recordStatus == null) {
+            this.recordStatus = "ACTIVE";
+        }
+
         if (this.accountingPeriod == null && this.deliveryDate != null) {
             this.accountingPeriod = this.deliveryDate.format(
                     DateTimeFormatter.ofPattern("yyyy-MM"));
@@ -83,4 +99,11 @@ public class Order {
     @Builder.Default
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
+
+    /**
+     * 便利方法：判斷是否已作廢
+     */
+    public boolean isVoided() {
+        return "VOIDED".equals(this.recordStatus);
+    }
 }

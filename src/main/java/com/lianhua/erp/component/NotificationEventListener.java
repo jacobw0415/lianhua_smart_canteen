@@ -1,7 +1,8 @@
 package com.lianhua.erp.component;
 
 import com.lianhua.erp.event.PurchaseEvent;
-import com.lianhua.erp.event.ReceiptEvent; // 🚀 新增匯入
+import com.lianhua.erp.event.ReceiptEvent;
+import com.lianhua.erp.event.ExpenseEvent; // 🚀 新增匯入
 import com.lianhua.erp.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,63 +40,89 @@ public class NotificationEventListener {
 
         List<Long> receiverIds = List.of(1L);
 
-        switch (action) {
-            case "PURCHASE_VOIDED":
-                notificationService.send("PURCHASE_VOID_ALERT", "purchases",
-                        event.getPurchase().getId(), finalPayload, receiverIds);
-                break;
-            // 未來可擴充 PURCHASE_CREATED 等
+        if ("PURCHASE_VOIDED".equals(action)) {
+            notificationService.send("PURCHASE_VOID_ALERT", "purchases",
+                    event.getPurchase().getId(), finalPayload, receiverIds);
         }
     }
 
     /**
-     * 2. ✨ 新增：監聽收款相關事件 (收款單)
+     * 2. 監聽收款相關事件 (收款單)
      */
     @Async
     @EventListener
     public void handleReceiptEvent(ReceiptEvent event) {
         String action = event.getAction();
-        // 這裡透過 receipt.getOrder() 取得單號
         String orderNo = event.getReceipt().getOrder().getOrderNo();
 
         log.info("🔔 [事件監聽] 收到收款事件: Action={}, OrderNo={}", action, orderNo);
 
-        // 1. 構建 Payload
         Map<String, Object> finalPayload = new HashMap<>();
         finalPayload.put("no", orderNo);
         finalPayload.put("amount", event.getReceipt().getAmount());
 
-        // 2. 併入 Service 傳來的 reason
         if (event.getPayload() != null) {
             finalPayload.putAll(event.getPayload());
         }
 
         List<Long> receiverIds = List.of(1L);
 
-        // 3. 根據動作分發
-        switch (action) {
-            case "RECEIPT_VOIDED":
-                log.info("🚫 執行 [收款單作廢] 通知發送，原因: {}", finalPayload.getOrDefault("reason", "無"));
-                // 這裡的 "RECEIPT_VOID_ALERT" 需對應 NotificationServiceImpl 的 renderText
-                notificationService.send(
-                        "RECEIPT_VOID_ALERT",
-                        "orders",
-                        event.getReceipt().getOrder().getId(),
-                        finalPayload,
-                        receiverIds
-                );
-                break;
+        if ("RECEIPT_VOIDED".equals(action)) {
+            log.info("🚫 執行 [收款單作廢] 通知發送，原因: {}", finalPayload.getOrDefault("reason", "無"));
+            notificationService.send(
+                    "RECEIPT_VOID_ALERT",
+                    "orders",
+                    event.getReceipt().getOrder().getId(),
+                    finalPayload,
+                    receiverIds
+            );
+        }
+    }
 
-            case "RECEIPT_CREATED":
-                log.info("✨ 執行 [新增收款] 通知發送");
-                notificationService.send(
-                        "RECEIPT_CREATED_ALERT",
-                        "orders",
-                        event.getReceipt().getOrder().getId(),
-                        finalPayload,
-                        receiverIds
-                );
-                break;
+    /**
+     * 3. ✨ 新增：監聽費用支出相關事件 (Expense)
+     */
+    @Async
+    @EventListener
+    public void handleExpenseEvent(ExpenseEvent event) {
+        String action = event.getAction();
+        // 取得分類名稱以利辨識 (例如：EX-003 網路費)
+        String categoryName = event.getExpense().getCategory() != null ?
+                event.getExpense().getCategory().getName() : "未知分類";
+
+        log.info("🔔 [事件監聽] 收到支出事件: Action={}, ExpenseId={}", action, event.getExpense().getId());
+
+        // 1. 構建 Payload
+        Map<String, Object> finalPayload = new HashMap<>();
+
+        // 🚀 對應您要求的格式：EX-003 (類別)
+        // 注意：這裡的 "no" key 要與 Service 層發送時一致
+        if (event.getPayload() != null && event.getPayload().containsKey("no")) {
+            finalPayload.put("no", event.getPayload().get("no"));
+        } else {
+            String formattedId = String.format("EX-%03d", event.getExpense().getId());
+            finalPayload.put("no", formattedId + " (" + categoryName + ")");
+        }
+
+        finalPayload.put("amount", event.getExpense().getAmount());
+
+        // 2. 併入作廢原因
+        if (event.getPayload() != null) {
+            finalPayload.putAll(event.getPayload());
+        }
+
+        List<Long> receiverIds = List.of(1L);
+
+        // 3. 處理支出作廢通知
+        if ("EXPENSE_VOIDED".equals(action)) {
+            log.info("🚫 執行 [支出作廢] 通知發送");
+            notificationService.send(
+                    "EXPENSE_VOID_ALERT",
+                    "expenses", // 對應資料表
+                    event.getExpense().getId(),
+                    finalPayload,
+                    receiverIds
+            );
         }
     }
 }
