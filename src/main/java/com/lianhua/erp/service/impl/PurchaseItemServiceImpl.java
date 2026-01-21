@@ -74,6 +74,22 @@ public class PurchaseItemServiceImpl implements PurchaseItemService {
                     "已作廢的採購單不可新增明細");
         }
 
+        // ✨ 新增：防止重複進貨品項（排除已作廢的進貨單）
+        // 邏輯：檢查同一供應商、同一天、同一品項名稱
+        boolean hasActiveDuplicate = itemRepository.existsActivePurchaseItem(
+                purchase.getSupplier().getId(),
+                purchase.getPurchaseDate(),
+                dto.getItem().trim()
+        );
+
+        if (hasActiveDuplicate) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    String.format("重複品項：供應商於 %s 已有有效的進貨紀錄包含「%s」",
+                            purchase.getPurchaseDate(), dto.getItem().trim())
+            );
+        }
+
         // =============================================
         // 3️⃣ 驗證明細資料
         // =============================================

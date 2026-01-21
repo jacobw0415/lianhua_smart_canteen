@@ -188,8 +188,10 @@ public class ExpenseCategoryServiceImpl implements ExpenseCategoryService {
         }
         
         // === 更新允許欄位（描述、啟用狀態、是否為薪資類別、頻率類型）===
-        if (StringUtils.hasText(dto.getDescription())) {
+        if (dto.getDescription() != null) {
+            // trim() 之後即便是空字串也會被存入，達到「刪除文字」的效果
             String description = dto.getDescription().trim();
+
             if (description.length() > 255) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,

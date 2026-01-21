@@ -8,6 +8,7 @@ import com.lianhua.erp.event.PurchaseEvent;
 import com.lianhua.erp.mapper.PurchaseMapper;
 import com.lianhua.erp.mapper.PaymentMapper;
 import com.lianhua.erp.mapper.PurchaseItemMapper;
+import com.lianhua.erp.repository.PurchaseItemRepository;
 import com.lianhua.erp.repository.PurchaseRepository;
 import com.lianhua.erp.repository.PaymentRepository;
 import com.lianhua.erp.repository.SupplierRepository;
@@ -52,6 +53,7 @@ public class PurchaseServiceImpl implements PurchaseService {
     private final PurchaseItemMapper purchaseItemMapper;
     private final com.lianhua.erp.numbering.PurchaseNoGenerator purchaseNoGenerator;
     private final ApplicationEventPublisher eventPublisher;
+    private final PurchaseItemRepository purchaseItemRepository;
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
 
@@ -166,8 +168,24 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
 
         // =============================================
-        // 3️⃣ 移除重複檢查（因為現在支援多明細，不再需要此檢查）
+        // 3️⃣ 防止重複進貨（支援作廢後重新建立）
         // =============================================
+        for (PurchaseItemRequestDto itemDto : dto.getItems()) {
+            // 調用 Repository 中排除 VOIDED 狀態的方法
+            boolean hasActiveDuplicate = purchaseItemRepository.existsActivePurchaseItem(
+                    dto.getSupplierId(),
+                    dto.getPurchaseDate(),
+                    itemDto.getItem().trim()
+            );
+
+            if (hasActiveDuplicate) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        String.format("重複進貨：供應商於 %s 已有有效的進貨紀錄包含「%s」，請檢查是否已重複建單",
+                                dto.getPurchaseDate(), itemDto.getItem().trim())
+                );
+            }
+        }
 
         // =============================================
         // 移除空白付款資訊

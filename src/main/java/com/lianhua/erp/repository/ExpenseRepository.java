@@ -12,9 +12,10 @@ import java.time.LocalDate;
 
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpecificationExecutor<Expense> {
+
     /**
      * 檢查薪資類別在同一天是否已有相同類別的支出記錄
-     * 只檢查 ACTIVE 狀態的記錄（已作廢的記錄不參與頻率檢查）
+     * ✅ 修改：在 SQL 中明確排除 VOIDED 狀態
      */
     @Query("""
             SELECT COUNT(e) > 0
@@ -23,17 +24,17 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
               AND e.expenseDate = :expenseDate
               AND e.category.id = :categoryId
               AND e.status = :status
+              AND e.status != 'VOIDED'
             """)
     boolean existsByEmployeeIdAndExpenseDateAndCategoryId(
             @Param("employeeId") Long employeeId,
             @Param("expenseDate") LocalDate expenseDate,
             @Param("categoryId") Long categoryId,
             @Param("status") ExpenseStatus status);
-    
+
     /**
      * 檢查非薪資類別（employee_id 為 NULL）在同一天是否已有相同類別的支出記錄
-     * 用於防止同一天建立多筆相同類別的非薪資支出（如房租）
-     * 只檢查 ACTIVE 狀態的記錄（已作廢的記錄不參與頻率檢查）
+     * ✅ 修改：在 SQL 中明確排除 VOIDED 狀態
      */
     @Query("""
             SELECT COUNT(e) > 0
@@ -42,16 +43,16 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
               AND e.expenseDate = :expenseDate
               AND e.category.id = :categoryId
               AND e.status = :status
+              AND e.status != 'VOIDED'
             """)
     boolean existsByEmployeeIdIsNullAndExpenseDateAndCategoryId(
             @Param("expenseDate") LocalDate expenseDate,
             @Param("categoryId") Long categoryId,
             @Param("status") ExpenseStatus status);
-    
+
     /**
      * 檢查薪資類別在同一會計期間是否已有相同類別的支出記錄
-     * 用於頻率類型為 MONTHLY 的費用類別
-     * 只檢查 ACTIVE 狀態的記錄（已作廢的記錄不參與頻率檢查）
+     * ✅ 修改：在 SQL 中明確排除 VOIDED 狀態
      */
     @Query("""
             SELECT COUNT(e) > 0
@@ -60,17 +61,17 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
               AND e.accountingPeriod = :accountingPeriod
               AND e.category.id = :categoryId
               AND e.status = :status
+              AND e.status != 'VOIDED'
             """)
     boolean existsByEmployeeIdAndAccountingPeriodAndCategoryId(
             @Param("employeeId") Long employeeId,
             @Param("accountingPeriod") String accountingPeriod,
             @Param("categoryId") Long categoryId,
             @Param("status") ExpenseStatus status);
-    
+
     /**
      * 檢查非薪資類別在同一會計期間是否已有相同類別的支出記錄
-     * 用於頻率類型為 MONTHLY 的費用類別（如房租）
-     * 只檢查 ACTIVE 狀態的記錄（已作廢的記錄不參與頻率檢查）
+     * ✅ 修改：在 SQL 中明確排除 VOIDED 狀態
      */
     @Query("""
             SELECT COUNT(e) > 0
@@ -79,16 +80,16 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
               AND e.accountingPeriod = :accountingPeriod
               AND e.category.id = :categoryId
               AND e.status = :status
+              AND e.status != 'VOIDED'
             """)
     boolean existsByEmployeeIdIsNullAndAccountingPeriodAndCategoryId(
             @Param("accountingPeriod") String accountingPeriod,
             @Param("categoryId") Long categoryId,
             @Param("status") ExpenseStatus status);
-    
+
     /**
      * 檢查薪資類別在指定日期區間內是否已有相同類別的支出記錄
-     * 用於頻率類型為 WEEKLY 或 BIWEEKLY 的費用類別
-     * 只檢查 ACTIVE 狀態的記錄（已作廢的記錄不參與頻率檢查）
+     * ✅ 修改：在 SQL 中明確排除 VOIDED 狀態
      */
     @Query("""
             SELECT COUNT(e) > 0
@@ -98,6 +99,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
               AND e.expenseDate <= :endDate
               AND e.category.id = :categoryId
               AND e.status = :status
+              AND e.status != 'VOIDED'
             """)
     boolean existsByEmployeeIdAndExpenseDateBetweenAndCategoryId(
             @Param("employeeId") Long employeeId,
@@ -105,11 +107,10 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
             @Param("endDate") LocalDate endDate,
             @Param("categoryId") Long categoryId,
             @Param("status") ExpenseStatus status);
-    
+
     /**
      * 檢查非薪資類別在指定日期區間內是否已有相同類別的支出記錄
-     * 用於頻率類型為 WEEKLY 或 BIWEEKLY 的費用類別
-     * 只檢查 ACTIVE 狀態的記錄（已作廢的記錄不參與頻率檢查）
+     * ✅ 修改：在 SQL 中明確排除 VOIDED 狀態
      */
     @Query("""
             SELECT COUNT(e) > 0
@@ -119,18 +120,15 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
               AND e.expenseDate <= :endDate
               AND e.category.id = :categoryId
               AND e.status = :status
+              AND e.status != 'VOIDED'
             """)
     boolean existsByEmployeeIdIsNullAndExpenseDateBetweenAndCategoryId(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,
             @Param("categoryId") Long categoryId,
             @Param("status") ExpenseStatus status);
-    
+
     boolean existsByCategoryId(Long categoryId);
-    
-    /**
-     * 檢查指定員工是否被支出記錄引用
-     * 用於刪除員工前的檢查
-     */
+
     boolean existsByEmployeeId(Long employeeId);
 }

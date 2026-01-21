@@ -9,24 +9,35 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate; // ✨ 需新增此 import
 import java.util.List;
 
 @Repository
 public interface PurchaseItemRepository extends JpaRepository<PurchaseItem, Long> {
-    
+
     List<PurchaseItem> findByPurchaseId(Long purchaseId);
-    
+
     void deleteByPurchaseId(Long purchaseId);
-    
+
     /**
-     * 計算指定採購單的所有明細總金額
+     * ✅ 新增：檢查是否存在有效的進貨品項（排除已作廢的進貨單）
      */
+    @Query("""
+            SELECT COUNT(i) > 0
+            FROM PurchaseItem i
+            WHERE i.purchase.supplier.id = :supplierId
+              AND i.purchase.purchaseDate = :purchaseDate
+              AND i.item = :itemName
+              AND i.purchase.recordStatus != 'VOIDED'
+            """)
+    boolean existsActivePurchaseItem(
+            @Param("supplierId") Long supplierId,
+            @Param("purchaseDate") LocalDate purchaseDate,
+            @Param("itemName") String itemName);
+
     @Query("SELECT COALESCE(SUM(i.subtotal), 0) FROM PurchaseItem i WHERE i.purchase.id = :purchaseId")
     BigDecimal sumTotalByPurchaseId(@Param("purchaseId") Long purchaseId);
-    
-    /**
-     * 支援關鍵字搜尋（搜尋品項名稱或備註）
-     */
+
     @Query("""
             SELECT i FROM PurchaseItem i
             WHERE LOWER(i.item) LIKE LOWER(CONCAT('%', :keyword, '%'))
@@ -34,4 +45,3 @@ public interface PurchaseItemRepository extends JpaRepository<PurchaseItem, Long
             """)
     Page<PurchaseItem> search(@Param("keyword") String keyword, Pageable pageable);
 }
-

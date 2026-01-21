@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -28,10 +29,11 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
               AND i.order.orderDate = :orderDate
               AND i.product.id = :productId
               AND i.order.orderStatus != 'CANCELLED'
+              AND i.order.recordStatus != 'VOIDED'
             """)
     boolean existsByOrder_Customer_IdAndOrder_OrderDateAndProduct_Id(
             @Param("customerId") Long customerId,
-            @Param("orderDate") java.time.LocalDate orderDate,
+            @Param("orderDate") LocalDate orderDate,
             @Param("productId") Long productId);
 
     // ✅ 支援關鍵字搜尋（搜尋商品名稱或備註）

@@ -332,6 +332,9 @@ public class ExpenseServiceImpl implements ExpenseService {
         // ✅ 自動設定會計期間（依 expenseDate 為準）
         expense.setAccountingPeriod(accountingPeriod);
 
+        // ✨ 新增：明確設定初始狀態為 ACTIVE，確保新建立的紀錄能被下次檢查偵測到
+        expense.setStatus(ExpenseStatus.ACTIVE);
+
         Expense saved = repository.save(expense);
         log.info("成功創建費用: ID={}, 類別={}, 金額={}, 日期={}",
                 saved.getId(), saved.getCategory().getName(), saved.getAmount(), saved.getExpenseDate());
@@ -423,9 +426,8 @@ public class ExpenseServiceImpl implements ExpenseService {
         if (dto.getAmount() != null && !Boolean.TRUE.equals(entity.getCategory().getIsSalary())) {
             entity.setAmount(dto.getAmount());
         }
-        if (dto.getNote() != null) {
-            entity.setNote(dto.getNote());
-        }
+
+        entity.setNote(dto.getNote());
 
         // ✅ accountingPeriod 不可修改，故此處不動
 

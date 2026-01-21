@@ -172,4 +172,27 @@ public class ExpenseController {
         ExpenseDto result = service.voidExpense(id, reason);
         return ResponseEntity.ok(ApiResponseDto.ok(result));
     }
+
+    // ================================
+    // ❌ 禁止直接刪除支出 (回拋友善訊息)
+    // ================================
+    @Operation(
+            summary = "刪除支出紀錄 (禁止使用)",
+            description = "根據財務審計規範，支出紀錄不開放直接刪除。請改用 /void 接口進行作廢操作。"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "405", description = "不允許刪除操作",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class)))
+    })
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
+    public void delete(@PathVariable Long id) {
+
+        // 拋出 Method Not Allowed 並附帶自定義訊息
+        // 前端 React-admin 會捕捉此訊息並顯示在通知列
+        throw new org.springframework.web.server.ResponseStatusException(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                "支出紀錄具有審計意義，不可直接刪除。若紀錄輸入有誤，請點選「作廢」按鈕，再重新建立新紀錄。"
+        );
+    }
 }

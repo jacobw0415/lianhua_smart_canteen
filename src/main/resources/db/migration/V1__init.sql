@@ -213,7 +213,7 @@ CREATE TABLE expenses (
     ON DELETE RESTRICT ON UPDATE CASCADE,
   FOREIGN KEY (employee_id) REFERENCES employees(id)
     ON DELETE SET NULL ON UPDATE CASCADE,
-  UNIQUE (employee_id, expense_date, category_id)
+  UNIQUE (employee_id, expense_date, category_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_expenses_category_id ON expenses(category_id);

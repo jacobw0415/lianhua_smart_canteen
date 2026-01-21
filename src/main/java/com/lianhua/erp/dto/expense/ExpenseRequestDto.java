@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.expense;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 @Schema(description = "支出建立／更新請求 DTO")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ExpenseRequestDto {
 
     @NotNull
