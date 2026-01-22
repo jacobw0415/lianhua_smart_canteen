@@ -62,23 +62,42 @@ public class OrderCustomerServiceImpl implements OrderCustomerService {
      * - 儲存並回傳 Response DTO
      */
     @Override
+    @Transactional
     public OrderCustomerResponseDto update(Long id, OrderCustomerRequestDto dto) {
         OrderCustomer entity = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("找不到客戶 ID: " + id));
-        
-        if (dto.getName() != null && repository.existsByNameAndIdNot(dto.getName(), id)) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "更新失敗，客戶名稱已存在：" + dto.getName()
-            );
+
+        // 1. 名稱變更與唯一性檢查 (業務邏輯保留手動處理)
+        if (dto.getName() != null && !dto.getName().equalsIgnoreCase(entity.getName())) {
+            if (repository.existsByNameAndIdNot(dto.getName(), id)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "更新失敗，客戶名稱已存在：" + dto.getName()
+                );
+            }
+            entity.setName(dto.getName().trim());
         }
 
+        // 2. 先執行自動映射 (處理地址、電話、Email 等其他欄位)
+        // 註：Mapper 的 IGNORE 策略會跳過 DTO 為 null 的欄位
         mapper.updateEntityFromDto(dto, entity);
 
-        if (dto.getBillingCycle() != null) {
-            entity.setBillingCycle(OrderCustomer.BillingCycle.valueOf(dto.getBillingCycle()));
+        // 3. 【手動覆蓋】備註欄位：確保 null 能清空資料庫
+        if (dto.getNote() != null) {
+            entity.setNote(dto.getNote().trim());
+        } else {
+            // 在 Mapper 執行後強制設為 null，蓋掉 IGNORE 導致的舊值
+            entity.setNote(null);
         }
 
+        // 4. 【手動覆蓋】結帳週期 (Enum)：比照備註，支援清空
+        if (dto.getBillingCycle() != null) {
+            entity.setBillingCycle(OrderCustomer.BillingCycle.valueOf(dto.getBillingCycle()));
+        } else {
+            entity.setBillingCycle(null);
+        }
+
+        log.info("✅ 成功更新客戶資料：ID={}, Name={}", id, entity.getName());
         return mapper.toResponseDto(repository.save(entity));
     }
 

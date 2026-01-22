@@ -10,6 +10,6 @@ public class NameValidator implements ConstraintValidator<ValidName, String> {
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {
         if (value == null) return true;
-        return value.matches(REGEX) && value.trim().length() >= 2;
+        return value.matches(REGEX) && !value.trim().isEmpty();
     }
 }

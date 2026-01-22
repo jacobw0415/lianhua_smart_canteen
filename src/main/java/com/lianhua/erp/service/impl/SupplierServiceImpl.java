@@ -8,7 +8,7 @@ import com.lianhua.erp.mapper.SupplierMapper;
 import com.lianhua.erp.repository.SupplierRepository;
 import com.lianhua.erp.repository.PurchaseRepository;
 import com.lianhua.erp.service.SupplierService;
-import com.lianhua.erp.service.impl.spec.SupplierSpecifications; // ⭐ 引入 Spec
+import com.lianhua.erp.service.impl.spec.SupplierSpecifications;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -18,7 +18,7 @@ import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils; // 改用 Spring 工具類
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -73,6 +73,13 @@ public class SupplierServiceImpl implements SupplierService {
         }
 
         supplierMapper.updateEntityFromDto(dto, supplier);
+
+        if (dto.getNote() != null) {
+            supplier.setNote(dto.getNote().trim());
+        } else {
+            supplier.setNote(null);
+        }
+
         try {
             return supplierMapper.toDto(supplierRepository.save(supplier));
         } catch (DataIntegrityViolationException ex) {

@@ -209,13 +209,20 @@ CREATE TABLE expenses (
   void_reason VARCHAR(500) NULL COMMENT '作廢原因',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  -- 【新增虛擬列】用於控制唯一性：僅在有效時保留 ID，作廢時變為 NULL
+  active_employee_id BIGINT GENERATED ALWAYS AS (IF(status = 'ACTIVE', employee_id, NULL)) VIRTUAL,
+
   FOREIGN KEY (category_id) REFERENCES expense_categories(id)
     ON DELETE RESTRICT ON UPDATE CASCADE,
   FOREIGN KEY (employee_id) REFERENCES employees(id)
     ON DELETE SET NULL ON UPDATE CASCADE,
-  UNIQUE (employee_id, expense_date, category_id, status)
+
+  -- 【修正唯一索引】使用虛擬列替代原本的 employee_id + status
+  -- 這能確保：有效單據不能重複，但作廢單據可以有無數個
+  UNIQUE INDEX uk_expenses_active_repeat (active_employee_id, expense_date, category_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 其他一般索引保持不變
 CREATE INDEX idx_expenses_category_id ON expenses(category_id);
 CREATE INDEX idx_expenses_employee_id ON expenses(employee_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date);

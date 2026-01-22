@@ -16,7 +16,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,10 +97,28 @@ public class ReceiptServiceImpl implements ReceiptService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "已作廢的收款單不可修改");
         }
 
+        // 1. 保存原始金額（因為金額由系統計算，不應被 Mapper 覆蓋）
         BigDecimal originalAmount = receipt.getAmount();
+
+        // 2. 使用 Mapper 自動更新其他欄位 (receivedDate, method 等)
+        // 這裡會自動處理日期變動，但備註會因為 IGNORE 策略被跳過
         mapper.updateEntityFromDto(dto, receipt);
+
+        // 3. 回填原始金額，確保安全性
         receipt.setAmount(originalAmount);
 
+        // 4. 手動處理備註：解決 IGNORE 導致無法清空的問題
+        if (dto.getNote() != null) {
+            String note = dto.getNote().trim();
+            if (note.length() > 500) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "備註長度不可超過500個字元。");
+            }
+            receipt.setNote(note);
+        } else {
+            receipt.setNote(null); // 強制清空
+        }
+
+        // 5. 連動更新會計期間 (只要日期有變動就重算)
         if (receipt.getReceivedDate() != null) {
             receipt.setAccountingPeriod(receipt.getReceivedDate().format(DateTimeFormatter.ofPattern("yyyy-MM")));
         }

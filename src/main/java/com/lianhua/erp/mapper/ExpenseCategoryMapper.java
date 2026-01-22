@@ -5,11 +5,7 @@ import com.lianhua.erp.dto.expense.ExpenseCategoryRequestDto;
 import com.lianhua.erp.dto.expense.ExpenseCategoryResponseDto;
 import org.mapstruct.*;
 
-// 🚀 加入 NullValuePropertyMappingStrategy.IGNORE
-@Mapper(
-        componentModel = "spring",
-        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
-)
+@Mapper(componentModel = "spring")
 public interface ExpenseCategoryMapper {
 
     @Mapping(target = "id", ignore = true)

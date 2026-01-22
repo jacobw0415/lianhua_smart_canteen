@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.receipt;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.Column;
 import jakarta.validation.constraints.*;
@@ -13,6 +14,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 @Schema(description = "收款建立／更新請求 DTO（金額自動由訂單帶入）")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ReceiptRequestDto {
     
     @NotNull

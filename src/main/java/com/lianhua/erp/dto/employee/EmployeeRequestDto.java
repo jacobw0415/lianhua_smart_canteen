@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.employee;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -11,6 +12,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 @Schema(description = "建立或更新員工資料的請求 DTO")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class EmployeeRequestDto {
     
     @NotBlank(message = "員工全名不可為空")
