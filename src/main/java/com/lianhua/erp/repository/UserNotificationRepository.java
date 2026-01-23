@@ -29,4 +29,7 @@ public interface UserNotificationRepository extends JpaRepository<UserNotificati
     List<UserNotification> findAllByUserId(@Param("userId") Long userId);
 
     Page<UserNotification> findByUserId(Long userId, Pageable pageable);
+    @Query(value = "SELECT un FROM UserNotification un JOIN FETCH un.notification n WHERE un.userId = :userId",
+            countQuery = "SELECT count(un) FROM UserNotification un WHERE un.userId = :userId")
+    Page<UserNotification> findAllByUserIdWithFetch(@Param("userId") Long userId, Pageable pageable);
 }

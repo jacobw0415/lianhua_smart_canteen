@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.orderCustomer;
 
+import com.lianhua.erp.dto.validation.BaseRequestDto;
 import com.lianhua.erp.validation.ValidName;
 import com.lianhua.erp.validation.ValidNote;
 import com.lianhua.erp.validation.ValidPhone;
@@ -8,14 +9,15 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @Schema(description = "客戶請求 DTO（新增 / 編輯用）")
-public class OrderCustomerRequest {
+public class OrderCustomerRequest extends BaseRequestDto {
 
-    @Schema(description = "客戶名稱", example = "聯華股份有限公司", required = true)
+    @Schema(description = "客戶名稱", example = "聯華股份有限公司")
     @NotBlank(message = "客戶名稱不可為空")
     private String name;
 
