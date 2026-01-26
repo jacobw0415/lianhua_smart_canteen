@@ -31,6 +31,19 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    public void sendSystemAlert(String message, String alertType, List<Long> receiverIds) {
+        // 將系統告警訊息包裝成 Payload
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("message", message);
+        payload.put("alertType", alertType); // 例如: WARNING, ERROR, INFO
+
+        // 呼叫原本的 send 方法，使用專屬的 TemplateCode
+        // targetType 標記為 SYSTEM，targetId 設為 0L 表示這不是針對單一單據的動作
+        this.send("SYSTEM_CHECK_ALERT", "SYSTEM", 0L, payload, receiverIds);
+    }
+
+    @Override
+    @Transactional
     public void send(String templateCode, String targetType, Long targetId,
                      Map<String, Object> payload, List<Long> receiverIds) {
         try {
@@ -107,6 +120,18 @@ public class NotificationServiceImpl implements NotificationService {
         try {
             Map<String, Object> payload = objectMapper.readValue(payloadJson, Map.class);
             String no = String.valueOf(payload.getOrDefault("no", payload.getOrDefault("purchaseNo", "未知")));
+
+            // --- 處理系統檢查通知 (4-9項) ---
+            if ("SYSTEM_CHECK_ALERT".equals(code)) {
+                String alertType = String.valueOf(payload.getOrDefault("alertType", "WARNING"));
+                String message = String.valueOf(payload.getOrDefault("message", "系統檢查異常"));
+
+                // 根據告警等級給予不同圖示
+                String icon = "ERROR".equals(alertType) ? "🚨" : "💡";
+                dto.setTitle(icon + " 系統檢查提醒");
+                dto.setContent(message);
+                return; // 處理完畢直接回傳，不走後面的單據解析邏輯
+            }
 
             Object rawReason = payload.get("reason");
             String reason = (rawReason == null || "null".equals(String.valueOf(rawReason)) || String.valueOf(rawReason).trim().isEmpty())

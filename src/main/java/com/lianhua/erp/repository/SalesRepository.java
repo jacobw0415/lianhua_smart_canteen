@@ -16,4 +16,6 @@ public interface SalesRepository extends JpaRepository<Sale, Long>, JpaSpecifica
     boolean existsBySaleDateAndProductId(LocalDate saleDate, Long productId);
 
     boolean existsByProductId(Long productId);
+
+    boolean existsBySaleDate(LocalDate saleDate);
 }

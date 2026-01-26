@@ -131,4 +131,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
     boolean existsByCategoryId(Long categoryId);
 
     boolean existsByEmployeeId(Long employeeId);
+
+    boolean existsByExpenseDate(LocalDate expenseDate);
+
+    boolean existsByExpenseDateBetween(LocalDate start, LocalDate end);
 }

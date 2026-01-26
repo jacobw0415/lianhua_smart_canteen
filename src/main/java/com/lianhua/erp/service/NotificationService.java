@@ -10,6 +10,12 @@ import java.util.Map;
 public interface NotificationService {
 
     /**
+     * ✨ 新增：發送系統層級的告警通知 (專供 Scheduler 使用)
+     * 適合 4~9 項：無需 template，直接發送文字訊息給特定角色或全體管理員
+     */
+    void sendSystemAlert(String message, String alertType, List<Long> receiverIds);
+
+    /**
      * 發送通知給多位使用者
      */
     void send(String templateCode, String targetType, Long targetId,
