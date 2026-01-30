@@ -1,8 +1,11 @@
 package com.lianhua.erp.dto.dashboard;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Builder;
+
 import java.math.BigDecimal;
 
+@Builder
 @Schema(description = "儀表板核心統計指標摘要")
 public record DashboardStatsDto(
         @Schema(description = "今日銷售總額", example = "4500.00")

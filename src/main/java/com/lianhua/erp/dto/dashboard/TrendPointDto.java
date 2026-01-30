@@ -9,10 +9,10 @@ public record TrendPointDto(
         @Schema(description = "統計日期", example = "2026-01-27")
         LocalDate date,
 
-        @Schema(description = "統計金額", example = "5200.00")
-        BigDecimal amount,
+        @Schema(description = "零售營收金額", example = "5200.00")
+        BigDecimal saleAmount,
 
-        @Schema(description = "數據類型 (SALES: 銷售, EXPENSE: 支出, PURCHASE: 採購)", example = "SALES")
-        String type
+        @Schema(description = "訂單收款金額", example = "3200.00")
+        BigDecimal receiptAmount
 ) {
 }
