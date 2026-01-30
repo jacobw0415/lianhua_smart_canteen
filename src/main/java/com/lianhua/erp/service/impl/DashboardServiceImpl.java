@@ -159,4 +159,77 @@ public class DashboardServiceImpl implements DashboardService {
         if (obj instanceof BigDecimal) return (BigDecimal) obj;
         return new BigDecimal(obj.toString());
     }
+
+    // =========================================================
+    // 2. 核心決策圖表 (v3.0 財務三表與深度分析映射)
+    // =========================================================
+
+    /** [圖表 1] 損益平衡分析：映射累計營收、累計支出與平衡門檻 */
+    @Override
+    public List<BreakEvenPointDto> getBreakEvenAnalysis(String period) {
+        return dashboardRepository.getBreakEvenData(period).stream()
+                .map(row -> new BreakEvenPointDto(
+                        parseLocalDate(row[0]),     // date
+                        parseBigDecimal(row[1]),    // runningRevenue
+                        parseBigDecimal(row[2]),    // runningExpense
+                        parseBigDecimal(row[3])     // breakEvenThreshold
+                )).collect(Collectors.toList());
+    }
+
+    /** [圖表 2] 流動性指標：單行數據映射 */
+    @Override
+    public LiquidityDto getLiquidityAnalytics() {
+        return dashboardRepository.getLiquidityMetrics().stream()
+                .findFirst()
+                .map(row -> new LiquidityDto(
+                        parseBigDecimal(row[0]),    // liquidAssets
+                        parseBigDecimal(row[1]),    // liquidLiabilities
+                        parseBigDecimal(row[2])     // quickAssets
+                )).orElse(new LiquidityDto(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+    }
+
+    /** [圖表 3] 未來現金流預測：30 天數據映射 */
+    @Override
+    public List<CashflowForecastDto> getCashflowForecast() {
+        return dashboardRepository.getCashflowForecast().stream()
+                .map(row -> new CashflowForecastDto(
+                        parseLocalDate(row[0]),     // date
+                        parseBigDecimal(row[1]),    // inflow
+                        parseBigDecimal(row[2])     // outflow
+                )).collect(Collectors.toList());
+    }
+
+    /** [圖表 4] 商品獲利 Pareto 分析：名稱、金額、累計百分比 */
+    @Override
+    public List<ProductParetoDto> getProductParetoAnalysis(LocalDate start, LocalDate end) {
+        return dashboardRepository.getProductPareto(start, end).stream()
+                .map(row -> new ProductParetoDto(
+                        (String) row[0],            // productName
+                        parseBigDecimal(row[1]),    // totalAmount
+                        parseBigDecimal(row[2]).doubleValue() // cumulativePct
+                )).collect(Collectors.toList());
+    }
+
+    /** [圖表 5] 供應商採購集中度分析 */
+    @Override
+    public List<SupplierConcentrationDto> getSupplierConcentration(LocalDate start, LocalDate end) {
+        return dashboardRepository.getSupplierConcentration(start, end).stream()
+                .map(row -> new SupplierConcentrationDto(
+                        (String) row[0],            // supplierName
+                        parseBigDecimal(row[1]).doubleValue(), // ratio
+                        parseBigDecimal(row[2])     // totalAmount
+                )).collect(Collectors.toList());
+    }
+
+    /** [圖表 6] 客戶回購與沉睡分析 */
+    @Override
+    public List<CustomerRetentionDto> getCustomerRetention() {
+        return dashboardRepository.getCustomerRetention().stream()
+                .map(row -> new CustomerRetentionDto(
+                        (String) row[0],            // customerName
+                        parseLocalDate(row[1]),     // lastOrderDate
+                        ((Number) row[2]).intValue(), // daysSinceLastOrder
+                        (String) row[3]             // status (活躍/風險/流失)
+                )).collect(Collectors.toList());
+    }
 }

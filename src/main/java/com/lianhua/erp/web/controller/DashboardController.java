@@ -15,10 +15,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -120,5 +122,80 @@ public class DashboardController {
             @Parameter(description = "會計期間 (YYYY-MM)", example = "2026-01") @RequestParam(required = false) String period
     ) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getOrderFunnel(period)));
+    }
+
+    /* =========================================================
+     * 6. 深度財務與獲利決策
+     * ========================================================= */
+
+    @GetMapping("/analytics/break-even")
+    @Operation(summary = "獲取損益平衡分析", description = "分析當月累計營收何時超越固定成本門檻。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功取得數據", content = @Content(array = @ArraySchema(schema = @Schema(implementation = BreakEvenPointDto.class)))),
+            @ApiResponse(responseCode = "400", description = "會計期間格式錯誤", content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "500", description = "系統錯誤", content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
+    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    public ResponseEntity<ApiResponseDto<List<BreakEvenPointDto>>> getBreakEven(
+            @Parameter(description = "會計期間 (YYYY-MM)", example = "2026-01") @RequestParam String period
+    ) {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.getBreakEvenAnalysis(period)));
+    }
+
+    @GetMapping("/analytics/liquidity")
+    @Operation(summary = "獲取流動性指標", description = "包含流動比率、速動比率等財務健康度。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功取得財務指標", content = @Content(schema = @Schema(implementation = LiquidityDto.class)))
+    })
+    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    public ResponseEntity<ApiResponseDto<LiquidityDto>> getLiquidity() {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.getLiquidityAnalytics()));
+    }
+
+    @GetMapping("/analytics/cashflow-forecast")
+    @Operation(summary = "獲取未來 30 天現金流預測", description = "結合應收應付到期日預估資金水位。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功取得預測數據", content = @Content(array = @ArraySchema(schema = @Schema(implementation = CashflowForecastDto.class))))
+    })
+    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    public ResponseEntity<ApiResponseDto<List<CashflowForecastDto>>> getCashflowForecast() {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.getCashflowForecast()));
+    }
+
+    @GetMapping("/analytics/product-pareto")
+    @Operation(summary = "獲取商品獲利 Pareto 分析", description = "識別貢獻公司 80% 獲利的品項。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ProductParetoDto.class)))),
+            @ApiResponse(responseCode = "400", description = "日期格式錯誤")
+    })
+    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    public ResponseEntity<ApiResponseDto<List<ProductParetoDto>>> getProductPareto(
+            @Parameter(description = "開始日期", example = "2026-01-01") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @Parameter(description = "結束日期", example = "2026-01-31") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end
+    ) {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.getProductParetoAnalysis(start, end)));
+    }
+
+    @GetMapping("/analytics/supplier-concentration")
+    @Operation(summary = "獲取供應商採購集中度", description = "評估採購額佔比與風險。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功", content = @Content(array = @ArraySchema(schema = @Schema(implementation = SupplierConcentrationDto.class))))
+    })
+    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    public ResponseEntity<ApiResponseDto<List<SupplierConcentrationDto>>> getSupplierConcentration(
+            @Parameter(description = "開始日期") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @Parameter(description = "結束日期") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end
+    ) {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.getSupplierConcentration(start, end)));
+    }
+
+    @GetMapping("/analytics/customer-retention")
+    @Operation(summary = "獲取客戶回購與沉睡分析", description = "監控批發客戶流失風險。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功", content = @Content(array = @ArraySchema(schema = @Schema(implementation = CustomerRetentionDto.class))))
+    })
+    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<ApiResponseDto<List<CustomerRetentionDto>>> getCustomerRetention() {
+        return ResponseEntity.ok(ApiResponseDto.ok(service.getCustomerRetention()));
     }
 }

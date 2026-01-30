@@ -243,4 +243,133 @@ public interface DashboardRepository extends JpaRepository<Order, Long> {
         GROUP BY order_status
         """, nativeQuery = true)
     List<Object[]> getOrderFunnel();
+
+    /* =========================================================
+     * 3. 核心決策圖表 (v3.0 財務三表與深度分析)
+     * ========================================================= */
+
+    /** * [圖表 1] 損益平衡分析 (Break-Even Analysis)
+     * 回傳：日期、當日累計營收、當日累計支出、損益平衡門檻
+     */
+    @Query(value = """
+        SELECT 
+            t_agg.d AS date,
+            SUM(t_agg.daily_rev) OVER (ORDER BY t_agg.d) AS runningRevenue,
+            SUM(t_agg.daily_exp) OVER (ORDER BY t_agg.d) AS runningExpense,
+            (SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE accounting_period = :period AND status = 'ACTIVE') AS breakEvenThreshold
+        FROM (
+            SELECT d, SUM(rev) as daily_rev, SUM(exp) as daily_exp
+            FROM (
+                SELECT sale_date AS d, amount AS rev, 0 AS exp FROM sales WHERE accounting_period = :period
+                UNION ALL
+                SELECT expense_date AS d, 0 AS rev, amount AS exp FROM expenses WHERE accounting_period = :period AND status = 'ACTIVE'
+            ) union_t
+            GROUP BY d
+        ) t_agg
+        ORDER BY t_agg.d ASC
+        """, nativeQuery = true)
+    List<Object[]> getBreakEvenData(@Param("period") String period);
+
+    /** * [圖表 2] 流動性與償債能力 (Current Ratio)
+     * 回傳：流動資產、流動負債、速動資產
+     */
+    @Query(value = """
+        SELECT 
+            (SELECT COALESCE(SUM(amount), 0) FROM sales) + (SELECT COALESCE(SUM(amount), 0) FROM receipts WHERE status = 'ACTIVE') AS liquidAssets,
+            (SELECT COALESCE(SUM(balance), 0) FROM purchases WHERE record_status = 'ACTIVE') AS liquidLiabilities,
+            (SELECT COALESCE(SUM(amount), 0) FROM receipts WHERE status = 'ACTIVE') AS quickAssets
+        """, nativeQuery = true)
+    List<Object[]> getLiquidityMetrics();
+
+    /** * [圖表 3] 未來 30 天現金流預測 (Cash Flow Forecast)
+     * 回傳：預測日期、預計流入、預計流出
+     */
+    /** 未來 30 天現金流預測 (修正逾期邏輯) */
+    @Query(value = """
+    SELECT 
+        -- 如果日期已過，則歸類為今天，否則按原日期
+        CASE WHEN t.pred_date < CURDATE() THEN CURDATE() ELSE t.pred_date END AS date,
+        SUM(expected_in) AS inflow,
+        SUM(expected_out) AS outflow
+    FROM (
+        -- 應收帳款：未收款金額
+        SELECT o.delivery_date AS pred_date, (o.total_amount - IFNULL(r_agg.paid, 0)) AS expected_in, 0 AS expected_out
+        FROM orders o
+        LEFT JOIN (SELECT order_id, SUM(amount) as paid FROM receipts WHERE status = 'ACTIVE' GROUP BY order_id) r_agg ON o.id = r_agg.order_id
+        WHERE o.record_status = 'ACTIVE' AND o.payment_status != 'PAID'
+        AND o.delivery_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+        
+        UNION ALL
+        
+        -- 應付帳款：未付款金額
+        SELECT p.purchase_date AS pred_date, 0 AS expected_in, p.balance AS expected_out
+        FROM purchases p 
+        WHERE p.record_status = 'ACTIVE' AND p.status != 'PAID'
+        AND p.purchase_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+    ) t
+    GROUP BY date 
+    ORDER BY date ASC
+    """, nativeQuery = true)
+    List<Object[]> getCashflowForecast();
+
+    /** * [圖表 4] 商品獲利貢獻 Pareto 分析 (Pareto Driver)
+     * 回傳：商品名稱、總銷售額、累計百分比
+     */
+    @Query(value = """
+    SELECT 
+        name, totalAmount,
+        (SUM(totalAmount) OVER (ORDER BY totalAmount DESC) / SUM(totalAmount) OVER ()) * 100 AS cumulativePct
+    FROM (
+        SELECT p.name, SUM(s.amount) AS totalAmount
+        FROM sales s
+        JOIN products p ON s.product_id = p.id
+        WHERE s.sale_date BETWEEN :startDate AND :endDate
+        GROUP BY p.name
+    ) t
+    ORDER BY totalAmount DESC
+    """, nativeQuery = true)
+    List<Object[]> getProductPareto(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    /** * [圖表 5] 供應商採購集中度 (Concentration)
+     * 回傳：供應商名稱、採購佔比、採購總額
+     */
+    @Query(value = """
+    SELECT 
+        s.name,
+        -- 分子：該供應商採購總額 / 分母：該區間所有 active 採購總額
+        (SUM(p.total_amount) / 
+            NULLIF((SELECT SUM(total_amount) 
+                    FROM purchases 
+                    WHERE record_status = 'ACTIVE' 
+                    AND purchase_date BETWEEN :startDate AND :endDate), 0)
+        ) * 100 AS ratio,
+        SUM(p.total_amount) AS totalAmount
+    FROM purchases p
+    JOIN suppliers s ON p.supplier_id = s.id
+    WHERE p.record_status = 'ACTIVE' 
+      AND p.purchase_date BETWEEN :startDate AND :endDate
+    GROUP BY s.name
+    ORDER BY totalAmount DESC
+    """, nativeQuery = true)
+    List<Object[]> getSupplierConcentration(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    /** * [圖表 6] 客戶回購與沉睡分析 (Customer Retention)
+     * 回傳：客戶名稱、最後交易日、距今天數、狀態
+     */
+    @Query(value = """
+        SELECT 
+            c.name,
+            MAX(o.order_date) AS lastOrderDate,
+            DATEDIFF(CURDATE(), MAX(o.order_date)) AS daysSinceLastOrder,
+            CASE 
+                WHEN DATEDIFF(CURDATE(), MAX(o.order_date)) <= 30 THEN '活躍'
+                WHEN DATEDIFF(CURDATE(), MAX(o.order_date)) <= 60 THEN '沉睡風險'
+                ELSE '流失'
+            END AS status
+        FROM order_customers c
+        LEFT JOIN orders o ON c.id = o.customer_id AND o.record_status = 'ACTIVE'
+        GROUP BY c.name
+        ORDER BY daysSinceLastOrder DESC
+        """, nativeQuery = true)
+    List<Object[]> getCustomerRetention();
 }
