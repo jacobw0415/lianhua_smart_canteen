@@ -285,32 +285,51 @@ public interface DashboardRepository extends JpaRepository<Order, Long> {
      * 回傳：預測日期、預計流入、預計流出
      */
     /** 未來 30 天現金流預測 (修正逾期邏輯) */
+    /** * [圖表 3] 未來現金流預測
+     * 邏輯：將基準日之前的「未結帳款」全部歸類到基準日當天（顯示即時資金壓力）
+     * 並過濾出基準日後 X 天內的預計流入與流出。
+     */
     @Query(value = """
     SELECT 
-        -- 如果日期已過，則歸類為今天，否則按原日期
-        CASE WHEN t.pred_date < CURDATE() THEN CURDATE() ELSE t.pred_date END AS date,
+        -- 核心邏輯：基準日以前的欠款擠壓到基準日，其餘按原日期顯示
+        CASE WHEN t.pred_date < :baseDate THEN :baseDate ELSE t.pred_date END AS date,
         SUM(expected_in) AS inflow,
         SUM(expected_out) AS outflow
     FROM (
-        -- 應收帳款：未收款金額
-        SELECT o.delivery_date AS pred_date, (o.total_amount - IFNULL(r_agg.paid, 0)) AS expected_in, 0 AS expected_out
+        -- 1. 應收帳款 (AR)
+        SELECT o.delivery_date AS pred_date, 
+               (o.total_amount - IFNULL(r_agg.paid, 0)) AS expected_in, 
+               0 AS expected_out
         FROM orders o
-        LEFT JOIN (SELECT order_id, SUM(amount) as paid FROM receipts WHERE status = 'ACTIVE' GROUP BY order_id) r_agg ON o.id = r_agg.order_id
-        WHERE o.record_status = 'ACTIVE' AND o.payment_status != 'PAID'
-        AND o.delivery_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+        LEFT JOIN (
+            SELECT order_id, SUM(amount) as paid 
+            FROM receipts WHERE status = 'ACTIVE' 
+            GROUP BY order_id
+        ) r_agg ON o.id = r_agg.order_id
+        WHERE o.record_status = 'ACTIVE' 
+          AND o.payment_status != 'PAID'
+          -- 🔍 修正過濾：只抓基準日之後 N 天內的，或基準日之前的逾期款
+          AND DATEDIFF(o.delivery_date, :baseDate) <= :days
         
         UNION ALL
         
-        -- 應付帳款：未付款金額
-        SELECT p.purchase_date AS pred_date, 0 AS expected_in, p.balance AS expected_out
+        -- 2. 應付帳款 (AP)
+        SELECT p.purchase_date AS pred_date, 
+               0 AS expected_in, 
+               p.balance AS expected_out
         FROM purchases p 
-        WHERE p.record_status = 'ACTIVE' AND p.status != 'PAID'
-        AND p.purchase_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+        WHERE p.record_status = 'ACTIVE' 
+          AND p.status != 'PAID'
+          -- 🔍 修正過濾：只抓基準日之後 N 天內的，或基準日之前的逾期款
+          AND DATEDIFF(p.purchase_date, :baseDate) <= :days
     ) t
+    -- 🔍 終極保險：過濾掉太遠以後的資料（例如 days 設 7，就不該出現 30 天後的點）
+    -- 且排除掉已經「太老」的數據（視需求而定，這裡設定抓取範圍內的所有點）
+    WHERE DATEDIFF(CASE WHEN t.pred_date < :baseDate THEN :baseDate ELSE t.pred_date END, :baseDate) BETWEEN 0 AND :days
     GROUP BY date 
     ORDER BY date ASC
     """, nativeQuery = true)
-    List<Object[]> getCashflowForecast();
+    List<Object[]> getCashflowForecast(@Param("baseDate") LocalDate baseDate, @Param("days") int days);
 
     /** * [圖表 4] 商品獲利貢獻 Pareto 分析 (Pareto Driver)
      * 回傳：商品名稱、總銷售額、累計百分比

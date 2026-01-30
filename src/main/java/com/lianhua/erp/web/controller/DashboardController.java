@@ -152,15 +152,19 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getLiquidityAnalytics()));
     }
 
-    @GetMapping("/analytics/cashflow-forecast")
-    @Operation(summary = "獲取未來 30 天現金流預測", description = "結合應收應付到期日預估資金水位。")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "成功取得預測數據", content = @Content(array = @ArraySchema(schema = @Schema(implementation = CashflowForecastDto.class))))
-    })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
-    public ResponseEntity<ApiResponseDto<List<CashflowForecastDto>>> getCashflowForecast() {
-        return ResponseEntity.ok(ApiResponseDto.ok(service.getCashflowForecast()));
-    }
+        @GetMapping("/analytics/cashflow-forecast")
+        @Operation(summary = "獲取未來 30 天現金流預測", description = "結合應收應付到期日預估資金水位。")
+        @ApiResponses({
+                @ApiResponse(responseCode = "200", description = "成功取得預測數據", content = @Content(array = @ArraySchema(schema = @Schema(implementation = CashflowForecastDto.class))))
+        })
+        public ResponseEntity<ApiResponseDto<List<CashflowForecastDto>>> getCashflowForecast(
+                @Parameter(description = "基準日 (YYYY-MM-DD)")
+                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate baseDate,
+                @Parameter(description = "天數") @RequestParam(defaultValue = "30") int days
+        ) {
+            LocalDate effectiveDate = (baseDate != null) ? baseDate : LocalDate.now();
+            return ResponseEntity.ok(ApiResponseDto.ok(service.getCashflowForecast(effectiveDate, days)));
+        }
 
     @GetMapping("/analytics/product-pareto")
     @Operation(summary = "獲取商品獲利 Pareto 分析", description = "識別貢獻公司 80% 獲利的品項。")

@@ -151,6 +151,8 @@ public class DashboardServiceImpl implements DashboardService {
         if (obj == null) return null;
         if (obj instanceof java.sql.Date) return ((java.sql.Date) obj).toLocalDate();
         if (obj instanceof java.time.LocalDate) return (LocalDate) obj;
+        // 增加一個對 Timestamp 的處理，預防某些環境下的行為
+        if (obj instanceof java.sql.Timestamp) return ((java.sql.Timestamp) obj).toLocalDateTime().toLocalDate();
         return LocalDate.parse(obj.toString());
     }
 
@@ -190,12 +192,12 @@ public class DashboardServiceImpl implements DashboardService {
 
     /** [圖表 3] 未來現金流預測：30 天數據映射 */
     @Override
-    public List<CashflowForecastDto> getCashflowForecast() {
-        return dashboardRepository.getCashflowForecast().stream()
+    public List<CashflowForecastDto> getCashflowForecast(LocalDate baseDate, int days) {
+        return dashboardRepository.getCashflowForecast(baseDate, days).stream()
                 .map(row -> new CashflowForecastDto(
-                        parseLocalDate(row[0]),     // date
-                        parseBigDecimal(row[1]),    // inflow
-                        parseBigDecimal(row[2])     // outflow
+                        parseLocalDate(row[0]),
+                        parseBigDecimal(row[1]),
+                        parseBigDecimal(row[2])
                 )).collect(Collectors.toList());
     }
 

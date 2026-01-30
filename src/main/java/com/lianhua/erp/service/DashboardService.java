@@ -80,7 +80,8 @@
          * [圖表 3] 獲取未來 30 天現金流預測
          * 結合應收與應付到期日進行資金水位預估
          */
-        List<CashflowForecastDto> getCashflowForecast();
+        List<CashflowForecastDto> getCashflowForecast(LocalDate baseDate, int days);
+
 
         /**
          * [圖表 4] 獲取商品獲利貢獻 Pareto 分析

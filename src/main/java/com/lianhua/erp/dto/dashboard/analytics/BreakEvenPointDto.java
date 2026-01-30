@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.dashboard.analytics;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -7,6 +8,7 @@ import java.math.BigDecimal;
 @Schema(description = "損益平衡分析數據點")
 public record BreakEvenPointDto(
         @Schema(description = "日期", example = "2026-01-15")
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd", timezone = "Asia/Taipei")
         java.time.LocalDate date,
 
         @Schema(description = "當日累計營收 (Running Total)", example = "125000.00")
