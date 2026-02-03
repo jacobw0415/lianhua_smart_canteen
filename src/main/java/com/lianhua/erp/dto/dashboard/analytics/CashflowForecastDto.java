@@ -15,5 +15,8 @@ public record CashflowForecastDto(
         BigDecimal inflow,
 
         @Schema(description = "預計流出金額", example = "8000.00")
-        BigDecimal outflow
+        BigDecimal outflow,
+
+        @Schema(description = "淨流入（流入 - 流出）", example = "7000.00")
+        BigDecimal net
 ) {}

@@ -104,4 +104,21 @@
          * 監控客戶下單間隔與潛在流失風險
          */
         List<CustomerRetentionDto> getCustomerRetention();
+
+        /**
+         * [圖表 7] 獲取採購結構分析 (依進貨項目)
+         * 分析特定期間內各品項的採購金額佔比
+         * @param start 開始日期
+         * @param end 結束日期
+         */
+        List<PurchaseStructureDto> getPurchaseStructureByItem(LocalDate start, LocalDate end);
+
+        /**
+         * [圖表 8] 獲取客戶採購集中度分析
+         * 分析指定期間內各客戶的訂單總額及其對比全體營收的佔比。
+         * @param start 開始日期
+         * @param end 結束日期
+         */
+        List<CustomerConcentrationDto> getCustomerConcentration(LocalDate start, LocalDate end);
+
     }

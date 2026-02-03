@@ -194,11 +194,16 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public List<CashflowForecastDto> getCashflowForecast(LocalDate baseDate, int days) {
         return dashboardRepository.getCashflowForecast(baseDate, days).stream()
-                .map(row -> new CashflowForecastDto(
-                        parseLocalDate(row[0]),
-                        parseBigDecimal(row[1]),
-                        parseBigDecimal(row[2])
-                )).collect(Collectors.toList());
+                .map(row -> {
+                    var date = parseLocalDate(row[0]);
+                    var inflow = parseBigDecimal(row[1]);
+                    var outflow = parseBigDecimal(row[2]);
+                    var net = (inflow != null && outflow != null)
+                            ? inflow.subtract(outflow)
+                            : null;
+                    return new CashflowForecastDto(date, inflow, outflow, net);
+                })
+                .collect(Collectors.toList());
     }
 
     /** [圖表 4] 商品獲利 Pareto 分析：名稱、金額、累計百分比 */
@@ -234,4 +239,34 @@ public class DashboardServiceImpl implements DashboardService {
                         (String) row[3]             // status (活躍/風險/流失)
                 )).collect(Collectors.toList());
     }
+
+    /** [圖表 7] 採購結構分析 (按品項) */
+    @Override
+    public List<PurchaseStructureDto> getPurchaseStructureByItem(LocalDate start, LocalDate end) {
+        return dashboardRepository.getPurchaseStructureByItem(start, end).stream()
+                .map(row -> new PurchaseStructureDto(
+                        (String) row[0],           // item name
+                        parseBigDecimal(row[1])    // totalAmount
+                )).collect(Collectors.toList());
+    }
+
+    /**
+     * [圖表 9] 客戶採購集中度分析實作
+     * 核心邏輯：計算各客戶在指定期間內的訂單總額及其佔全體營收的比例。
+     */
+    @Override
+    public List<CustomerConcentrationDto> getCustomerConcentration(LocalDate startDate, LocalDate endDate) {
+        // 1. 執行 Repository 原生查詢
+        List<Object[]> results = dashboardRepository.getCustomerConcentration(startDate, endDate);
+
+        // 2. 將查詢結果 Object[] 映射至 DTO
+        return results.stream()
+                .map(row -> new CustomerConcentrationDto(
+                        (String) row[0],              // oc.name: 客戶名稱
+                        ((Number) row[1]).doubleValue(), // ratio: 百分比佔比
+                        parseBigDecimal(row[2])       // totalAmount: 訂單總金額
+                ))
+                .collect(Collectors.toList());
+    }
+
 }

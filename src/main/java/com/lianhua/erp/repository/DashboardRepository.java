@@ -391,4 +391,46 @@ public interface DashboardRepository extends JpaRepository<Order, Long> {
         ORDER BY daysSinceLastOrder DESC
         """, nativeQuery = true)
     List<Object[]> getCustomerRetention();
+
+    /** 採購結構分析：依進貨項目 (item) 聚合，排除作廢單，不含商品分類 */
+    @Query(value = """
+    SELECT 
+        pi.item AS category_name,
+        SUM(pi.subtotal) AS total_amount
+    FROM purchase_items pi
+    INNER JOIN purchases p ON pi.purchase_id = p.id
+    WHERE p.record_status = 'ACTIVE'
+      AND p.purchase_date BETWEEN :startDate AND :endDate
+    GROUP BY pi.item
+    ORDER BY total_amount DESC
+    """, nativeQuery = true)
+    List<Object[]> getPurchaseStructureByItem(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    /** * [圖表] 客戶集中度／營收貢獻分布 (Customer Concentration / Revenue Contribution)
+     * 回傳：客戶名稱、營收佔比(%)、營收總額
+     * 依營收總額降序，供前段顯示前 N 大客戶與「其他」彙總。
+     */
+    @Query(value = """
+    SELECT 
+        oc.name,
+        (SUM(o.total_amount) / NULLIF(
+            (SELECT SUM(total_amount) 
+             FROM orders 
+             WHERE record_status = 'ACTIVE' 
+               AND order_date BETWEEN :startDate AND :endDate), 0)
+        ) * 100 AS ratio,
+        SUM(o.total_amount) AS totalAmount
+    FROM orders o
+    JOIN order_customers oc ON o.customer_id = oc.id
+    WHERE o.record_status = 'ACTIVE'
+      AND o.order_date BETWEEN :startDate AND :endDate
+    GROUP BY oc.id, oc.name
+    ORDER BY totalAmount DESC
+    """, nativeQuery = true)
+    List<Object[]> getCustomerConcentration(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
 }

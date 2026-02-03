@@ -202,4 +202,55 @@ public class DashboardController {
     public ResponseEntity<ApiResponseDto<List<CustomerRetentionDto>>> getCustomerRetention() {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getCustomerRetention()));
     }
+
+    /**
+     * [圖表 7] 獲取採購結構分析 (依進貨項目)
+     * 識別特定期間內各品項的採購金額分布與佔比。
+     */
+    @GetMapping("/analytics/purchase-structure")
+    @Operation(summary = "獲取採購結構分析", description = "依據進貨項目 (item) 聚合採購金額，排除已作廢單據。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功取得採購結構數據",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = PurchaseStructureDto.class)))),
+            @ApiResponse(responseCode = "400", description = "請求日期格式錯誤",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
+    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    public ResponseEntity<ApiResponseDto<List<PurchaseStructureDto>>> getPurchaseStructure(
+            @Parameter(description = "開始日期 (YYYY-MM-DD)", example = "2026-01-01")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @Parameter(description = "結束日期 (YYYY-MM-DD)", example = "2026-01-31")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end
+    ) {
+        // 調用 Service 層獲取聚合後的採購品項數據
+        return ResponseEntity.ok(ApiResponseDto.ok(service.getPurchaseStructureByItem(start, end)));
+    }
+
+    /**
+     * [圖表 9] 獲取客戶採購集中度分析 (Customer Concentration)
+     * 分析指定期間內各 B2B 客戶的訂單總額及其佔全體營收的比例，用於識別關鍵客戶風險。
+     */
+    @GetMapping("/analytics/customer-concentration")
+    @Operation(summary = "獲取客戶採購集中度分析", description = "計算各客戶在指定期間內的訂單總額及其佔全體營收的佔比，排除已作廢單據。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "成功取得客戶集中度數據",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = CustomerConcentrationDto.class)))),
+            @ApiResponse(responseCode = "400", description = "請求日期格式錯誤",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
+                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
+    })
+    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+    public ResponseEntity<ApiResponseDto<List<CustomerConcentrationDto>>> getCustomerConcentration(
+            @Parameter(description = "開始日期 (YYYY-MM-DD)", example = "2026-01-01")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @Parameter(description = "結束日期 (YYYY-MM-DD)", example = "2026-01-31")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end
+    ) {
+        // 調用 Service 實作，處理客戶營收貢獻度之聚合分析
+        return ResponseEntity.ok(ApiResponseDto.ok(service.getCustomerConcentration(start, end)));
+    }
+
 }
