@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.user;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +11,7 @@ import java.util.Set;
 
 @Data
 @Schema(description = "使用者請求 DTO (用於新增/更新使用者)")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class UserRequestDto {
 
     @NotBlank(message = "帳號不能為空")

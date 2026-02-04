@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -22,34 +23,30 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // 1. 從資料庫查找使用者，並根據加強版 EAGER 設定載入角色
+        // 1. 從資料庫查找使用者
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("找不到使用者: " + username));
 
-        // 2. 將 Roles 與 Permissions 轉換為 Spring Security 的 GrantedAuthority
-        // 包含角色 (需帶 ROLE_ 前綴) 與具體權限 (如 purchase:void)
+        // 2. 將 Roles 與 Permissions 轉換為 Authorities
         List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
                 .flatMap(role -> {
-                    // 加入角色本身
-                    java.util.stream.Stream<String> roleName = java.util.stream.Stream.of(role.getName());
-                    // 加入該角色擁有的所有具體權限
-                    java.util.stream.Stream<String> permissions = role.getPermissions().stream()
+                    Stream<String> roleName = Stream.of(role.getName());
+                    Stream<String> permissions = role.getPermissions().stream()
                             .map(com.lianhua.erp.domain.Permission::getName);
-                    return java.util.stream.Stream.concat(roleName, permissions);
+                    return Stream.concat(roleName, permissions);
                 })
                 .distinct()
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
 
-        // 3. 回傳 Spring Security 內建的 User 物件
-        return new org.springframework.security.core.userdetails.User(
-                user.getUsername(),
-                user.getPassword(),
-                user.getEnabled(),
-                true, // accountNonExpired
-                true, // credentialsNonExpired
-                true, // accountNonLocked
-                authorities
+        // 3. ✅ 關鍵修改：回傳自定義的 CustomUserDetails
+        // 這樣 JwtUtils 才能正確提取 user.getId() (即 uid)
+        return new CustomUserDetails(
+                user.getId(),           // 🌿 傳入資料庫的 ID，對應 JWT 的 uid
+                user.getUsername(),     // 帳號
+                user.getPassword(),     // 加密後的密碼
+                user.getEnabled(),      // 帳號啟用狀態
+                authorities             // 權限清單
         );
     }
 }

@@ -17,5 +17,7 @@
 
         UserDto updateUser(Long id, UserRequestDto dto);
 
+        UserDto getUserByUsername(String username);
+
         void deleteUser(Long id);
     }

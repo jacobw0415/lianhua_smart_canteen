@@ -1,32 +1,35 @@
 package com.lianhua.erp.security;
 
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * JWT 認證過濾器
- * 負責攔截請求、解析 Token 並建立安全上下文
+ * JWT 認證過濾器 (效能優化版)
+ * 負責攔截請求、從 Claims 提取權限並建立安全上下文，避免重複查詢資料庫
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
-    private final UserDetailsService userDetailsService;
 
     @Override
     protected void doFilterInternal(
@@ -36,46 +39,51 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         try {
-            // 1. 從請求標頭中提取 JWT
+            // 1. 從請求標頭提取 JWT
             String jwt = parseJwt(request);
 
-            // 2. 驗證 Token 是否存在且有效
+            // 2. 驗證 Token 是否有效
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
-                String username = jwtUtils.getUserNameFromJwtToken(jwt);
 
-                // 3. 從資料庫加載使用者詳細資訊 (含 Roles 與 Permissions)
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                // 3. 直接從 Token 取得 Claims (內含 uid 與 roles)
+                Claims claims = jwtUtils.getClaimsFromJwtToken(jwt);
+                String username = claims.getSubject();
 
-                // 4. 建立 Spring Security 認證物件
+                // 4. 將 Claims 中的 roles 映射為 Spring Security 的 Authorities
+                @SuppressWarnings("unchecked")
+                List<String> roles = claims.get("roles", List.class);
+
+                List<SimpleGrantedAuthority> authorities = roles.stream()
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
+
+                // 5. 建立認證物件 (使用自定義 Principal 儲存 uid 以供後續使用)
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails,
+                        username, // 這裡可視需求改為傳入自定義的 User 物件
                         null,
-                        userDetails.getAuthorities()
+                        authorities
                 );
 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                // 5. 將認證資訊存入上下文，後續的 @PreAuthorize 才能生效
+                // 6. 存入 Security 上下文，讓 @PreAuthorize 生效
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                log.debug("已從 Token 建立使用者 '{}' 的安全上下文, 角色: {}", username, roles);
             }
         } catch (Exception e) {
-            logger.error("無法設定使用者認證: {}", e);
+            log.error("無法設定使用者認證: {}", e.getMessage());
         }
 
-        // 6. 繼續執行過濾器鏈
+        // 7. 繼續過濾器鏈
         filterChain.doFilter(request, response);
     }
 
-    /**
-     * 從 Authorization Header 提取 Bearer Token
-     */
     private String parseJwt(HttpServletRequest request) {
         String headerAuth = request.getHeader("Authorization");
-
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
             return headerAuth.substring(7);
         }
-
         return null;
     }
 }

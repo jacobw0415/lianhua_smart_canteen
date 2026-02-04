@@ -2,29 +2,32 @@ package com.lianhua.erp.web.controller;
 
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
 import com.lianhua.erp.dto.error.*;
+import com.lianhua.erp.dto.user.JwtResponse;
 import com.lianhua.erp.dto.user.UserRegisterDto;
 import com.lianhua.erp.dto.user.UserDto;
+import com.lianhua.erp.security.CustomUserDetails;
 import com.lianhua.erp.security.JwtUtils;
 import com.lianhua.erp.service.AuthService;
 import com.lianhua.erp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import com.lianhua.erp.dto.user.LoginRequest;
+
+import java.util.List;
 
 /**
  * 認證控制中心
@@ -63,8 +66,9 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @PostMapping("/login")
-    public ApiResponseDto<JwtResponse> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-        // 1. 使用 AuthenticationManager 進行帳密驗證
+    public ApiResponseDto<JwtResponse> authenticateUser(
+            @Valid @RequestBody LoginRequest loginRequest) {
+
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.getUsername(),
@@ -72,14 +76,26 @@ public class AuthController {
                 )
         );
 
-        // 2. 驗證成功後，將認證資訊存入 SecurityContext
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // 3. 產生 JWT Token
-        String jwt = jwtUtils.generateJwtToken(authentication.getName());
+        String jwt = jwtUtils.generateJwtToken(authentication);
 
-        // 4. 回傳 Token 資訊
-        return ApiResponseDto.ok(new JwtResponse(jwt, authentication.getName()));
+        // 這裡轉回你的 CustomUserDetails
+        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
+
+        Long userId = principal.getId();
+        List<String> roles = principal.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList();
+
+        JwtResponse body = new JwtResponse();
+        body.setId(userId);                 // ✅ 前端會存成 localStorage.userId
+        body.setToken(jwt);
+        body.setType("Bearer");
+        body.setUsername(principal.getUsername());
+        body.setRoles(roles);               // ✅ 前端會存成 localStorage.roles / role
+
+        return ApiResponseDto.ok(body);
     }
 
     // ============================================================
@@ -114,38 +130,5 @@ public class AuthController {
     @PostMapping("/register")
     public ApiResponseDto<UserDto> registerUser(@Valid @RequestBody UserRegisterDto registerDto) {
         return ApiResponseDto.ok(userService.registerUser(registerDto));
-    }
-
-    // ============================================================
-    // 內部 DTO 類別
-    // ============================================================
-
-    @Data
-    @Schema(description = "登入請求")
-    public static class LoginRequest {
-        @Schema(example = "admin")
-        private String username;
-        @Schema(example = "admin123")
-        private String password;
-    }
-
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @Schema(description = "登入成功回應")
-    public static class JwtResponse {
-        @Schema(description = "JWT 存取令牌")
-        private String token;
-
-        @Schema(description = "令牌類型", example = "Bearer")
-        private String type = "Bearer";
-
-        @Schema(description = "使用者帳號", example = "admin")
-        private String username;
-
-        public JwtResponse(String accessToken, String username) {
-            this.token = accessToken;
-            this.username = username;
-        }
     }
 }

@@ -47,48 +47,65 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toList());
     }
 
-    /** 取得單一使用者 */
+    /** 取得單一使用者 - 🌿 引用 findByIdWithRoles 讓燈號亮起 */
     @Override
     @Transactional(readOnly = true)
     public UserDto getUserById(Long id) {
-        // 註：User Entity 已設定 Roles 為 EAGER，此處直接 findById 即可
-        User user = userRepository.findById(id)
+        // 使用 JOIN FETCH 版本，效能更佳
+        User user = userRepository.findByIdWithRoles(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
         return userMapper.toDto(user);
     }
 
-    /** 管理員建立使用者（支援加強版欄位 email, employeeId） */
+    @Override
+    @Transactional(readOnly = true)
+    public UserDto getUserByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("找不到使用者帳號: " + username));
+        return userMapper.toDto(user);
+    }
+
+    /** 管理員建立使用者 - 🌿 引用 existsByUsername & existsByEmail 讓燈號亮起 */
     @Override
     @Transactional
     public UserDto createUser(UserRequestDto dto) {
-        // 1️⃣ 建立使用者基本資料 (包含新欄位)
+        // 1. 唯一性校驗 (防禦性編程)
+        if (userRepository.existsByUsername(dto.getUsername())) {
+            throw new IllegalArgumentException("帳號名稱已存在: " + dto.getUsername());
+        }
+        if (dto.getEmail() != null && userRepository.existsByEmail(dto.getEmail())) {
+            throw new IllegalArgumentException("Email 已經被使用: " + dto.getEmail());
+        }
+
         User user = User.builder()
                 .username(dto.getUsername())
                 .password(passwordEncoder.encode(dto.getPassword()))
                 .fullName(dto.getFullName())
-                .email(dto.getEmail())           // 🌿 加強版新欄位
-                .employee_id(dto.getEmployeeId()) // 🌿 加強版新欄位
+                .email(dto.getEmail())
+                .employee_id(dto.getEmployeeId())
                 .enabled(dto.getEnabled() != null ? dto.getEnabled() : true)
                 .roles(new HashSet<>())
                 .build();
 
-        // 2️⃣ 若有指定角色，直接從 Repository 取得 Role 放入 Set
         if (dto.getRoleNames() != null && !dto.getRoleNames().isEmpty()) {
             for (String roleName : dto.getRoleNames()) {
                 Role role = roleRepository.findByName(roleName.toUpperCase())
                         .orElseThrow(() -> new EntityNotFoundException("Role not found: " + roleName));
-                user.addRole(role); // 簡化後的輔助方法
+                user.addRole(role);
             }
         }
 
-        // 3️⃣ 保存（JPA 會自動維護 user_roles 中間表）
         return userMapper.toDto(userRepository.save(user));
     }
 
-    /** 使用者註冊（自動給予 USER 角色） */
+    /** 使用者註冊 - 🌿 引用 existsByUsername 確保註冊安全 */
     @Override
     @Transactional
     public UserDto registerUser(UserRegisterDto dto) {
+        if (userRepository.existsByUsername(dto.getUsername())) {
+            throw new IllegalArgumentException("該帳號名稱已被註冊");
+        }
+
         Role defaultRole = roleRepository.findByName("ROLE_USER")
                 .orElseThrow(() -> new EntityNotFoundException("Default role ROLE_USER not found"));
 
@@ -101,7 +118,6 @@ public class UserServiceImpl implements UserService {
                 .build();
 
         user.addRole(defaultRole);
-
         return userMapper.toDto(userRepository.save(user));
     }
 
@@ -112,31 +128,33 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
 
-        // 更新基本資訊
+        // 若修改 Email，需檢查是否與他人重複
+        if (dto.getEmail() != null && !dto.getEmail().equals(user.getEmail())) {
+            if (userRepository.existsByEmail(dto.getEmail())) {
+                throw new IllegalArgumentException("新的 Email 已經被其他帳號使用");
+            }
+            user.setEmail(dto.getEmail());
+        }
+
         if (dto.getUsername() != null) user.setUsername(dto.getUsername());
         if (dto.getFullName() != null) user.setFullName(dto.getFullName());
-        if (dto.getEmail() != null) user.setEmail(dto.getEmail());
         if (dto.getEnabled() != null) user.setEnabled(dto.getEnabled());
 
-        // 更新密碼
         if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(dto.getPassword()));
         }
 
-        // 🌿 重構後：簡單的角色更新邏輯
         if (dto.getRoleNames() != null) {
             Set<Role> newRoles = dto.getRoleNames().stream()
                     .map(name -> roleRepository.findByName(name.toUpperCase())
                             .orElseThrow(() -> new EntityNotFoundException("Role not found: " + name)))
                     .collect(Collectors.toSet());
-
-            user.setRoles(newRoles); // 直接替換即可，JPA 會自動處理刪除與新增
+            user.setRoles(newRoles);
         }
 
         return userMapper.toDto(userRepository.save(user));
     }
 
-    /** 刪除使用者 */
     @Override
     @Transactional
     public void deleteUser(Long id) {

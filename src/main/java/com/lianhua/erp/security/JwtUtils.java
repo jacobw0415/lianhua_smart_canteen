@@ -4,48 +4,65 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.springframework.security.core.Authentication;
 
 @Slf4j
 @Component
 public class JwtUtils {
 
-    // 建議在 application.properties 設定：lianhua.app.jwtSecret (至少 32 字元)
     @Value("${lianhua.app.jwtSecret:LianhuaERP_Secure_Secret_Key_2026_Standard}")
     private String jwtSecret;
 
-    @Value("${lianhua.app.jwtExpirationMs:86400000}") // 預設 24 小時
+    @Value("${lianhua.app.jwtExpirationMs:86400000}")
     private int jwtExpirationMs;
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** 產生 Token：在 Login 成功後呼叫 */
-    public String generateJwtToken(String username) {
+    /** * [修改重點 1] 加入 uid 與 roles 到 JWT Claims
+     * 修改參數為 Authentication 以便取得 CustomUserDetails 的詳細資訊
+     */
+    public String generateJwtToken(Authentication authentication) {
+        CustomUserDetails userPrincipal = (CustomUserDetails) authentication.getPrincipal();
+
+        List<String> roles = userPrincipal.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
         return Jwts.builder()
-                .setSubject(username)
+                .setSubject(userPrincipal.getUsername())
+                .claim("uid", userPrincipal.getId())
+                .claim("roles", roles)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    /** 從 Token 中提取使用者帳號：用於 Filter 驗證 */
-    public String getUserNameFromJwtToken(String token) {
+    /** * [修改重點 2] 提取所有 Claims
+     * 方便 Filter 直接讀取 roles 而不需重複解析
+     */
+    public Claims getClaimsFromJwtToken(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+                .getBody();
     }
 
-    /** 驗證 Token 是否合法與過期 */
+    public String getUserNameFromJwtToken(String token) {
+        return getClaimsFromJwtToken(token).getSubject();
+    }
+
     public boolean validateJwtToken(String authToken) {
         try {
             Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
