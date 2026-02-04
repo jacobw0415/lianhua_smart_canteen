@@ -231,41 +231,81 @@ CREATE INDEX idx_expenses_status ON expenses(status);
 CREATE INDEX idx_expenses_voided_at ON expenses(voided_at);
 
 -- ------------------------------------------------------------
--- 9. 使用者表
+-- 9. 使用者表 (加強版：增加員工關聯與電子郵件)
 -- ------------------------------------------------------------
 CREATE TABLE users (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  username VARCHAR(60) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  full_name VARCHAR(100),
-  enabled BOOLEAN DEFAULT TRUE,
+  username VARCHAR(60) UNIQUE NOT NULL COMMENT '登入帳號',
+  password VARCHAR(255) NOT NULL COMMENT 'BCrypt 加密密碼',
+  full_name VARCHAR(100) COMMENT '顯示姓名',
+  email VARCHAR(100) UNIQUE COMMENT '用於找回密碼或通知',
+  employee_id BIGINT UNIQUE COMMENT '關聯員工表 ID',
+  enabled BOOLEAN DEFAULT TRUE COMMENT '帳號是否啟用',
+  last_login_at TIMESTAMP NULL COMMENT '最後登入時間',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_users_employee
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+    ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 10. 角色表
+-- 10. 角色表 (加強版：增加描述)
 -- ------------------------------------------------------------
 CREATE TABLE roles (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(50) UNIQUE NOT NULL
+  name VARCHAR(50) UNIQUE NOT NULL COMMENT '角色代碼 (如 ROLE_ADMIN, ROLE_MANAGER)',
+  description VARCHAR(100) COMMENT '角色中文名稱/描述'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 11. 使用者角色關聯表
+-- 10.1 權限定義表 (新增：實作顆粒度權限控制)
+-- ------------------------------------------------------------
+CREATE TABLE permissions (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(50) UNIQUE NOT NULL COMMENT '權限識別碼 (如 purchase:view, order:create)',
+  description VARCHAR(100) COMMENT '權限描述',
+  module VARCHAR(50) COMMENT '所屬模組 (如 進貨, 銷售, 財務)'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 11. 使用者角色關聯表 (保持不變，標準多對多)
 -- ------------------------------------------------------------
 CREATE TABLE user_roles (
   user_id BIGINT NOT NULL,
   role_id BIGINT NOT NULL,
   PRIMARY KEY(user_id, role_id),
-  FOREIGN KEY(user_id) REFERENCES users(id)
-    ON DELETE CASCADE ON UPDATE CASCADE,
-  FOREIGN KEY(role_id) REFERENCES roles(id)
-    ON DELETE CASCADE ON UPDATE CASCADE
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY(role_id) REFERENCES roles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 11.1 角色權限關聯表 (新增：角色與權限的多對多)
+-- ------------------------------------------------------------
+CREATE TABLE role_permissions (
+  role_id BIGINT NOT NULL,
+  permission_id BIGINT NOT NULL,
+  PRIMARY KEY(role_id, permission_id),
+  FOREIGN KEY(role_id) REFERENCES roles(id) ON DELETE CASCADE,
+  FOREIGN KEY(permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 11.2 登入審核日誌 (新增：安全性稽核用)
+-- ------------------------------------------------------------
+CREATE TABLE login_logs (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT,
+  login_ip VARCHAR(45),
+  login_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  status ENUM('SUCCESS', 'FAILED') DEFAULT 'SUCCESS',
+  user_agent VARCHAR(255),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
-CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
+CREATE INDEX idx_role_permissions_role_id ON role_permissions(role_id);
 
 -- ------------------------------------------------------------
 -- 12. 訂單商家表 (合作單位)

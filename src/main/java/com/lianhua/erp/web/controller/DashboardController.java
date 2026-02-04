@@ -42,7 +42,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "400", description = "請求參數錯誤", content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤", content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER', 'ADMIN')")
+
     public ResponseEntity<ApiResponseDto<DashboardStatsDto>> getStats() {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getDashboardStats()));
     }
@@ -53,7 +53,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "200", description = "成功取得趨勢數據", content = @Content(array = @ArraySchema(schema = @Schema(implementation = TrendPointDto.class)))),
             @ApiResponse(responseCode = "500", description = "伺服器錯誤", content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER', 'ADMIN')")
+
     public ResponseEntity<ApiResponseDto<List<TrendPointDto>>> getTrends(
             @Parameter(description = "回溯天數", example = "30") @RequestParam(defaultValue = "30") int days
     ) {
@@ -66,7 +66,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "200", description = "成功取得支出結構數據", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ExpenseCompositionDto.class)))),
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER', 'ADMIN')")
+
     public ResponseEntity<ApiResponseDto<List<ExpenseCompositionDto>>> getExpenseComposition() {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getExpenseComposition()));
     }
@@ -77,7 +77,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "200", description = "成功取得清單", content = @Content(array = @ArraySchema(schema = @Schema(implementation = DashboardTaskDto.class)))),
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER', 'ADMIN')")
+
     public ResponseEntity<ApiResponseDto<List<DashboardTaskDto>>> getTasks() {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getPendingTasks()));
     }
@@ -93,7 +93,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "200", description = "成功取得帳齡數據", content = @Content(array = @ArraySchema(schema = @Schema(implementation = AccountAgingDto.class)))),
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+
     public ResponseEntity<ApiResponseDto<List<AccountAgingDto>>> getAgingAnalytics() {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getAgingAnalytics()));
     }
@@ -104,7 +104,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "200", description = "成功取得損益趨勢", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ProfitLossPointDto.class)))),
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+
     public ResponseEntity<ApiResponseDto<List<ProfitLossPointDto>>> getProfitLossTrend(
             @Parameter(description = "回溯月數", example = "6") @RequestParam(defaultValue = "6") int months
     ) {
@@ -117,7 +117,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "200", description = "成功取得漏斗數據", content = @Content(array = @ArraySchema(schema = @Schema(implementation = OrderFunnelDto.class)))),
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER', 'ADMIN')")
+
     public ResponseEntity<ApiResponseDto<List<OrderFunnelDto>>> getOrderFunnel(
             @Parameter(description = "會計期間 (YYYY-MM)", example = "2026-01") @RequestParam(required = false) String period
     ) {
@@ -135,7 +135,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "400", description = "會計期間格式錯誤", content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
             @ApiResponse(responseCode = "500", description = "系統錯誤", content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+
     public ResponseEntity<ApiResponseDto<List<BreakEvenPointDto>>> getBreakEven(
             @Parameter(description = "會計期間 (YYYY-MM)", example = "2026-01") @RequestParam String period
     ) {
@@ -147,7 +147,7 @@ public class DashboardController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "成功取得財務指標", content = @Content(schema = @Schema(implementation = LiquidityDto.class)))
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+
     public ResponseEntity<ApiResponseDto<LiquidityDto>> getLiquidity() {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getLiquidityAnalytics()));
     }
@@ -172,7 +172,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "200", description = "成功", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ProductParetoDto.class)))),
             @ApiResponse(responseCode = "400", description = "日期格式錯誤")
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+
     public ResponseEntity<ApiResponseDto<List<ProductParetoDto>>> getProductPareto(
             @Parameter(description = "開始日期", example = "2026-01-01") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @Parameter(description = "結束日期", example = "2026-01-31") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end
@@ -185,7 +185,7 @@ public class DashboardController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "成功", content = @Content(array = @ArraySchema(schema = @Schema(implementation = SupplierConcentrationDto.class))))
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+
     public ResponseEntity<ApiResponseDto<List<SupplierConcentrationDto>>> getSupplierConcentration(
             @Parameter(description = "開始日期") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
             @Parameter(description = "結束日期") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end
@@ -198,7 +198,7 @@ public class DashboardController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "成功", content = @Content(array = @ArraySchema(schema = @Schema(implementation = CustomerRetentionDto.class))))
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER', 'ADMIN')")
+
     public ResponseEntity<ApiResponseDto<List<CustomerRetentionDto>>> getCustomerRetention() {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getCustomerRetention()));
     }
@@ -217,7 +217,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+
     public ResponseEntity<ApiResponseDto<List<PurchaseStructureDto>>> getPurchaseStructure(
             @Parameter(description = "開始日期 (YYYY-MM-DD)", example = "2026-01-01")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
@@ -242,7 +242,7 @@ public class DashboardController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
+
     public ResponseEntity<ApiResponseDto<List<CustomerConcentrationDto>>> getCustomerConcentration(
             @Parameter(description = "開始日期 (YYYY-MM-DD)", example = "2026-01-01")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,

@@ -14,28 +14,32 @@ public class CorsConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
+
+        // 1. 允許攜帶憑證（如 Cookie，雖然我們主要用 JWT，但開啟此項能增加未來擴充性）
         config.setAllowCredentials(true);
 
-        // ✅ 允許的前端來源
+        // 2. 允許的前端來源：包含 Vite 預設埠號
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "http://127.0.0.1:5173"
+                "http://127.0.0.1:5173",
+                "http://localhost:3000" // 備用常見埠號
         ));
 
-        // ✅ 關鍵修正：加入 "PATCH" 方法
-        // 瀏覽器在發送 PATCH 前會先發送 OPTIONS，這裡必須包含兩者
+        // 3. 允許的方法：ERP 常見的增刪改查，包含必要的 PATCH 與 OPTIONS
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-        // ✅ 關鍵修正：允許所有 Headers 或明確指定常用標頭
-        // 有時候前端會帶入自訂標頭，設定為 "*" 最為穩健
+        // 4. 允許的標頭：設為 "*" 以兼容 React-Admin 或 Swagger 可能帶入的自定義標頭
         config.setAllowedHeaders(List.of("*"));
 
-        // ✅ 設定預檢請求的有效時間 (秒)
-        // 設定為 3600 秒 (1小時) 可以讓瀏覽器不用每次點擊都問一次 OPTIONS，增加即時性
+        // 5. 💡 關鍵新增：暴露標頭
+        // 確保前端 JavaScript (如 axios/fetch) 能夠讀取到回應中的 Authorization 標頭
+        config.setExposedHeaders(List.of("Authorization", "Content-Type"));
+
+        // 6. 設定預檢請求 (OPTIONS) 的有效時間 (1小時)
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // 確保路徑對應您的 API 根路徑
+        // 對所有以 /api/ 開頭的路徑生效
         source.registerCorsConfiguration("/api/**", config);
 
         return new CorsFilter(source);

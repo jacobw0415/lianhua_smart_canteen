@@ -1,5 +1,6 @@
 package com.lianhua.erp.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
@@ -8,11 +9,6 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * 使用者實體
- * 對應資料表：users
- * 關聯：一對多 -> user_roles
- */
 @Entity
 @Table(name = "users")
 @Getter
@@ -23,26 +19,33 @@ import java.util.Set;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class User {
-    
-    // ===============================
-    // 🔹 欄位定義
-    // ===============================
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
     private Long id;
-    
+
     @Column(nullable = false, unique = true, length = 60)
     private String username;
-    
+
+    @JsonIgnore // 安全考量：序列化 JSON 時隱藏密碼
     @Column(nullable = false)
     private String password;
-    
+
+    @Column(name = "full_name")
     private String fullName;
-    
+
+    @Column(unique = true)
+    private String email; // 🌿 新增：對應加強版 SQL
+
+    @Column(name = "employee_id", unique = true)
+    private Long employee_id; // 🌿 新增：對應員工關聯 (可改為 @OneToOne 關聯 Employee 實體)
+
     @Builder.Default
     private Boolean enabled = true;
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt; // 🌿 新增：紀錄登入時間
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -51,54 +54,41 @@ public class User {
     private LocalDateTime updatedAt;
 
     @PrePersist
-    public void prePersist() {
+    protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
-    public void preUpdate() {
+    protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
-    
+
     // ===============================
-    // 🔹 關聯設定：User ↔ UserRole
+    // 🔹 簡化關聯：直接多對多 Roles
     // ===============================
-    
+
     @Builder.Default
-    @OneToMany(
-            mappedBy = "user",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true,
-            fetch = FetchType.LAZY
+    @ManyToMany(fetch = FetchType.EAGER) // 登入時通常需要立即知道權限，改用 EAGER
+    @JoinTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
     )
-    @JsonIgnoreProperties({"user", "hibernateLazyInitializer", "handler"})
-    private Set<UserRole> userRoles = new HashSet<>();
-    
+    private Set<Role> roles = new HashSet<>();
+
     // ===============================
-    // 🔹 輔助方法：維護雙向關聯
+    // 🔹 輔助方法
     // ===============================
-    
-    public void addRole(UserRole userRole) {
-        if (userRole == null) return;
-        if (userRoles == null) {
-            userRoles = new HashSet<>();
-        }
-        userRoles.add(userRole);
-        userRole.setUser(this);
+
+    public void addRole(Role role) {
+        this.roles.add(role);
     }
-    
-    public void removeRole(UserRole userRole) {
-        if (userRole == null) return;
-        if (userRoles != null) {
-            userRoles.remove(userRole);
-        }
-        userRole.setUser(null);
+
+    public void removeRole(Role role) {
+        this.roles.remove(role);
     }
-    
-    // ===============================
-    // 🔹 可選：避免 toString() 循環參照
-    // ===============================
+
     @Override
     public String toString() {
         return "User{" +
@@ -106,7 +96,6 @@ public class User {
                 ", username='" + username + '\'' +
                 ", fullName='" + fullName + '\'' +
                 ", enabled=" + enabled +
-                ", roles=" + (userRoles != null ? userRoles.size() : 0) +
                 '}';
     }
 }

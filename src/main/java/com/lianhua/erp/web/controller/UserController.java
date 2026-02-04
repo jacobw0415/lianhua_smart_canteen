@@ -20,48 +20,30 @@ import java.util.List;
 
 /**
  * 使用者管理 API
- * 包含：註冊、查詢、建立、更新、刪除。
+ * 包含：查詢、建立、更新、刪除（註冊邏輯建議移至 AuthController）。
  */
 @RestController
 @RequestMapping("/api/users")
-@Tag(name = "使用者管理", description = "使用者與角色管理 API")
+@Tag(name = "使用者管理", description = "提供管理員維護 ERP 帳號、權限角色與員工關聯之功能")
 public class UserController {
 
     private final UserService userService;
+
     public UserController(UserService userService) {
         this.userService = userService;
     }
 
     // ============================================================
-    // 🟢 一般使用者註冊（自動套用 USER 角色）
-    // ============================================================
-    @Operation(summary = "使用者註冊（自動套用 USER 角色）")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "註冊成功",
-                    content = @Content(schema = @Schema(implementation = UserDto.class))),
-            @ApiResponse(responseCode = "400", description = "參數錯誤",
-                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
-            @ApiResponse(responseCode = "409", description = "使用者已存在",
-                    content = @Content(schema = @Schema(implementation = ConflictResponse.class))),
-            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
-                    content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
-    })
-    @PostMapping("/register")
-    public ResponseEntity<ApiResponseDto<UserDto>> registerUser(@Valid @RequestBody UserRegisterDto dto) {
-        return ResponseEntity.ok(ApiResponseDto.ok(userService.registerUser(dto)));
-    }
-
-    // ============================================================
-    // ⚙️ 管理員功能區
+    // ⚙️ 管理員功能區 (RBAC 保護)
     // ============================================================
 
-    @Operation(summary = "取得所有使用者（含角色）")
+    @Operation(summary = "取得所有使用者（含角色與基本資訊）")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "成功取得所有使用者",
                     content = @Content(schema = @Schema(implementation = UserDto.class))),
-            @ApiResponse(responseCode = "403", description = "無權限",
+            @ApiResponse(responseCode = "403", description = "無權限存取（需具備 ROLE_ADMIN）",
                     content = @Content(schema = @Schema(implementation = ForbiddenResponse.class))),
-            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @GetMapping
@@ -70,13 +52,13 @@ public class UserController {
         return ResponseEntity.ok(ApiResponseDto.ok(userService.getAllUsers()));
     }
 
-    @Operation(summary = "取得指定使用者（含角色）")
+    @Operation(summary = "取得指定使用者詳細資訊")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "成功取得使用者資訊",
                     content = @Content(schema = @Schema(implementation = UserDto.class))),
-            @ApiResponse(responseCode = "404", description = "找不到使用者",
+            @ApiResponse(responseCode = "404", description = "找不到該使用者 ID",
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class))),
-            @ApiResponse(responseCode = "500", description = "伺服器錯誤",
+            @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @GetMapping("/{id}")
@@ -85,49 +67,50 @@ public class UserController {
         return ResponseEntity.ok(ApiResponseDto.ok(userService.getUserById(id)));
     }
 
-    @Operation(summary = "建立使用者（可指定角色）")
+    @Operation(summary = "建立使用者（支援角色設定與員工關聯）")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "成功建立使用者",
+            @ApiResponse(responseCode = "201", description = "成功建立使用者",
                     content = @Content(schema = @Schema(implementation = UserDto.class))),
-            @ApiResponse(responseCode = "400", description = "參數錯誤",
+            @ApiResponse(responseCode = "400", description = "參數錯誤（如 Email 格式不正確）",
                     content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
-            @ApiResponse(responseCode = "409", description = "使用者已存在",
+            @ApiResponse(responseCode = "409", description = "帳號或電子郵件已存在",
                     content = @Content(schema = @Schema(implementation = ConflictResponse.class)))
     })
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponseDto<UserDto>> createUser(@RequestBody UserRequestDto dto) {
+    public ResponseEntity<ApiResponseDto<UserDto>> createUser(@Valid @RequestBody UserRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponseDto.created(userService.createUser(dto)));
     }
 
-    @Operation(summary = "更新使用者資訊（可修改角色）")
+    @Operation(summary = "更新使用者資訊（含權限變更與帳號啟停）")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "成功更新使用者",
                     content = @Content(schema = @Schema(implementation = UserDto.class))),
-            @ApiResponse(responseCode = "400", description = "更新參數錯誤",
+            @ApiResponse(responseCode = "400", description = "更新參數格式錯誤",
                     content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
-            @ApiResponse(responseCode = "404", description = "找不到使用者",
+            @ApiResponse(responseCode = "404", description = "找不到該使用者 ID",
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponseDto<UserDto>> updateUser(
-            @PathVariable Long id, @RequestBody UserRequestDto dto) {
+            @PathVariable Long id, @Valid @RequestBody UserRequestDto dto) {
         return ResponseEntity.ok(ApiResponseDto.ok(userService.updateUser(id, dto)));
     }
 
-    @Operation(summary = "刪除使用者（限管理員）")
+    @Operation(summary = "刪除使用者帳號")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "成功刪除使用者",
-                    content = @Content(schema = @Schema(implementation = NoContentResponse.class))),
-            @ApiResponse(responseCode = "404", description = "找不到使用者",
+            @ApiResponse(responseCode = "204", description = "成功刪除使用者"),
+            @ApiResponse(responseCode = "403", description = "無權限刪除",
+                    content = @Content(schema = @Schema(implementation = ForbiddenResponse.class))),
+            @ApiResponse(responseCode = "404", description = "找不到該使用者 ID",
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
-        return ResponseEntity.noContent().build(); // 204 No Content，無 body
+        return ResponseEntity.noContent().build();
     }
 }
