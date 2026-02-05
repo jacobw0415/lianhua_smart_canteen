@@ -21,7 +21,7 @@ public class JwtUtils {
     @Value("${lianhua.app.jwtSecret:LianhuaERP_Secure_Secret_Key_2026_Standard}")
     private String jwtSecret;
 
-    @Value("${lianhua.app.jwtExpirationMs:86400000}")
+    @Value("${lianhua.app.jwtExpirationMs:3600000}")
     private int jwtExpirationMs;
 
     private SecretKey getSigningKey() {
@@ -42,7 +42,7 @@ public class JwtUtils {
                 .setSubject(userPrincipal.getUsername())
                 .claim("uid", userPrincipal.getId())
                 .claim("roles", roles)
-                .setIssuedAt(new Date())
+                .setIssuer("Lianhua-ERP-System")
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
@@ -70,7 +70,7 @@ public class JwtUtils {
         } catch (SecurityException | MalformedJwtException e) {
             log.error("無效的 JWT 簽名: {}", e.getMessage());
         } catch (ExpiredJwtException e) {
-            log.error("JWT Token 已過期: {}", e.getMessage());
+            log.warn("JWT Token 已過期，系統將強制登出使用者: {}", e.getMessage());
         } catch (UnsupportedJwtException e) {
             log.error("不支援的 JWT Token: {}", e.getMessage());
         } catch (IllegalArgumentException e) {

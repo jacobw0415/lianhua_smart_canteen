@@ -436,6 +436,23 @@ CREATE TABLE user_notifications (
 
 CREATE INDEX idx_user_notifications_status ON user_notifications(user_id, is_read);
 
+-- ------------------------------------------------------------
+-- 17. 密碼重設權杖表 (新增：支援忘記密碼功能)
+-- ------------------------------------------------------------
+CREATE TABLE password_reset_tokens (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  token VARCHAR(100) NOT NULL UNIQUE COMMENT '加密後的重設權杖',
+  user_id BIGINT NOT NULL COMMENT '關聯的使用者',
+  expiry_date TIMESTAMP NOT NULL COMMENT '權杖過期時間',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_password_reset_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_password_reset_token ON password_reset_tokens(token);
+
 -- ============================================================
 --    Schema v2.7 完成：
 --    1. 整合 v2.6 所有修正（作廢機制、費用類別更新）。

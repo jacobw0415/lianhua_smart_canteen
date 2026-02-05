@@ -29,7 +29,6 @@ public class GlobalSearchController {
     private final GlobalSearchService globalSearchService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('GLOBAL_SEARCH')")
     @Operation(summary = "全域搜尋", description = "輸入關鍵字即可在訂單編號、進貨單號、客戶名稱等欄位中進行模糊搜尋，並支援月份過濾")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "搜尋成功", content = @Content(schema = @Schema(implementation = GlobalSearchResponse.class))),

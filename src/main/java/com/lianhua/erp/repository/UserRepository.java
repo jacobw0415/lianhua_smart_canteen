@@ -15,6 +15,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /** 透過帳號查找使用者（登入核心邏輯） */
     Optional<User> findByUsername(String username);
 
+    //  /** 透過帳號查找信箱（登入核心邏輯） */
+    Optional<User> findByEmail(String email);
+
     /** * 取得單一使用者並抓取角色
      * 註：若 Entity 已設為 EAGER，此方法可簡化，但使用 JOIN FETCH 可確保在不同情境下的效能優化
      */

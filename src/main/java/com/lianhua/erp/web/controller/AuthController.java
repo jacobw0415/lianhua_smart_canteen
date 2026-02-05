@@ -1,6 +1,8 @@
 package com.lianhua.erp.web.controller;
 
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
+import com.lianhua.erp.dto.auth.ForgotPasswordRequest;
+import com.lianhua.erp.dto.auth.ResetPasswordRequest;
 import com.lianhua.erp.dto.error.*;
 import com.lianhua.erp.dto.user.JwtResponse;
 import com.lianhua.erp.dto.user.UserRegisterDto;
@@ -8,6 +10,7 @@ import com.lianhua.erp.dto.user.UserDto;
 import com.lianhua.erp.security.CustomUserDetails;
 import com.lianhua.erp.security.JwtUtils;
 import com.lianhua.erp.service.AuthService;
+import com.lianhua.erp.service.PasswordResetService;
 import com.lianhua.erp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -43,14 +46,16 @@ public class AuthController {
     private final JwtUtils jwtUtils;
     private final UserService userService;
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
 
     public AuthController(AuthenticationManager authenticationManager,
                           JwtUtils jwtUtils,
-                          UserService userService, AuthService authService) {
+                          UserService userService, AuthService authService, PasswordResetService passwordResetService) {
         this.authenticationManager = authenticationManager;
         this.jwtUtils = jwtUtils;
         this.userService = userService;
         this.authService = authService;
+        this.passwordResetService = passwordResetService;
     }
 
     // ============================================================
@@ -96,6 +101,36 @@ public class AuthController {
         body.setRoles(roles);               // ✅ 前端會存成 localStorage.roles / role
 
         return ApiResponseDto.ok(body);
+    }
+
+    // ============================================================
+    // 📧 忘記密碼 (Forgot Password)
+    // ============================================================
+    @Operation(summary = "忘記密碼 - 發送重設郵件", description = "接收 Email 並發送帶有 Token 的重設連結")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "郵件發送成功"),
+            @ApiResponse(responseCode = "404", description = "找不到該 Email 關聯的帳號",
+                    content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
+    })
+    @PostMapping("/forgot-password") // 🌿 調用此處會讓 Service.processForgotPassword 亮燈
+    public ApiResponseDto<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordResetService.processForgotPassword(request);
+        return ApiResponseDto.ok("重設連結已發送至您的信箱，請於 15 分鐘內完成操作");
+    }
+
+    // ============================================================
+    // 🔑 重設密碼 (Reset Password)
+    // ============================================================
+    @Operation(summary = "提交重設密碼", description = "驗證郵件中的 Token 並更新為新密碼")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "密碼重設成功"),
+            @ApiResponse(responseCode = "400", description = "Token 無效或已過期",
+                    content = @Content(schema = @Schema(implementation = BadRequestResponse.class)))
+    })
+    @PostMapping("/reset-password") // 🌿 調用此處會讓 Service.resetPassword 亮燈
+    public ApiResponseDto<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.resetPassword(request);
+        return ApiResponseDto.ok("密碼已成功更新，請使用新密碼登入");
     }
 
     // ============================================================
