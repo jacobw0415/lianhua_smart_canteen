@@ -9,9 +9,9 @@ public interface EmailService {
     /**
      * 發送密碼重設郵件
      * @param toEmail 收件人地址
-     * @param token 驗證權杖
+     * @param resetLink 完整的重設連結 (包含 Protocol, IP/Domain, Path 與 Token)
      */
-    void sendPasswordResetEmail(String toEmail, String token);
+    void sendPasswordResetEmail(String toEmail, String resetLink);
 
     /**
      * 通用 HTML 郵件發送 (供通知中心使用)

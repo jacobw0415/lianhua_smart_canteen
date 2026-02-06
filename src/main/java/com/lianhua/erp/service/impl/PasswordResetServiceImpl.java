@@ -11,6 +11,8 @@ import com.lianhua.erp.service.PasswordResetService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PasswordResetServiceImpl implements PasswordResetService {
@@ -27,6 +30,10 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
 
+    // 從 application.properties 讀取預設網址，若無則預設 localhost
+    @Value("${app.frontend.default-url:http://localhost:5173}")
+    private String defaultFrontendUrl;
+
     @Override
     @Transactional
     public void processForgotPassword(@Valid ForgotPasswordRequest request) {
@@ -34,22 +41,37 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new EntityNotFoundException("找不到與此 Email 關聯的帳號"));
 
-        // 2. 清理舊的重設請求
+        // 2. 清理該使用者舊的重設請求，確保 Token 唯一性
         tokenRepository.deleteByUserId(user.getId());
         tokenRepository.flush();
 
-        // 3. 生成 15 分鐘有效的 Token
+        // 3. 生成 15 分鐘有效的 Token 並儲存
         String token = UUID.randomUUID().toString();
         PasswordResetToken resetToken = new PasswordResetToken();
         resetToken.setToken(token);
         resetToken.setUser(user);
         resetToken.setExpiryDate(LocalDateTime.now().plusMinutes(15));
 
-
         tokenRepository.save(resetToken);
 
-        // 4. 發送郵件
-        emailService.sendPasswordResetEmail(user.getEmail(), token);
+        // 4. 動態組裝重設連結
+        // 優先使用前端傳入的 URL (例如 http://10.18.2.103:5173)，若無則 fallback 到設定檔
+        String baseUrl = request.getResetLinkBaseUrl();
+        if (baseUrl == null || baseUrl.isBlank()) {
+            baseUrl = defaultFrontendUrl;
+        }
+
+        // 去除結尾斜線並拼接路徑與 Token
+        String cleanBaseUrl = baseUrl.endsWith("/")
+                ? baseUrl.substring(0, baseUrl.length() - 1)
+                : baseUrl;
+
+        String resetLink = cleanBaseUrl + "/reset-password?token=" + token;
+
+        log.info("發送密碼重設郵件至: {}, 產生的連結: {}", user.getEmail(), resetLink);
+
+        // 5. 發送郵件 (傳送完整的 resetLink)
+        emailService.sendPasswordResetEmail(user.getEmail(), resetLink);
     }
 
     @Override
@@ -70,7 +92,8 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
-        // 4. 刪除已使用的 Token
+        // 4. 刪除已使用的 Token，確保單次有效
         tokenRepository.delete(resetToken);
+        log.info("使用者 {} 密碼重設成功", user.getUsername());
     }
 }
