@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.ar;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -24,6 +25,7 @@ public class ARAgingOrderDetailDto {
     private String orderNo;
 
     @Schema(description = "訂單日期", example = "2025-01-08")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate orderDate;
 
     @Schema(description = "交貨日期", example = "2025-01-10")

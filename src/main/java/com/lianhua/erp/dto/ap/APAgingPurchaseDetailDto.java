@@ -1,5 +1,6 @@
 package com.lianhua.erp.dto.ap;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -24,6 +25,7 @@ public class APAgingPurchaseDetailDto {
     private String purchaseNo;
 
     @Schema(description = "進貨日期", example = "2025-01-08")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate purchaseDate;
 
     @Schema(description = "該筆進貨金額（total amount）", example = "5000.00")
