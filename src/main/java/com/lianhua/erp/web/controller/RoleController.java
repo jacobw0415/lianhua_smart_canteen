@@ -27,7 +27,7 @@ import java.util.Set;
  */
 @RestController
 @RequestMapping("/api/roles")
-@Tag(name = "03. 角色與權限管理", description = "提供管理員維護 ERP 角色與權限映射功能")
+@Tag(name = "角色與權限管理", description = "提供管理員維護 ERP 角色與權限映射功能")
 @RequiredArgsConstructor
 public class RoleController {
 
@@ -40,7 +40,7 @@ public class RoleController {
             @ApiResponse(responseCode = "403", description = "權限不足（需管理員權限）", content = @Content(schema = @Schema(implementation = ForbiddenResponse.class)))
     })
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('role:view')")
     public ResponseEntity<ApiResponseDto<List<RoleDto>>> getAllRoles() {
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponseDto.ok(roleService.getAllRoles()));
@@ -52,7 +52,7 @@ public class RoleController {
             @ApiResponse(responseCode = "404", description = "找不到該角色 ID", content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('role:view')")
     public ResponseEntity<ApiResponseDto<RoleDto>> getRoleById(@PathVariable Long id) {
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponseDto.ok(roleService.getRoleById(id)));
@@ -65,7 +65,7 @@ public class RoleController {
             @ApiResponse(responseCode = "404", description = "角色或權限 ID 不存在", content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}/permissions")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('role:edit')")
     public ResponseEntity<ApiResponseDto<RoleDto>> updateRolePermissions(
             @PathVariable Long id,
             @RequestBody Set<String> permissionNames) {

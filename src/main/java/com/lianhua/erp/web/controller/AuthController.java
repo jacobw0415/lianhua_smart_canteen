@@ -39,7 +39,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/auth")
-@Tag(name = "01. 認證管理", description = "登入與註冊相關 API (公開路徑)")
+@Tag(name = "認證管理", description = "登入與註冊相關 API (公開路徑)")
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
@@ -92,13 +92,18 @@ public class AuthController {
         List<String> roles = principal.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .toList();
+        // 僅角色代碼（ROLE_ 開頭），供前端角色選單/下拉使用，避免與權限混在一起出現多種選項
+        List<String> roleNames = roles.stream()
+                .filter(a -> a != null && a.startsWith("ROLE_"))
+                .toList();
 
         JwtResponse body = new JwtResponse();
         body.setId(userId);                 // ✅ 前端會存成 localStorage.userId
         body.setToken(jwt);
         body.setType("Bearer");
         body.setUsername(principal.getUsername());
-        body.setRoles(roles);               // ✅ 前端會存成 localStorage.roles / role
+        body.setRoles(roles);              // ✅ 完整 authorities（角色+權限），供權限判斷
+        body.setRoleNames(roleNames);       // ✅ 僅角色，供「角色代碼」顯示/選項用
 
         return ApiResponseDto.ok(body);
     }

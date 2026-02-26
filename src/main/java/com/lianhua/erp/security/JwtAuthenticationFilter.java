@@ -22,7 +22,8 @@ import java.util.stream.Collectors;
 
 /**
  * JWT 認證過濾器 (效能優化版)
- * 負責攔截請求、從 Claims 提取權限並建立安全上下文，避免重複查詢資料庫
+ * 負責攔截請求、從 JWT 的 "roles" claim 提取「角色與權限」(authorities) 並建立安全上下文，避免重複查詢資料庫。
+ * 註：claim 名為 "roles"，內容實際為角色名 + 權限名合併清單，供 hasRole / hasAuthority 使用。
  */
 @Slf4j
 @Component
@@ -45,11 +46,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 2. 驗證 Token 是否有效
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
 
-                // 3. 直接從 Token 取得 Claims (內含 uid 與 roles)
+                // 3. 從 Token 取得 Claims（含 uid 與 "roles"：角色+權限合併的 authority 清單）
                 Claims claims = jwtUtils.getClaimsFromJwtToken(jwt);
                 String username = claims.getSubject();
 
-                // 4. 將 Claims 中的 roles 映射為 Spring Security 的 Authorities
+                // 4. 將 "roles" claim 映射為 Spring Security 的 Authorities（供 hasRole / hasAuthority 使用）
                 @SuppressWarnings("unchecked")
                 List<String> roles = claims.get("roles", List.class);
 
@@ -69,7 +70,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // 6. 存入 Security 上下文，讓 @PreAuthorize 生效
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                log.debug("已從 Token 建立使用者 '{}' 的安全上下文, 角色: {}", username, roles);
+                log.debug("已從 Token 建立使用者 '{}' 的安全上下文, authorities: {}", username, roles);
             }
         } catch (Exception e) {
             log.error("無法設定使用者認證: {}", e.getMessage());

@@ -25,7 +25,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/users")
-@Tag(name = "02. 使用者管理", description = "提供管理員維護 ERP 帳號、權限角色與員工關聯之功能")
+@Tag(name = "使用者管理", description = "提供管理員維護 ERP 帳號、權限角色與員工關聯之功能")
 public class UserController {
 
     private final UserService userService;
@@ -63,7 +63,7 @@ public class UserController {
             @ApiResponse(responseCode = "403", description = "權限不足（需管理員權限）", content = @Content(schema = @Schema(implementation = ForbiddenResponse.class)))
     })
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('user:view')")
     public ResponseEntity<ApiResponseDto<List<UserDto>>> getAllUsers() {
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponseDto.ok(userService.getAllUsers()));
@@ -71,7 +71,7 @@ public class UserController {
 
     @Operation(summary = "取得指定使用者詳細資訊")
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('user:view')")
     public ResponseEntity<ApiResponseDto<UserDto>> getUserById(@PathVariable Long id) {
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponseDto.ok(userService.getUserById(id)));
@@ -79,7 +79,7 @@ public class UserController {
 
     @Operation(summary = "建立使用者", description = "由管理員手動建立帳號")
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<ApiResponseDto<UserDto>> createUser(@Valid @RequestBody UserRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponseDto.created(userService.createUser(dto)));
@@ -87,7 +87,7 @@ public class UserController {
 
     @Operation(summary = "更新使用者資訊")
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<ApiResponseDto<UserDto>> updateUser(
             @PathVariable Long id, @Valid @RequestBody UserRequestDto dto) {
         return ResponseEntity.status(HttpStatus.OK)
@@ -96,7 +96,7 @@ public class UserController {
 
     @Operation(summary = "刪除使用者帳號")
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();

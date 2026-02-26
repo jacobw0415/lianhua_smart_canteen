@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -44,6 +45,7 @@ public class OrderController {
     })
     @PageableAsQueryParam
     @GetMapping
+    @PreAuthorize("hasAuthority('order:view')")
     public ResponseEntity<ApiResponseDto<Page<OrderResponseDto>>> list(
             @ParameterObject Pageable pageable
     ) {
@@ -78,6 +80,7 @@ public class OrderController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('order:view')")
     public ResponseEntity<ApiResponseDto<Page<OrderResponseDto>>> search(
             @ParameterObject OrderSearchRequest searchRequest,
             @ParameterObject Pageable pageable
@@ -97,6 +100,7 @@ public class OrderController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('order:view')")
     public ResponseEntity<ApiResponseDto<OrderResponseDto>> getById(
             @PathVariable Long id
     ) {
@@ -116,6 +120,7 @@ public class OrderController {
                     content = @Content(schema = @Schema(implementation = ConflictResponse.class)))
     })
     @PostMapping
+    @PreAuthorize("hasAuthority('order:edit')")
     public ResponseEntity<ApiResponseDto<OrderResponseDto>> create(
             @Valid @RequestBody OrderRequestDto dto
     ) {
@@ -128,6 +133,7 @@ public class OrderController {
     // ============================================================
     @Operation(summary = "更新訂單")
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('order:edit')")
     public ResponseEntity<ApiResponseDto<OrderResponseDto>> update(
             @PathVariable Long id,
             @Valid @RequestBody OrderRequestDto dto
@@ -140,6 +146,7 @@ public class OrderController {
     // ============================================================
     @Operation(summary = "刪除訂單")
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('order:edit')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

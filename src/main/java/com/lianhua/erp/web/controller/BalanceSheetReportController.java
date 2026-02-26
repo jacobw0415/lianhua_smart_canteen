@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,6 +32,7 @@ import java.util.List;
 @RequestMapping("/api/reports/balance_sheet")
 @RequiredArgsConstructor
 @Tag(name = "資產負債表", description = "資產負債表報表 API - 統計資產、負債與權益")
+@PreAuthorize("hasAuthority('report:view')")
 public class BalanceSheetReportController {
 
   private final BalanceSheetReportService balanceSheetReportService;

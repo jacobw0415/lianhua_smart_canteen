@@ -20,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -45,6 +46,7 @@ public class ExpenseController {
     })
     @PageableAsQueryParam
     @GetMapping
+    @PreAuthorize("hasAuthority('expense:view')")
     public ResponseEntity<ApiResponseDto<Page<ExpenseDto>>> getAll(
             @ParameterObject Pageable pageable
     ) {
@@ -64,6 +66,7 @@ public class ExpenseController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('expense:view')")
     public ResponseEntity<ApiResponseDto<ExpenseDto>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.findById(id)));
     }
@@ -83,6 +86,7 @@ public class ExpenseController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @PostMapping
+    @PreAuthorize("hasAuthority('expense:edit')")
     public ResponseEntity<ApiResponseDto<ExpenseDto>> create(@Valid @RequestBody ExpenseRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.ok(service.create(dto)));
     }
@@ -104,6 +108,7 @@ public class ExpenseController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('expense:edit')")
     public ResponseEntity<ApiResponseDto<ExpenseDto>> update(
             @PathVariable Long id, @Valid @RequestBody ExpenseRequestDto dto) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.update(id, dto)));
@@ -139,6 +144,7 @@ public class ExpenseController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('expense:view')")
     public ResponseEntity<ApiResponseDto<Page<ExpenseDto>>> searchExpenses(
             @ParameterObject ExpenseSearchRequest req,
             @ParameterObject Pageable pageable
@@ -164,6 +170,7 @@ public class ExpenseController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @PostMapping("/{id}/void")
+    @PreAuthorize("hasAuthority('expense:edit')")
     public ResponseEntity<ApiResponseDto<ExpenseDto>> voidExpense(
             @PathVariable Long id,
             @RequestBody(required = false) java.util.Map<String, String> request) {
@@ -185,6 +192,7 @@ public class ExpenseController {
                     content = @Content(schema = @Schema(implementation = BadRequestResponse.class)))
     })
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('expense:edit')")
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public void delete(@PathVariable Long id) {
 

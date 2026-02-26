@@ -27,6 +27,7 @@ import java.util.List;
 @RequestMapping("/api/dashboard")
 @RequiredArgsConstructor
 @Tag(name = "營運儀表板", description = "Dashboard Management API")
+@PreAuthorize("hasAuthority('dashboard:view')")
 public class DashboardController {
 
     private final DashboardService service;

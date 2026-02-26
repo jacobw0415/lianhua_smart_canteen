@@ -22,10 +22,12 @@ public class RoleServiceImpl implements RoleService {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
 
+    /** 僅回傳 name 以 ROLE_ 開頭的角色，避免歷史資料中的 ADMIN/USER 等非標準項出現在 Swagger/前端 */
     @Override
     @Transactional(readOnly = true)
     public List<RoleDto> getAllRoles() {
         return roleRepository.findAll().stream()
+                .filter(r -> r.getName() != null && r.getName().startsWith("ROLE_"))
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
@@ -60,6 +62,7 @@ public class RoleServiceImpl implements RoleService {
                 .id(role.getId())
                 .name(role.getName())
                 .description(role.getDescription())
+                .displayName(role.getDescription())
                 .permissions(role.getPermissions().stream()
                         .map(Permission::getName)
                         .collect(Collectors.toSet()))

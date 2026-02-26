@@ -28,8 +28,10 @@ public class JwtUtils {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** * [修改重點 1] 加入 uid 與 roles 到 JWT Claims
-     * 修改參數為 Authentication 以便取得 CustomUserDetails 的詳細資訊
+    /**
+     * 產生 JWT，並將 uid 與 authorities 寫入 Claims。
+     * 註：claim 名稱為 "roles"，但內容為「角色 + 權限」合併的 authority 清單（如 ROLE_ADMIN, user:view），
+     * 供 Filter 還原為 Spring Security 的 GrantedAuthority，使 hasRole / hasAuthority 皆可正確運作。
      */
     public String generateJwtToken(Authentication authentication) {
         CustomUserDetails userPrincipal = (CustomUserDetails) authentication.getPrincipal();
@@ -48,8 +50,9 @@ public class JwtUtils {
                 .compact();
     }
 
-    /** * [修改重點 2] 提取所有 Claims
-     * 方便 Filter 直接讀取 roles 而不需重複解析
+    /**
+     * 提取 JWT 所有 Claims（含 roles claim：角色與權限合併的 authority 清單）。
+     * 方便 Filter 直接讀取並還原 Security 上下文，無需重複查庫。
      */
     public Claims getClaimsFromJwtToken(String token) {
         return Jwts.parserBuilder()

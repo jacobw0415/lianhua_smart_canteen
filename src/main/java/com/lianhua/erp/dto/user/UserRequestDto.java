@@ -36,6 +36,9 @@ public class UserRequestDto {
     @Schema(description = "是否啟用帳號", example = "true")
     private Boolean enabled;
 
-    @Schema(description = "角色名稱列表，例如 ['ROLE_ADMIN', 'ROLE_USER']", example = "[\"ROLE_ADMIN\"]")
+    @Schema(
+            description = "角色代碼列表，須傳完整代碼（如 ROLE_ADMIN、ROLE_USER），後端會以大寫比對。可從 GET /api/roles 取得可用角色。",
+            example = "[\"ROLE_ADMIN\"]"
+    )
     private Set<String> roleNames;
 }

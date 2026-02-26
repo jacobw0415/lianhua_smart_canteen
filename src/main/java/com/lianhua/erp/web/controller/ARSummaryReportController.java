@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -19,6 +20,7 @@ import java.util.List;
 @RequestMapping("/api/reports/ar_summary")
 @RequiredArgsConstructor
 @Tag(name = "應收帳款總表", description = "應收帳款總表報表 API - 依會計期間彙總應收、已收、未收")
+@PreAuthorize("hasAuthority('report:view')")
 public class ARSummaryReportController {
 
     private final ARSummaryReportService summaryService;
