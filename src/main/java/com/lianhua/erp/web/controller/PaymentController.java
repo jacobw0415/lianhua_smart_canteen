@@ -18,6 +18,7 @@ import org.springdoc.core.converters.models.PageableAsQueryParam;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -45,6 +46,7 @@ public class PaymentController {
     })
     @PageableAsQueryParam
     @GetMapping
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<Page<PaymentResponseDto>>> getAllPayments(
             @ParameterObject Pageable pageable
     ) {
@@ -66,6 +68,7 @@ public class PaymentController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @GetMapping("/{purchaseId}")
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<PaymentResponseDto>> getPaymentsByPurchase(
             @PathVariable Long purchaseId
     ) {
@@ -87,6 +90,7 @@ public class PaymentController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @DeleteMapping("/{purchaseId}")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<Void>> deletePaymentsByPurchase(
             @PathVariable Long purchaseId
     ) {
@@ -113,6 +117,7 @@ public class PaymentController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<Page<PaymentResponseDto>>> searchPayments(
             @ParameterObject PaymentSearchRequest req,
             @ParameterObject Pageable pageable
@@ -141,6 +146,7 @@ public class PaymentController {
                             schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @PostMapping("/{id}/void")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<PaymentResponseDto>> voidPayment(
             @PathVariable Long id,
             @RequestBody(required = false) java.util.Map<String, String> request) {

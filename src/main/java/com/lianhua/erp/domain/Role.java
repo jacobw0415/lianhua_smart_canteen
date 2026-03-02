@@ -48,6 +48,7 @@ public class Role {
 
     @JsonIgnore // 避免循環參照
     @ManyToMany(mappedBy = "roles")
+    @Builder.Default
     private Set<User> users = new HashSet<>();
 
     // ===============================

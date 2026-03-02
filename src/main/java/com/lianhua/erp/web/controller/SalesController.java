@@ -22,6 +22,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -51,6 +52,7 @@ public class SalesController {
     })
     @PageableAsQueryParam
     @GetMapping
+    @PreAuthorize("hasAuthority('sale:view')")
     public ResponseEntity<ApiResponseDto<Page<SalesResponseDto>>> getAllSales(
             @ParameterObject Pageable pageable
     ) {
@@ -71,6 +73,7 @@ public class SalesController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('sale:view')")
     public ResponseEntity<ApiResponseDto<SalesResponseDto>> getSaleById(
             @PathVariable Long id
     ) {
@@ -95,6 +98,7 @@ public class SalesController {
                     content = @Content(schema = @Schema(implementation = ConflictResponse.class)))
     })
     @PostMapping
+    @PreAuthorize("hasAuthority('sale:edit')")
     public ResponseEntity<ApiResponseDto<SalesResponseDto>> createSale(
             @Valid @RequestBody SalesRequestDto dto
     ) {
@@ -119,6 +123,7 @@ public class SalesController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('sale:edit')")
     public ResponseEntity<ApiResponseDto<SalesResponseDto>> updateSale(
             @PathVariable Long id,
             @Valid @RequestBody SalesRequestDto dto
@@ -140,6 +145,7 @@ public class SalesController {
     })
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('sale:edit')")
     public void deleteSale(@PathVariable Long id) {
         salesService.delete(id);
     }
@@ -174,6 +180,7 @@ public class SalesController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('sale:view')")
     public ResponseEntity<ApiResponseDto<Page<SalesResponseDto>>> searchSales(
             @ParameterObject @ModelAttribute SaleSearchRequestDto req,
             @ParameterObject Pageable pageable

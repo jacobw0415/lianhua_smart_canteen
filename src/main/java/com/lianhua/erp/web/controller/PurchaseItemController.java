@@ -20,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -51,6 +52,7 @@ public class PurchaseItemController {
     })
     @PageableAsQueryParam
     @GetMapping("/api/purchase-items")
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<Page<PurchaseItemDto>>> getAllPurchaseItems(
             @ParameterObject Pageable pageable
     ) {
@@ -72,6 +74,7 @@ public class PurchaseItemController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @GetMapping("/api/purchases/{purchaseId}/items")
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<List<PurchaseItemDto>>> findByPurchaseId(
             @PathVariable Long purchaseId) {
         var items = service.findByPurchaseId(purchaseId);
@@ -101,6 +104,7 @@ public class PurchaseItemController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PostMapping("/api/purchases/{purchaseId}/items")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<PurchaseItemDto>> create(
             @PathVariable Long purchaseId,
             @Valid @RequestBody PurchaseItemRequestDto dto) {
@@ -133,6 +137,7 @@ public class PurchaseItemController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/api/purchases/{purchaseId}/items/{itemId}")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<PurchaseItemDto>> update(
             @PathVariable Long purchaseId,
             @PathVariable Long itemId,
@@ -166,6 +171,7 @@ public class PurchaseItemController {
     })
     @DeleteMapping("/api/purchases/{purchaseId}/items/{itemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public void delete(
             @PathVariable Long purchaseId,
             @PathVariable Long itemId) {

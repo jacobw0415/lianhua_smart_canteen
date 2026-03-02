@@ -28,6 +28,7 @@ public class Sale {
     
     @Column(name = "accounting_period", length = 7, nullable = false)
     @Schema(description = "會計期間（YYYY-MM）")
+    @Builder.Default
     private String accountingPeriod = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
     
     @Column(nullable = false)

@@ -17,6 +17,7 @@ import org.springdoc.core.converters.models.PageableAsQueryParam;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -46,6 +47,7 @@ public class EmployeeController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @PageableAsQueryParam
+    @PreAuthorize("hasAuthority('user:view')")
     public ResponseEntity<ApiResponseDto<Page<EmployeeResponseDto>>> findAll(
             @ParameterObject Pageable pageable
     ) {
@@ -68,6 +70,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('user:view')")
     public ResponseEntity<ApiResponseDto<List<EmployeeResponseDto>>> getActive() {
         List<EmployeeResponseDto> list = service.getActive();
         if (list.isEmpty()) {
@@ -90,6 +93,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('user:view')")
     public ResponseEntity<ApiResponseDto<EmployeeResponseDto>> findById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.findById(id)));
     }
@@ -109,6 +113,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<ApiResponseDto<EmployeeResponseDto>> create(
             @Valid @RequestBody EmployeeRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -132,6 +137,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<ApiResponseDto<EmployeeResponseDto>> update(
             @PathVariable Long id, @Valid @RequestBody EmployeeRequestDto dto) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.update(id, dto)));
@@ -162,6 +168,7 @@ public class EmployeeController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('user:view')")
     public ResponseEntity<ApiResponseDto<Page<EmployeeResponseDto>>> searchEmployees(
             @ParameterObject EmployeeSearchRequest request,
             @ParameterObject Pageable pageable
@@ -186,6 +193,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<ApiResponseDto<EmployeeResponseDto>> activate(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.activate(id)));
     }
@@ -206,6 +214,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<ApiResponseDto<EmployeeResponseDto>> deactivate(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.deactivate(id)));
     }
@@ -224,6 +233,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

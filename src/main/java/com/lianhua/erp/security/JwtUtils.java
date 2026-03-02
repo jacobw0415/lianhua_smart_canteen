@@ -25,6 +25,9 @@ public class JwtUtils {
     private int jwtExpirationMs;
 
     private SecretKey getSigningKey() {
+        if ("LianhuaERP_Secure_Secret_Key_2026_Standard".equals(jwtSecret)) {
+            log.warn("目前正在使用預設 JWT Secret，請於生產環境設定 lianhua.app.jwtSecret 以提高安全性。");
+        }
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 

@@ -18,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -48,6 +49,7 @@ public class SupplierController {
     })
     @PageableAsQueryParam      // 🔥 美化 pageable
     @GetMapping
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<Page<SupplierResponseDto>>> getAllSuppliers(
             @ParameterObject Pageable pageable      // 🔥 讓 pageable 展開成 page/size/sort
     ) {
@@ -68,6 +70,7 @@ public class SupplierController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<SupplierResponseDto>> getSupplierById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(supplierService.getSupplierById(id)));
     }
@@ -88,6 +91,7 @@ public class SupplierController {
                     content = @Content(schema = @Schema(implementation = ConflictResponse.class)))
     })
     @PostMapping
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<SupplierResponseDto>> createSupplier(
             @Valid @RequestBody SupplierRequestDto dto) {
 
@@ -109,6 +113,7 @@ public class SupplierController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<SupplierResponseDto>> updateSupplier(
             @PathVariable Long id,
             @Valid @RequestBody SupplierRequestDto dto) {
@@ -129,6 +134,7 @@ public class SupplierController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}/deactivate")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<SupplierResponseDto>> deactivateSupplier(
             @PathVariable Long id) {
 
@@ -149,6 +155,7 @@ public class SupplierController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}/activate")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<SupplierResponseDto>> activateSupplier(
             @PathVariable Long id) {
 
@@ -162,6 +169,7 @@ public class SupplierController {
     // ============================================================
     @Operation(summary = "刪除供應商")
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<Void>> deleteSupplier(@PathVariable Long id) {
         supplierService.deleteSupplier(id);
         return ResponseEntity.ok(ApiResponseDto.deleted());
@@ -190,6 +198,7 @@ public class SupplierController {
     })
     @PageableAsQueryParam   // 🔥 讓 Swagger 把 Pageable 展開成 page/size/sort
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<Page<SupplierResponseDto>>> searchSuppliers(
             @ParameterObject @ModelAttribute SupplierSearchRequest req, // 🔥 搜尋參數展開
             @ParameterObject Pageable pageable                         // 🔥 分頁展開
@@ -216,6 +225,7 @@ public class SupplierController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @GetMapping("/active")
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<List<SupplierResponseDto>>> getActiveSuppliers() {
 
         List<SupplierResponseDto> list = supplierService.getActiveSuppliers();

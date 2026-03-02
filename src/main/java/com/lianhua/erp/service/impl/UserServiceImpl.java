@@ -33,19 +33,22 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final UserAuditLogRepository userAuditLogRepository;
     private final ObjectMapper objectMapper;
+    private final com.lianhua.erp.service.PasswordPolicyValidator passwordPolicyValidator;
 
     public UserServiceImpl(UserRepository userRepository,
                            RoleRepository roleRepository,
                            PasswordEncoder passwordEncoder,
                            UserMapper userMapper,
                            UserAuditLogRepository userAuditLogRepository,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           com.lianhua.erp.service.PasswordPolicyValidator passwordPolicyValidator) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.userMapper = userMapper;
         this.userAuditLogRepository = userAuditLogRepository;
         this.objectMapper = objectMapper;
+        this.passwordPolicyValidator = passwordPolicyValidator;
     }
 
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
@@ -90,6 +93,7 @@ public class UserServiceImpl implements UserService {
         if (dto.getPassword() == null || dto.getPassword().isBlank()) {
             throw new IllegalArgumentException("建立使用者時密碼為必填");
         }
+        passwordPolicyValidator.validate(dto.getPassword());
         // 1. 唯一性校驗 (防禦性編程)
         if (userRepository.existsByUsername(dto.getUsername())) {
             throw new IllegalArgumentException("帳號名稱已存在: " + dto.getUsername());
@@ -131,6 +135,8 @@ public class UserServiceImpl implements UserService {
         if (userRepository.existsByUsername(dto.getUsername())) {
             throw new IllegalArgumentException("該帳號名稱已被註冊");
         }
+
+        passwordPolicyValidator.validate(dto.getPassword());
 
         Role defaultRole = roleRepository.findByName("ROLE_USER")
                 .orElseThrow(() -> new EntityNotFoundException("Default role ROLE_USER not found"));
@@ -192,6 +198,7 @@ public class UserServiceImpl implements UserService {
         if (dto.getEnabled() != null) user.setEnabled(dto.getEnabled());
 
         if (passwordReset) {
+            passwordPolicyValidator.validate(dto.getPassword());
             user.setPassword(passwordEncoder.encode(dto.getPassword()));
         }
 
@@ -261,6 +268,7 @@ public class UserServiceImpl implements UserService {
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
             throw new IllegalStateException("目前密碼錯誤");
         }
+        passwordPolicyValidator.validate(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         saveAudit(currentUserId, currentUserId, ACTION_USER_CHANGE_OWN_PASSWORD, "{\"password\":\"changed\"}");

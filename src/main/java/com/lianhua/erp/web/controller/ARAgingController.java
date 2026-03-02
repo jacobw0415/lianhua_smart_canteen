@@ -13,6 +13,7 @@ import org.springdoc.core.converters.models.PageableAsQueryParam;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RequestMapping("/api/ar")
 @RequiredArgsConstructor
 @Tag(name = "應收帳款紀錄", description = "應收帳款 API")
+@PreAuthorize("hasAuthority('report:view')")
 public class ARAgingController {
 
     private final ARAgingService agingService;

@@ -1,7 +1,6 @@
 package com.lianhua.erp.dto.error;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.Instant;
 
 @Schema(description = "統一錯誤回傳格式")
 public record ErrorResponse(

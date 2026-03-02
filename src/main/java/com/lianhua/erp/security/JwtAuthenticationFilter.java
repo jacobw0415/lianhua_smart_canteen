@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
+    private final com.lianhua.erp.service.TokenBlacklistService tokenBlacklistService;
 
     @Override
     protected void doFilterInternal(
@@ -43,8 +44,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 1. 從請求標頭提取 JWT
             String jwt = parseJwt(request);
 
-            // 2. 驗證 Token 是否有效
-            if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
+            // 2. 驗證 Token 是否有效，且未在黑名單中
+            if (jwt != null && jwtUtils.validateJwtToken(jwt) && !tokenBlacklistService.isBlacklisted(jwt)) {
 
                 // 3. 從 Token 取得 Claims（含 uid 與 "roles"：角色+權限合併的 authority 清單）
                 Claims claims = jwtUtils.getClaimsFromJwtToken(jwt);

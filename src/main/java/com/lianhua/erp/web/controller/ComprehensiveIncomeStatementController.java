@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,6 +33,7 @@ import java.util.List;
 @RequestMapping("/api/reports/comprehensive_income_statement")
 @RequiredArgsConstructor
 @Tag(name = "綜合損益表", description = "綜合損益表報表 API - 統計收入、成本、費用與淨利")
+@PreAuthorize("hasAuthority('report:view')")
 public class ComprehensiveIncomeStatementController {
 
     private final ComprehensiveIncomeStatementService comprehensiveIncomeStatementService;

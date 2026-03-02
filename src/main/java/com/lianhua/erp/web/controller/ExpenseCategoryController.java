@@ -16,6 +16,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +40,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('expense:view')")
     public ResponseEntity<ApiResponseDto<List<ExpenseCategoryResponseDto>>> getAll() {
         List<ExpenseCategoryResponseDto> list = service.getAll();
         if (list.isEmpty()) {
@@ -61,6 +63,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('expense:view')")
     public ResponseEntity<ApiResponseDto<List<ExpenseCategoryResponseDto>>> getActive() {
         List<ExpenseCategoryResponseDto> list = service.getActive();
         if (list.isEmpty()) {
@@ -83,6 +86,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('expense:view')")
     public ResponseEntity<ApiResponseDto<ExpenseCategoryResponseDto>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getById(id)));
     }
@@ -102,6 +106,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('expense:edit')")
     public ResponseEntity<ApiResponseDto<ExpenseCategoryResponseDto>> create(
             @Valid @RequestBody ExpenseCategoryRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -125,6 +130,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('expense:edit')")
     public ResponseEntity<ApiResponseDto<ExpenseCategoryResponseDto>> update(
             @PathVariable Long id, @Valid @RequestBody ExpenseCategoryRequestDto dto) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.update(id, dto)));
@@ -143,6 +149,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('expense:edit')")
     public ResponseEntity<ApiResponseDto<ExpenseCategoryResponseDto>> activate(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.activate(id)));
     }
@@ -162,6 +169,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('expense:edit')")
     public ResponseEntity<ApiResponseDto<ExpenseCategoryResponseDto>> deactivate(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.deactivate(id)));
     }
@@ -179,6 +187,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('expense:view')")
     public ResponseEntity<ApiResponseDto<List<ExpenseCategoryResponseDto>>> search(
             ExpenseCategorySearchRequest search) {
         
@@ -209,6 +218,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
+    @PreAuthorize("hasAuthority('expense:edit')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

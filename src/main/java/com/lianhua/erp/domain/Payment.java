@@ -34,17 +34,21 @@ public class Payment {
     private Purchase purchase;
 
     @Column(nullable = false, precision = 10, scale = 2)
+    @Builder.Default
     private BigDecimal amount = BigDecimal.ZERO;
 
     @Column(name = "pay_date")
+    @Builder.Default
     private LocalDate payDate = LocalDate.now();
     
     @Column(name = "accounting_period", length = 7, nullable = false)
     @Schema(description = "會計期間（YYYY-MM）")
+    @Builder.Default
     private String accountingPeriod = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
     
     @Enumerated(EnumType.STRING)
     @Column(name = "method", nullable = false, length = 10)
+    @Builder.Default
     private Method method = Method.CASH;
 
     @Column(name = "reference_no", length = 100, unique = false)
@@ -63,8 +67,9 @@ public class Payment {
     @Column(name = "voided_at")
     private LocalDateTime voidedAt;
 
-    @Column(name = "void_reason", length = 500)
-    private String voidReason;
+    @Column(name = "void_reason", length = 500) 
+    @Builder.Default
+    private String voidReason = "VOIDED";
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

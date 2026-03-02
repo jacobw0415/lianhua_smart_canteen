@@ -33,6 +33,7 @@ public class Product {
     private BigDecimal unitPrice;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean active = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)

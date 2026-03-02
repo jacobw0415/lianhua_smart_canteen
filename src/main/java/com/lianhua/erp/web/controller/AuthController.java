@@ -10,6 +10,8 @@ import com.lianhua.erp.dto.user.UserDto;
 import com.lianhua.erp.security.CustomUserDetails;
 import com.lianhua.erp.security.JwtUtils;
 import com.lianhua.erp.service.AuthService;
+import com.lianhua.erp.service.LoginAttemptService;
+import com.lianhua.erp.service.LoginLogService;
 import com.lianhua.erp.service.PasswordResetService;
 import com.lianhua.erp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +31,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import com.lianhua.erp.dto.user.LoginRequest;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.core.AuthenticationException;
+
 import java.util.List;
 
 /**
@@ -46,15 +51,23 @@ public class AuthController {
     private final UserService userService;
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
+    private final LoginLogService loginLogService;
+    private final LoginAttemptService loginAttemptService;
 
     public AuthController(AuthenticationManager authenticationManager,
                           JwtUtils jwtUtils,
-                          UserService userService, AuthService authService, PasswordResetService passwordResetService) {
+                          UserService userService,
+                          AuthService authService,
+                          PasswordResetService passwordResetService,
+                          LoginLogService loginLogService,
+                          LoginAttemptService loginAttemptService) {
         this.authenticationManager = authenticationManager;
         this.jwtUtils = jwtUtils;
         this.userService = userService;
         this.authService = authService;
         this.passwordResetService = passwordResetService;
+        this.loginLogService = loginLogService;
+        this.loginAttemptService = loginAttemptService;
     }
 
     // ============================================================
@@ -71,14 +84,30 @@ public class AuthController {
     })
     @PostMapping("/login")
     public ApiResponseDto<JwtResponse> authenticateUser(
-            @Valid @RequestBody LoginRequest loginRequest) {
+            @Valid @RequestBody LoginRequest loginRequest,
+            HttpServletRequest request) {
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getUsername(),
-                        loginRequest.getPassword()
-                )
-        );
+        // 基於 IP + 帳號的簡易登入頻率限制
+        String clientIp = request.getRemoteAddr();
+        String attemptKey = clientIp + "|" + loginRequest.getUsername();
+        if (loginAttemptService.isBlocked(attemptKey)) {
+            throw new IllegalStateException("登入嘗試過多，請稍後再試");
+        }
+
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getUsername(),
+                            loginRequest.getPassword()
+                    )
+            );
+        } catch (AuthenticationException ex) {
+            // 登入失敗稽核記錄（不打斷原本的錯誤流程）
+            loginLogService.logFailure(loginRequest.getUsername(), request);
+            loginAttemptService.recordFailure(attemptKey);
+            throw ex;
+        }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
@@ -98,6 +127,10 @@ public class AuthController {
 
         // 更新該使用者的最後登入時間（last_login_at），供個人資料頁顯示
         userService.updateLastLoginAt(userId);
+        // 成功則重置登入失敗計數
+        loginAttemptService.reset(attemptKey);
+        // 寫入登入成功稽核日誌
+        loginLogService.logSuccess(userId, request);
 
         JwtResponse body = new JwtResponse();
         body.setId(userId);                 // ✅ 前端會存成 localStorage.userId

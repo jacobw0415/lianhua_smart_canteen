@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,6 +31,7 @@ public class ProductCategoryController {
             description = "建立一筆新的商品分類資料，分類名稱與代碼需為唯一值。"
     )
     @PostMapping
+    @PreAuthorize("hasAuthority('product:edit')")
     public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> create(
             @Valid @RequestBody ProductCategoryRequestDto dto) {
         ProductCategoryResponseDto created = service.create(dto);
@@ -44,6 +46,7 @@ public class ProductCategoryController {
             description = "依分類 ID 更新分類的基本資料（名稱、代碼、描述等）。"
     )
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('product:edit')")
     public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> update(
             @PathVariable Long id,
             @Valid @RequestBody ProductCategoryRequestDto dto) {
@@ -58,6 +61,7 @@ public class ProductCategoryController {
             description = "查詢系統中所有商品分類（包含啟用與停用）。"
     )
     @GetMapping
+    @PreAuthorize("hasAuthority('product:view')")
     public ResponseEntity<ApiResponseDto<List<ProductCategoryResponseDto>>> getAll() {
         List<ProductCategoryResponseDto> list = service.getAll();
         if (list.isEmpty()) {
@@ -75,6 +79,7 @@ public class ProductCategoryController {
             description = "查詢目前可用於業務流程的商品分類（active = true）。"
     )
     @GetMapping("/active")
+    @PreAuthorize("hasAuthority('product:view')")
     public ResponseEntity<ApiResponseDto<List<ProductCategoryResponseDto>>> getActive() {
         List<ProductCategoryResponseDto> list = service.getActive();
         if (list.isEmpty()) {
@@ -92,6 +97,7 @@ public class ProductCategoryController {
             description = "根據分類 ID 取得單一商品分類的詳細資料。"
     )
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('product:view')")
     public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> getById(
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getById(id)));
@@ -105,6 +111,7 @@ public class ProductCategoryController {
             description = "將指定商品分類設為停用，停用後該分類不可用於新增銷售單。"
     )
     @PutMapping("/{id}/deactivate")
+    @PreAuthorize("hasAuthority('product:edit')")
     public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> deactivate(
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.deactivate(id)));
@@ -118,6 +125,7 @@ public class ProductCategoryController {
             description = "將指定商品分類重新設為啟用狀態，使其可再次用於業務流程。"
     )
     @PutMapping("/{id}/activate")
+    @PreAuthorize("hasAuthority('product:edit')")
     public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> activate(
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.activate(id)));
@@ -138,6 +146,7 @@ public class ProductCategoryController {
             @ApiResponse(responseCode = "204", description = "查無符合條件的分類資料")
     })
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('product:view')")
     public ResponseEntity<ApiResponseDto<List<ProductCategoryResponseDto>>> search(
             ProductCategorySearchRequest search) {
 
@@ -162,6 +171,7 @@ public class ProductCategoryController {
             description = "依分類 ID 刪除商品分類，若分類已被商品引用則可能刪除失敗。"
     )
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('product:edit')")
     public ResponseEntity<ApiResponseDto<Void>> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.ok(ApiResponseDto.deleted());

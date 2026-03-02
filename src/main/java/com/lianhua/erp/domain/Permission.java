@@ -43,6 +43,7 @@ public class Permission {
 
     @JsonIgnore // 避免序列化時產生循環參照
     @ManyToMany(mappedBy = "permissions")
+    @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
     // ===============================

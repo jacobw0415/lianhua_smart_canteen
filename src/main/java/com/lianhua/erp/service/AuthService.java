@@ -1,6 +1,7 @@
 package com.lianhua.erp.service;
 
 import com.lianhua.erp.dto.auth.ForgotPasswordRequest;
+import com.lianhua.erp.security.JwtUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,14 @@ public class AuthService {
 
     @Value("${app.frontend.default-url:http://localhost:5173}")
     private String defaultFrontendUrl;
+
+    private final TokenBlacklistService tokenBlacklistService;
+    private final JwtUtils jwtUtils;
+
+    public AuthService(TokenBlacklistService tokenBlacklistService, JwtUtils jwtUtils) {
+        this.tokenBlacklistService = tokenBlacklistService;
+        this.jwtUtils = jwtUtils;
+    }
 
     /**
      * 處理忘記密碼邏輯：產生 Token 並發送動態網址信件
@@ -50,10 +59,11 @@ public class AuthService {
         String token = authHeader.substring(7).trim();
         if (token.isEmpty()) return;
 
-        // 2. 業務邏輯防護：DB 或黑名單操作
+        // 2. 將 Token 加入黑名單，避免登出後仍被使用
         try {
-            // TODO: 未來可在此實作 Redis 黑名單標記
-            log.info("Token processed for logout: {}", token.substring(0, 5) + "...");
+            var claims = jwtUtils.getClaimsFromJwtToken(token);
+            tokenBlacklistService.blacklist(token, claims.getExpiration());
+            log.info("Logout: Token 已加入黑名單 (前 8 碼): {}", token.substring(0, Math.min(8, token.length())));
         } catch (Exception e) {
             // 3. 捕捉所有例外，僅記錄日誌，防止回傳 500
             log.warn("Logout failed internally, but continuing: {}", e.getMessage());

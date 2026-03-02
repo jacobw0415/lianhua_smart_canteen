@@ -45,16 +45,19 @@ public class Order {
     // 業務狀態（物流 / 訂單流程）
     @Enumerated(EnumType.STRING)
     @Column(name = "order_status", nullable = false, length = 20)
+    @Builder.Default
     private OrderStatus orderStatus = OrderStatus.PENDING;
 
     // 付款狀態
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_status", nullable = false, length = 20)
+    @Column(name = "payment_status", nullable = false, length = 20) 
+    @Builder.Default
     private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
 
     // 🚀 關鍵新增：同步 Schema v2.8 的作廢欄位
     // 這些欄位讓 Order 一次性帶出作廢資訊，徹底解決前端閃跳
     @Column(name = "record_status", nullable = false, length = 20)
+    @Builder.Default
     private String recordStatus = "ACTIVE"; // ACTIVE or VOIDED
 
     @Column(name = "voided_at")

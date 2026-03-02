@@ -34,6 +34,7 @@ public class OrderCustomer {
     
     @Enumerated(EnumType.STRING)
     @Column(name = "billing_cycle", length = 20)
+    @Builder.Default
     private BillingCycle billingCycle = BillingCycle.MONTHLY;
     
     @Column(length = 255)

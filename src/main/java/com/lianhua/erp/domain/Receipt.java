@@ -30,6 +30,7 @@ public class Receipt {
             foreignKey = @ForeignKey(name = "fk_receipt_order"))
     private Order order;
     
+    @Builder.Default
     private LocalDate receivedDate = LocalDate.now();
     
     @Column(name = "accounting_period", length = 7, nullable = false)
@@ -40,6 +41,7 @@ public class Receipt {
     
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
+    @Builder.Default
     private PaymentMethod method = PaymentMethod.CASH;
     
     @Column(name = "reference_no", length = 100)

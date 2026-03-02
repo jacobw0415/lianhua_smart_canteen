@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -41,6 +42,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @PostMapping
+    @PreAuthorize("hasAuthority('product:edit')")
     public ResponseEntity<ApiResponseDto<ProductResponseDto>> create(@Valid @RequestBody ProductRequestDto dto) {
         ProductResponseDto created = service.create(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.ok(created));
@@ -60,6 +62,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('product:edit')")
     public ResponseEntity<ApiResponseDto<ProductResponseDto>> update(
             @PathVariable Long id,
             @Valid @RequestBody ProductRequestDto dto) {
@@ -76,6 +79,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @GetMapping
+    @PreAuthorize("hasAuthority('product:view')")
     public ResponseEntity<ApiResponseDto<List<ProductResponseDto>>> getAll() {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getAll()));
     }
@@ -89,6 +93,7 @@ public class ProductController {
             @ApiResponse(responseCode = "204", description = "目前沒有啟用中商品")
     })
     @GetMapping("/active")
+    @PreAuthorize("hasAuthority('product:view')")
     public ResponseEntity<ApiResponseDto<List<ProductResponseDto>>> getActive() {
         List<ProductResponseDto> list = service.getActiveProducts();
         if (list.isEmpty()) {
@@ -108,6 +113,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('product:view')")
     public ResponseEntity<ApiResponseDto<ProductResponseDto>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getById(id)));
     }
@@ -122,6 +128,7 @@ public class ProductController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @GetMapping("/{id}/relations")
+    @PreAuthorize("hasAuthority('product:view')")
     public ResponseEntity<ApiResponseDto<ProductResponseDto>> getWithRelations(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getWithRelations(id)));
     }
@@ -140,6 +147,7 @@ public class ProductController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @GetMapping("/category/{categoryId}")
+    @PreAuthorize("hasAuthority('product:view')")
     public ResponseEntity<ApiResponseDto<List<ProductResponseDto>>> getByCategory(
             @PathVariable Long categoryId) {
 
@@ -193,6 +201,7 @@ public class ProductController {
             )
     })
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('product:view')")
     public ResponseEntity<ApiResponseDto<List<ProductResponseDto>>> search(
             @ModelAttribute ProductSearchRequest search) {
 
@@ -214,6 +223,7 @@ public class ProductController {
             description = "將指定商品分類設為停用，停用後該分類不可用於新增銷售單。"
     )
     @PutMapping("/{id}/deactivate")
+    @PreAuthorize("hasAuthority('product:edit')")
     public ResponseEntity<ApiResponseDto<ProductResponseDto>> deactivate(
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.deactivate(id)));
@@ -224,6 +234,7 @@ public class ProductController {
             description = "將指定商品分類重新設為啟用狀態，使其可再次用於業務流程。"
     )
     @PutMapping("/{id}/activate")
+    @PreAuthorize("hasAuthority('product:edit')")
     public ResponseEntity<ApiResponseDto<ProductResponseDto>> activate(
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.activate(id)));
@@ -244,6 +255,7 @@ public class ProductController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('product:edit')")
     public void delete(@PathVariable Long id) {
         service.delete(id);
     }

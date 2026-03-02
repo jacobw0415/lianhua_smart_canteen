@@ -18,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -47,6 +48,7 @@ public class PurchaseController {
     })
     @PageableAsQueryParam
     @GetMapping
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<Page<PurchaseResponseDto>>> getAllPurchases(
             @ParameterObject Pageable pageable
     ) {
@@ -67,6 +69,7 @@ public class PurchaseController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<PurchaseResponseDto>> getPurchaseById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(purchaseService.getPurchaseById(id)));
     }
@@ -87,6 +90,7 @@ public class PurchaseController {
                     content = @Content(schema = @Schema(implementation = ConflictResponse.class)))
     })
     @PostMapping
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<PurchaseResponseDto>> createPurchase(
             @Valid @RequestBody PurchaseRequestDto dto) {
 
@@ -111,6 +115,7 @@ public class PurchaseController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<PurchaseResponseDto>> updatePurchase(
             @PathVariable Long id,
             @Valid @RequestBody PurchaseRequestDto dto) {
@@ -136,6 +141,7 @@ public class PurchaseController {
                     content = @Content(schema = @Schema(implementation = NotFoundResponse.class)))
     })
     @PutMapping("/{id}/status/{status}")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<PurchaseResponseDto>> updateStatus(
             @PathVariable Long id,
             @PathVariable String status) {
@@ -157,6 +163,7 @@ public class PurchaseController {
     })
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public void deletePurchase(@PathVariable Long id) {
         purchaseService.deletePurchase(id);
     }
@@ -181,6 +188,7 @@ public class PurchaseController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @PostMapping("/{id}/void")
+    @PreAuthorize("hasAuthority('purchase:edit')")
     public ResponseEntity<ApiResponseDto<PurchaseResponseDto>> voidPurchase(
             @PathVariable Long id,
             @RequestBody(required = false) java.util.Map<String, String> request) {
@@ -224,6 +232,7 @@ public class PurchaseController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<Page<PurchaseResponseDto>>> searchPurchases(
             @ParameterObject @ModelAttribute PurchaseSearchRequest req,   //  自動綁定查詢參數
             @ParameterObject Pageable pageable                            //  Page / size / sort

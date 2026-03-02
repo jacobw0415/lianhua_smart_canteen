@@ -18,6 +18,7 @@ import org.springdoc.core.converters.models.PageableAsQueryParam;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -49,6 +50,7 @@ public class ReceiptController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @PostMapping
+    @PreAuthorize("hasAuthority('sale:edit')")
     public ResponseEntity<ApiResponseDto<ReceiptResponseDto>> create(@Valid @RequestBody ReceiptRequestDto dto) {
         ReceiptResponseDto created = service.create(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseDto.ok(created));
@@ -68,6 +70,7 @@ public class ReceiptController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('sale:edit')")
     public ResponseEntity<ApiResponseDto<ReceiptResponseDto>> update(
             @PathVariable Long id,
             @Valid @RequestBody ReceiptRequestDto dto) {
@@ -90,6 +93,7 @@ public class ReceiptController {
     })
     @PageableAsQueryParam
     @GetMapping
+    @PreAuthorize("hasAuthority('sale:view')")
     public ResponseEntity<ApiResponseDto<Page<ReceiptResponseDto>>> getAll(
             @ParameterObject Pageable pageable
     ) {
@@ -111,6 +115,7 @@ public class ReceiptController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('sale:view')")
     public ResponseEntity<ApiResponseDto<ReceiptResponseDto>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.findById(id)));
     }
@@ -129,6 +134,7 @@ public class ReceiptController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @GetMapping("/order/{orderId}")
+    @PreAuthorize("hasAuthority('sale:view')")
     public ResponseEntity<ApiResponseDto<List<ReceiptResponseDto>>> getByOrder(@PathVariable Long orderId) {
         List<ReceiptResponseDto> list = service.findByOrderId(orderId);
         if (list.isEmpty()) {
@@ -155,6 +161,7 @@ public class ReceiptController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('sale:edit')")
     public ResponseEntity<ApiResponseDto<Void>> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.ok(ApiResponseDto.ok(null));
@@ -177,6 +184,7 @@ public class ReceiptController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @PostMapping("/{id}/void")
+    @PreAuthorize("hasAuthority('sale:edit')")
     public ResponseEntity<ApiResponseDto<ReceiptResponseDto>> voidReceipt(
             @PathVariable Long id,
             @RequestBody(required = false) java.util.Map<String, String> request) {
@@ -205,6 +213,7 @@ public class ReceiptController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('sale:view')")
     public ResponseEntity<ApiResponseDto<Page<ReceiptResponseDto>>> searchReceipts(
             @ParameterObject ReceiptSearchRequest req,
             @ParameterObject Pageable pageable

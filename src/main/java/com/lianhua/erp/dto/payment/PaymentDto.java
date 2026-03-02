@@ -21,10 +21,10 @@ public class PaymentDto {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
     
-    @Schema(description = "付款金額", example = "500.00", required = true)
+    @Schema(description = "付款金額", example = "500.00", requiredMode = Schema.RequiredMode.REQUIRED)
     private BigDecimal amount;
     
-    @Schema(description = "付款日期", example = "2025-10-11", required = true)
+    @Schema(description = "付款日期", example = "2025-10-11", requiredMode = Schema.RequiredMode.REQUIRED)
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate payDate;
     

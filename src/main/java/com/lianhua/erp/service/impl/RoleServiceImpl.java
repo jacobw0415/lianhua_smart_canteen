@@ -46,6 +46,17 @@ public class RoleServiceImpl implements RoleService {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("角色不存在"));
 
+        // 🌿 保護關鍵系統角色：避免透過 API 將 ROLE_ADMIN 的核心管理權限移除
+        if ("ROLE_ADMIN".equals(role.getName())) {
+            // 核心權限：維護帳號與角色本身的能力
+            String[] required = new String[] { "user:view", "user:edit", "role:view", "role:edit" };
+            for (String requiredPerm : required) {
+                if (permissionNames.stream().noneMatch(p -> p != null && p.equals(requiredPerm))) {
+                    throw new IllegalStateException("不得移除 ROLE_ADMIN 的核心權限：" + requiredPerm);
+                }
+            }
+        }
+
         // 根據權限名稱查找對應的 Permission Entity 清單
         Set<Permission> newPermissions = permissionNames.stream()
                 .map(name -> permissionRepository.findByName(name)

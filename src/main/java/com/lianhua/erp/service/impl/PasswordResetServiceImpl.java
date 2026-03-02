@@ -7,6 +7,7 @@ import com.lianhua.erp.dto.auth.ResetPasswordRequest;
 import com.lianhua.erp.repository.PasswordResetTokenRepository;
 import com.lianhua.erp.repository.UserRepository;
 import com.lianhua.erp.service.EmailService;
+import com.lianhua.erp.service.PasswordPolicyValidator;
 import com.lianhua.erp.service.PasswordResetService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
@@ -29,6 +30,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     private final PasswordResetTokenRepository tokenRepository;
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordPolicyValidator passwordPolicyValidator;
 
     // 從 application.properties 讀取預設網址，若無則預設 localhost
     @Value("${app.frontend.default-url:http://localhost:5173}")
@@ -87,7 +89,8 @@ public class PasswordResetServiceImpl implements PasswordResetService {
             throw new IllegalArgumentException("Token 已過期，請重新申請");
         }
 
-        // 3. 更新使用者密碼並加密
+        // 3. 檢查密碼強度並更新使用者密碼
+        passwordPolicyValidator.validate(request.getNewPassword());
         User user = resetToken.getUser();
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);

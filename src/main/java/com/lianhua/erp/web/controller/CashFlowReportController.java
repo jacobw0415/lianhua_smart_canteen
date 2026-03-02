@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.List;
 @RequestMapping("/api/reports/cash_flow_reports")
 @RequiredArgsConstructor
 @Tag(name = "現金流量表", description = "現金流量報表 API - 統計現金流入與流出")
+@PreAuthorize("hasAuthority('report:view')")
 public class CashFlowReportController {
 
   private final CashFlowReportService cashFlowReportService;

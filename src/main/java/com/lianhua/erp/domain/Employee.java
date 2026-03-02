@@ -34,6 +34,7 @@ public class Employee {
     
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
+    @Builder.Default
     private Status status = Status.ACTIVE;
 
     @Column(name = "created_at", nullable = false, updatable = false)
