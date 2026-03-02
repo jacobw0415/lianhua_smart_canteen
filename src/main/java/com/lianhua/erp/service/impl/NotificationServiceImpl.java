@@ -1,6 +1,7 @@
 package com.lianhua.erp.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lianhua.erp.domain.Notification;
 import com.lianhua.erp.domain.UserNotification;
@@ -118,7 +119,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private void renderText(NotificationResponseDto dto, String code, String payloadJson) {
         try {
-            Map<String, Object> payload = objectMapper.readValue(payloadJson, Map.class);
+            Map<String, Object> payload = objectMapper.readValue(payloadJson, new TypeReference<Map<String, Object>>() {});
             String no = String.valueOf(payload.getOrDefault("no", payload.getOrDefault("purchaseNo", "未知")));
 
             // --- 處理系統檢查通知 (4-9項) ---

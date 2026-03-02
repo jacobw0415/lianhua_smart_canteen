@@ -3,7 +3,6 @@ package com.lianhua.erp.service.impl;
 import com.lianhua.erp.domain.Order;
 import com.lianhua.erp.domain.OrderCustomer;
 import com.lianhua.erp.domain.Purchase;
-import com.lianhua.erp.domain.Supplier;
 import com.lianhua.erp.dto.globalSearch.GlobalSearchItemDto;
 import com.lianhua.erp.dto.globalSearch.GlobalSearchRequest;
 import com.lianhua.erp.dto.globalSearch.GlobalSearchResponse;

@@ -19,7 +19,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -96,6 +95,9 @@ public class AuthController {
         List<String> roleNames = roles.stream()
                 .filter(a -> a != null && a.startsWith("ROLE_"))
                 .toList();
+
+        // 更新該使用者的最後登入時間（last_login_at），供個人資料頁顯示
+        userService.updateLastLoginAt(userId);
 
         JwtResponse body = new JwtResponse();
         body.setId(userId);                 // ✅ 前端會存成 localStorage.userId

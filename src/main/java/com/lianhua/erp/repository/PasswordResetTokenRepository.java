@@ -1,7 +1,6 @@
 package com.lianhua.erp.repository;
 
 import com.lianhua.erp.domain.PasswordResetToken;
-import com.lianhua.erp.domain.User;
 import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

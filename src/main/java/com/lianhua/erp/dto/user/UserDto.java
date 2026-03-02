@@ -1,8 +1,10 @@
 package com.lianhua.erp.dto.user;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -32,4 +34,12 @@ public class UserDto {
 
     @Schema(description = "角色名稱清單", example = "[\"ROLE_ADMIN\", \"ROLE_USER\"]")
     private List<String> roles;
+
+    @Schema(description = "帳號建立時間")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime createdAt;
+
+    @Schema(description = "最後登入時間")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime lastLoginAt;
 }

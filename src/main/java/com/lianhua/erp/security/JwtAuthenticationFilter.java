@@ -53,14 +53,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // 4. 將 "roles" claim 映射為 Spring Security 的 Authorities（供 hasRole / hasAuthority 使用）
                 @SuppressWarnings("unchecked")
                 List<String> roles = claims.get("roles", List.class);
+                if (roles == null) {
+                    roles = List.of();
+                }
 
                 List<SimpleGrantedAuthority> authorities = roles.stream()
                         .map(SimpleGrantedAuthority::new)
                         .collect(Collectors.toList());
 
-                // 5. 建立認證物件 (使用自定義 Principal 儲存 uid 以供後續使用)
+                // 5. 從 JWT 取得 uid，組裝 CustomUserDetails 作為 Principal（供 /api/users/me、本人修改密碼等 API 取得 currentUserId）
+                Long uid = null;
+                Object uidClaim = claims.get("uid");
+                if (uidClaim instanceof Number) {
+                    uid = ((Number) uidClaim).longValue();
+                }
+
+                CustomUserDetails userDetails = new CustomUserDetails(
+                        uid != null ? uid : 0L,
+                        username,
+                        "",
+                        true,
+                        authorities
+                );
+
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        username, // 這裡可視需求改為傳入自定義的 User 物件
+                        userDetails,
                         null,
                         authorities
                 );

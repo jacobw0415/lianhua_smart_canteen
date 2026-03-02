@@ -39,4 +39,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     /** 檢查 Email 是否已被使用 */
     boolean existsByEmail(String email);
+
+    /** 統計「啟用中且具 ROLE_ADMIN」的使用者數量（用於保護最後一位管理員） */
+    @Query("SELECT COUNT(DISTINCT u.id) FROM User u JOIN u.roles r WHERE r.name = 'ROLE_ADMIN' AND u.enabled = true")
+    long countEnabledUsersWithRoleAdmin();
+
+    /** 統計「啟用中且具 ROLE_ADMIN」的使用者數量，排除指定使用者 id（用於更新時檢查：若將該使用者改為非管理員或停用，剩餘數量是否為 0） */
+    @Query("SELECT COUNT(DISTINCT u.id) FROM User u JOIN u.roles r WHERE r.name = 'ROLE_ADMIN' AND u.enabled = true AND u.id <> :excludeUserId")
+    long countEnabledUsersWithRoleAdminExcluding(@Param("excludeUserId") Long excludeUserId);
 }

@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/global_search")
 @RequiredArgsConstructor
-@Tag(name = "Global Search", description = "ERP 全域搜尋服務 - 支援訂單、進貨、客戶跨模組查詢")
+@Tag(name = "全域搜尋", description = "ERP 全域搜尋服務 - 支援訂單、進貨、客戶跨模組查詢")
 public class GlobalSearchController {
 
     private final GlobalSearchService globalSearchService;

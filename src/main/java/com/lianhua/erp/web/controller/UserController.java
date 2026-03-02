@@ -3,6 +3,7 @@ package com.lianhua.erp.web.controller;
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
 import com.lianhua.erp.dto.error.*;
 import com.lianhua.erp.dto.user.*;
+import com.lianhua.erp.security.CustomUserDetails;
 import com.lianhua.erp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -38,19 +39,41 @@ public class UserController {
     // 👋 個人功能區 (不限角色，只要登入即可存取)
     // ============================================================
 
-    @Operation(summary = "取得當前登入者個人資料", description = "供使用者查看自己的 Profile，解決前端個人資料載入問題")
+    @Operation(summary = "取得當前登入者個人資料", description = "供使用者查看自己的 Profile；回應含 id，供前端判斷是否為「編輯自己」")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "成功取得個人資料"),
             @ApiResponse(responseCode = "401", description = "未授權（請重新登入）", content = @Content(schema = @Schema(implementation = UnauthorizedResponse.class)))
     })
     @GetMapping("/me")
     public ResponseEntity<ApiResponseDto<UserDto>> getCurrentUserProfile() {
-        // 從 SecurityContext 中取得目前經過 JWT 認證的帳號名稱
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-
-        // 呼叫 userService 根據 username 查詢 (不依賴 URL 中的 ID)
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponseDto.ok(userService.getUserByUsername(currentUsername)));
+    }
+
+    @Operation(summary = "本人修改密碼", description = "驗證目前密碼後更新為新密碼（§4.4）；與管理員重設他人密碼分離")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "密碼已更新"),
+            @ApiResponse(responseCode = "400", description = "目前密碼錯誤或新密碼不符合規則", content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "401", description = "未授權", content = @Content(schema = @Schema(implementation = UnauthorizedResponse.class)))
+    })
+    @PutMapping("/me/password")
+    public ResponseEntity<ApiResponseDto<String>> changeOwnPassword(@Valid @RequestBody ChangePasswordRequest request) {
+        Long currentUserId = getCurrentUserIdOrNull();
+        if (currentUserId == null || currentUserId <= 0) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponseDto.error(401, "請先登入"));
+        }
+        userService.changePasswordForCurrentUser(currentUserId, request.getCurrentPassword(), request.getNewPassword());
+        return ResponseEntity.ok(ApiResponseDto.ok("密碼已更新"));
+    }
+
+    private Long getCurrentUserIdOrNull() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof CustomUserDetails) {
+            return ((CustomUserDetails) principal).getId();
+        }
+        return null;
     }
 
     // ============================================================
@@ -81,24 +104,27 @@ public class UserController {
     @PostMapping
     @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<ApiResponseDto<UserDto>> createUser(@Valid @RequestBody UserRequestDto dto) {
+        Long currentUserId = getCurrentUserIdOrNull();
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponseDto.created(userService.createUser(dto)));
+                .body(ApiResponseDto.created(userService.createUser(dto, currentUserId)));
     }
 
-    @Operation(summary = "更新使用者資訊")
+    @Operation(summary = "更新使用者資訊", description = "受 R1/R2 業務規則約束：自己不可改角色/啟用；不可移除最後一位管理員")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<ApiResponseDto<UserDto>> updateUser(
             @PathVariable Long id, @Valid @RequestBody UserRequestDto dto) {
+        Long currentUserId = getCurrentUserIdOrNull();
         return ResponseEntity.status(HttpStatus.OK)
-                .body(ApiResponseDto.ok(userService.updateUser(id, dto)));
+                .body(ApiResponseDto.ok(userService.updateUser(id, dto, currentUserId)));
     }
 
-    @Operation(summary = "刪除使用者帳號")
+    @Operation(summary = "刪除使用者帳號", description = "受 D1/D2 約束：不可刪除自己、不可刪除最後一位系統管理員")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        userService.deleteUser(id);
+        Long currentUserId = getCurrentUserIdOrNull();
+        userService.deleteUser(id, currentUserId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

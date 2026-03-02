@@ -1,7 +1,6 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.dto.report.APSummaryReportDto;
-import com.lianhua.erp.dto.report.ARSummaryReportDto;
 import com.lianhua.erp.repository.APSummaryReportRepository;
 import com.lianhua.erp.service.APSummaryReportService;
 import lombok.RequiredArgsConstructor;

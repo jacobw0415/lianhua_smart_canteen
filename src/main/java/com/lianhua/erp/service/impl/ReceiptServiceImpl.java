@@ -238,7 +238,6 @@ public class ReceiptServiceImpl implements ReceiptService {
         BigDecimal paidAmount = receiptRepository.sumAmountByOrderId(order.getId());
         if (paidAmount == null) paidAmount = BigDecimal.ZERO;
 
-        BigDecimal totalAmount = order.getTotalAmount();
         boolean hasAnyReceipt = receiptRepository.hasAnyReceiptByOrderId(order.getId());
 
         if (paidAmount.compareTo(BigDecimal.ZERO) == 0) {
