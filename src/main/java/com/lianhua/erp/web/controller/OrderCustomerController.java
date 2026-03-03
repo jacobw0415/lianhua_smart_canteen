@@ -23,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -44,7 +45,7 @@ public class OrderCustomerController {
             description = """
                     支援 page / size / sort，自動與 React-Admin 分頁整合。
                     例如：
-                    /api/order-customers?page=0&size=10&sort=id,asc
+                    /api/order_customers?page=0&size=10&sort=id,asc
                     """
     )
     @ApiResponses({
@@ -53,6 +54,7 @@ public class OrderCustomerController {
     })
     @PageableAsQueryParam
     @GetMapping
+    @PreAuthorize("hasAuthority('order_customer:view')")
     public ResponseEntity<ApiResponseDto<Page<OrderCustomerResponseDto>>> getAllCustomers(
             @ParameterObject Pageable pageable
     ) {
@@ -77,6 +79,7 @@ public class OrderCustomerController {
             )
     })
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('order_customer:view')")
     public ResponseEntity<ApiResponseDto<OrderCustomerResponseDto>> getCustomerById(
             @PathVariable Long id
     ) {
@@ -107,6 +110,7 @@ public class OrderCustomerController {
             )
     })
     @PostMapping
+    @PreAuthorize("hasAuthority('order:edit')")
     public ResponseEntity<ApiResponseDto<OrderCustomerResponseDto>> createCustomer(
             @Valid @RequestBody OrderCustomerRequestDto dto
     ) {
@@ -137,6 +141,7 @@ public class OrderCustomerController {
             )
     })
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('order:edit')")
     public ResponseEntity<ApiResponseDto<OrderCustomerResponseDto>> updateCustomer(
             @PathVariable Long id,
             @Valid @RequestBody OrderCustomerRequestDto dto
@@ -160,6 +165,7 @@ public class OrderCustomerController {
     })
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('order:edit')")
     public void deleteCustomer(@PathVariable Long id) {
         service.delete(id);
     }
@@ -180,7 +186,7 @@ public class OrderCustomerController {
 
                     與 React-Admin List / Filter 完整整合。
                     範例：
-                    /api/order-customers/search?page=0&size=10&sort=id,asc&name=聯華
+                    /api/order_customers/search?page=0&size=10&sort=id,asc&name=聯華
                     """
     )
     @ApiResponses({
@@ -202,6 +208,7 @@ public class OrderCustomerController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('order_customer:view')")
     public ResponseEntity<ApiResponseDto<Page<OrderCustomerResponseDto>>> searchCustomers(
             @ParameterObject @ModelAttribute OrderCustomerRequestDto request,
             @ParameterObject Pageable pageable

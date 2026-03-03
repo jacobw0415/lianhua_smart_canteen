@@ -61,7 +61,7 @@ public class ProductCategoryController {
             description = "查詢系統中所有商品分類（包含啟用與停用）。"
     )
     @GetMapping
-    @PreAuthorize("hasAuthority('product:view')")
+    @PreAuthorize("hasAuthority('product_category:view')")
     public ResponseEntity<ApiResponseDto<List<ProductCategoryResponseDto>>> getAll() {
         List<ProductCategoryResponseDto> list = service.getAll();
         if (list.isEmpty()) {
@@ -79,7 +79,7 @@ public class ProductCategoryController {
             description = "查詢目前可用於業務流程的商品分類（active = true）。"
     )
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('product:view')")
+    @PreAuthorize("hasAuthority('product_category:view')")
     public ResponseEntity<ApiResponseDto<List<ProductCategoryResponseDto>>> getActive() {
         List<ProductCategoryResponseDto> list = service.getActive();
         if (list.isEmpty()) {
@@ -97,7 +97,7 @@ public class ProductCategoryController {
             description = "根據分類 ID 取得單一商品分類的詳細資料。"
     )
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('product:view')")
+    @PreAuthorize("hasAuthority('product_category:view')")
     public ResponseEntity<ApiResponseDto<ProductCategoryResponseDto>> getById(
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getById(id)));
@@ -146,7 +146,7 @@ public class ProductCategoryController {
             @ApiResponse(responseCode = "204", description = "查無符合條件的分類資料")
     })
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('product:view')")
+    @PreAuthorize("hasAuthority('product_category:view')")
     public ResponseEntity<ApiResponseDto<List<ProductCategoryResponseDto>>> search(
             ProductCategorySearchRequest search) {
 

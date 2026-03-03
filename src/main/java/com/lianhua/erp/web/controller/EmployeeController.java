@@ -47,7 +47,7 @@ public class EmployeeController {
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
     @PageableAsQueryParam
-    @PreAuthorize("hasAuthority('user:view')")
+    @PreAuthorize("hasAuthority('employee:view')")
     public ResponseEntity<ApiResponseDto<Page<EmployeeResponseDto>>> findAll(
             @ParameterObject Pageable pageable
     ) {
@@ -70,7 +70,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAuthority('user:view')")
+    @PreAuthorize("hasAuthority('employee:view')")
     public ResponseEntity<ApiResponseDto<List<EmployeeResponseDto>>> getActive() {
         List<EmployeeResponseDto> list = service.getActive();
         if (list.isEmpty()) {
@@ -93,7 +93,7 @@ public class EmployeeController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAuthority('user:view')")
+    @PreAuthorize("hasAuthority('employee:view')")
     public ResponseEntity<ApiResponseDto<EmployeeResponseDto>> findById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.findById(id)));
     }
@@ -168,7 +168,7 @@ public class EmployeeController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('user:view')")
+    @PreAuthorize("hasAuthority('employee:view')")
     public ResponseEntity<ApiResponseDto<Page<EmployeeResponseDto>>> searchEmployees(
             @ParameterObject EmployeeSearchRequest request,
             @ParameterObject Pageable pageable

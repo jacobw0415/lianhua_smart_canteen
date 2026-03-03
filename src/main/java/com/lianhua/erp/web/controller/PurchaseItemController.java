@@ -42,7 +42,7 @@ public class PurchaseItemController {
             summary = "分頁取得所有採購明細清單",
             description = """
                     支援 page / size / sort，自動與 React-Admin 分頁整合。
-                    例如：/api/purchase-items?page=0&size=10&sort=id,desc
+                    例如：/api/purchase_items?page=0&size=10&sort=id,desc
                     """
     )
     @ApiResponses({
@@ -51,7 +51,7 @@ public class PurchaseItemController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @PageableAsQueryParam
-    @GetMapping("/api/purchase-items")
+    @GetMapping("/api/purchase_items")
     @PreAuthorize("hasAuthority('purchase:view')")
     public ResponseEntity<ApiResponseDto<Page<PurchaseItemDto>>> getAllPurchaseItems(
             @ParameterObject Pageable pageable

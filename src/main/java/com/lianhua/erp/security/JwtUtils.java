@@ -24,10 +24,24 @@ public class JwtUtils {
     @Value("${lianhua.app.jwtExpirationMs:3600000}")
     private int jwtExpirationMs;
 
+    @Value("${spring.profiles.active:}")
+    private String activeProfiles;
+
     private SecretKey getSigningKey() {
-        if ("LianhuaERP_Secure_Secret_Key_2026_Standard".equals(jwtSecret)) {
-            log.warn("目前正在使用預設 JWT Secret，請於生產環境設定 lianhua.app.jwtSecret 以提高安全性。");
+        // 開發環境允許使用預設 Secret，但在非 dev profile 時若仍為預設值，直接阻止啟動以避免誤用。
+        boolean looksLikeDefaultSecret = jwtSecret != null
+                && jwtSecret.contains("LianhuaERP_Secure_Secret_Key_2026_Standard");
+        boolean isDevProfile = activeProfiles != null && activeProfiles.contains("dev");
+
+        if (looksLikeDefaultSecret) {
+            if (isDevProfile) {
+                log.warn("目前在 dev profile 正在使用預設 JWT Secret，請於正式環境設定 lianhua.app.jwtSecret 或環境變數 JWT_SECRET 以提高安全性。");
+            } else {
+                log.error("偵測到在非 dev profile 使用預設 JWT Secret，為避免安全風險系統將停止啟動。請設定 lianhua.app.jwtSecret 或環境變數 JWT_SECRET。");
+                throw new IllegalStateException("JWT Secret 未正確設定，請參考 application.properties 中 lianhua.app.jwtSecret 說明。");
+            }
         }
+
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 

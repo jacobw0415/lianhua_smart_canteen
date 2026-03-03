@@ -36,9 +36,9 @@ public interface NotificationService {
     List<NotificationResponseDto> getUnreadList(Long userId);
 
     /**
-     * 標記為已讀
+     * 標記為已讀（僅允許該使用者操作自己的通知）
      */
-    void markAsRead(Long userNotificationId);
+    void markAsRead(Long userId, Long userNotificationId);
 
     /**
      * 獲取未讀總數 (用於顯示小紅點數字)

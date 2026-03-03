@@ -23,7 +23,7 @@ import java.util.Map;
 @RequestMapping("/api/ar")
 @RequiredArgsConstructor
 @Tag(name = "應收帳款紀錄", description = "應收帳款 API")
-@PreAuthorize("hasAuthority('report:view')")
+@PreAuthorize("hasAuthority('ar:view')")
 public class ARAgingController {
 
     private final ARAgingService agingService;

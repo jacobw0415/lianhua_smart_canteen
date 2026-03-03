@@ -3,7 +3,7 @@ package com.lianhua.erp.web.controller;
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
 import com.lianhua.erp.dto.error.*;
 import com.lianhua.erp.dto.user.*;
-import com.lianhua.erp.security.CustomUserDetails;
+import com.lianhua.erp.security.SecurityUtils;
 import com.lianhua.erp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -15,7 +15,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -46,7 +45,11 @@ public class UserController {
     })
     @GetMapping("/me")
     public ResponseEntity<ApiResponseDto<UserDto>> getCurrentUserProfile() {
-        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        String currentUsername = SecurityUtils.getCurrentUsernameOrNull();
+        if (currentUsername == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponseDto.error(401, "請先登入"));
+        }
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponseDto.ok(userService.getUserByUsername(currentUsername)));
     }
@@ -59,21 +62,13 @@ public class UserController {
     })
     @PutMapping("/me/password")
     public ResponseEntity<ApiResponseDto<String>> changeOwnPassword(@Valid @RequestBody ChangePasswordRequest request) {
-        Long currentUserId = getCurrentUserIdOrNull();
+        Long currentUserId = SecurityUtils.getCurrentUserIdOrNull();
         if (currentUserId == null || currentUserId <= 0) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponseDto.error(401, "請先登入"));
         }
         userService.changePasswordForCurrentUser(currentUserId, request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok(ApiResponseDto.ok("密碼已更新"));
-    }
-
-    private Long getCurrentUserIdOrNull() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (principal instanceof CustomUserDetails) {
-            return ((CustomUserDetails) principal).getId();
-        }
-        return null;
     }
 
     // ============================================================
@@ -104,7 +99,7 @@ public class UserController {
     @PostMapping
     @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<ApiResponseDto<UserDto>> createUser(@Valid @RequestBody UserRequestDto dto) {
-        Long currentUserId = getCurrentUserIdOrNull();
+        Long currentUserId = SecurityUtils.getCurrentUserIdOrNull();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponseDto.created(userService.createUser(dto, currentUserId)));
     }
@@ -114,7 +109,7 @@ public class UserController {
     @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<ApiResponseDto<UserDto>> updateUser(
             @PathVariable Long id, @Valid @RequestBody UserRequestDto dto) {
-        Long currentUserId = getCurrentUserIdOrNull();
+        Long currentUserId = SecurityUtils.getCurrentUserIdOrNull();
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponseDto.ok(userService.updateUser(id, dto, currentUserId)));
     }
@@ -123,7 +118,7 @@ public class UserController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('user:edit')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        Long currentUserId = getCurrentUserIdOrNull();
+        Long currentUserId = SecurityUtils.getCurrentUserIdOrNull();
         userService.deleteUser(id, currentUserId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }

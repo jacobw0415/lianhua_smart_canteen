@@ -20,7 +20,7 @@ import java.util.List;
 @RequestMapping("/api/reports/ap_summary")
 @RequiredArgsConstructor
 @Tag(name = "應付帳款總表", description = "應付帳款總表報表 API - 依會計期間彙總應付、已付、未付")
-@PreAuthorize("hasAuthority('report:view')")
+@PreAuthorize("hasAuthority('ap:view')")
 public class APSummaryReportController {
 
     private final APSummaryReportService summaryService;

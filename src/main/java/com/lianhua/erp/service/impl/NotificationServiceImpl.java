@@ -104,8 +104,11 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
-    public void markAsRead(Long userNotificationId) {
-        userNotificationRepo.findById(userNotificationId).ifPresent(un -> {
+    public void markAsRead(Long userId, Long userNotificationId) {
+        if (userId == null || userNotificationId == null) {
+            return;
+        }
+        userNotificationRepo.findByIdAndUserId(userNotificationId, userId).ifPresent(un -> {
             un.setIsRead(true);
             un.setReadAt(LocalDateTime.now());
             userNotificationRepo.save(un);

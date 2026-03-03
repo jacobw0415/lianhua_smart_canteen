@@ -40,7 +40,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAuthority('expense:view')")
+    @PreAuthorize("hasAuthority('expense_category:view')")
     public ResponseEntity<ApiResponseDto<List<ExpenseCategoryResponseDto>>> getAll() {
         List<ExpenseCategoryResponseDto> list = service.getAll();
         if (list.isEmpty()) {
@@ -63,7 +63,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAuthority('expense:view')")
+    @PreAuthorize("hasAuthority('expense_category:view')")
     public ResponseEntity<ApiResponseDto<List<ExpenseCategoryResponseDto>>> getActive() {
         List<ExpenseCategoryResponseDto> list = service.getActive();
         if (list.isEmpty()) {
@@ -86,7 +86,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAuthority('expense:view')")
+    @PreAuthorize("hasAuthority('expense_category:view')")
     public ResponseEntity<ApiResponseDto<ExpenseCategoryResponseDto>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.getById(id)));
     }
@@ -187,7 +187,7 @@ public class ExpenseCategoryController {
             @ApiResponse(responseCode = "500", description = "伺服器內部錯誤",
                     content = @Content(schema = @Schema(implementation = InternalServerErrorResponse.class)))
     })
-    @PreAuthorize("hasAuthority('expense:view')")
+    @PreAuthorize("hasAuthority('expense_category:view')")
     public ResponseEntity<ApiResponseDto<List<ExpenseCategoryResponseDto>>> search(
             ExpenseCategorySearchRequest search) {
         

@@ -46,7 +46,7 @@ public class PaymentController {
     })
     @PageableAsQueryParam
     @GetMapping
-    @PreAuthorize("hasAuthority('purchase:view')")
+    @PreAuthorize("hasAuthority('payment:view')")
     public ResponseEntity<ApiResponseDto<Page<PaymentResponseDto>>> getAllPayments(
             @ParameterObject Pageable pageable
     ) {
@@ -68,7 +68,7 @@ public class PaymentController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @GetMapping("/{purchaseId}")
-    @PreAuthorize("hasAuthority('purchase:view')")
+    @PreAuthorize("hasAuthority('payment:view')")
     public ResponseEntity<ApiResponseDto<PaymentResponseDto>> getPaymentsByPurchase(
             @PathVariable Long purchaseId
     ) {
@@ -117,7 +117,7 @@ public class PaymentController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('purchase:view')")
+    @PreAuthorize("hasAuthority('payment:view')")
     public ResponseEntity<ApiResponseDto<Page<PaymentResponseDto>>> searchPayments(
             @ParameterObject PaymentSearchRequest req,
             @ParameterObject Pageable pageable

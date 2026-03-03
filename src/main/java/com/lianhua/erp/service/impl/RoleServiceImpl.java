@@ -57,6 +57,16 @@ public class RoleServiceImpl implements RoleService {
             }
         }
 
+        // 🌿 一般使用者角色：不得賦予使用者管理／角色管理權限，符合 ROLE_USER 權限設定報告
+        if ("ROLE_USER".equals(role.getName())) {
+            String[] forbidden = new String[] { "user:view", "user:edit", "role:view", "role:edit" };
+            for (String perm : forbidden) {
+                if (permissionNames.stream().anyMatch(p -> p != null && p.equals(perm))) {
+                    throw new IllegalStateException("ROLE_USER 不得被賦予管理權限：" + perm + "，僅限一般業務權限（如 order:view、purchase:view 等）。");
+                }
+            }
+        }
+
         // 根據權限名稱查找對應的 Permission Entity 清單
         Set<Permission> newPermissions = permissionNames.stream()
                 .map(name -> permissionRepository.findByName(name)

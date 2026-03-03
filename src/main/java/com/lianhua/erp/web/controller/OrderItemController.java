@@ -37,7 +37,7 @@ public class OrderItemController {
             summary = "分頁取得所有訂單明細清單",
             description = """
                     支援 page / size / sort，自動與 React-Admin 分頁整合。
-                    例如：/api/order-items?page=0&size=10&sort=id,desc
+                    例如：/api/order_items?page=0&size=10&sort=id,desc
                     """
     )
     @ApiResponses({

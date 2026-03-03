@@ -93,7 +93,7 @@ public class ReceiptController {
     })
     @PageableAsQueryParam
     @GetMapping
-    @PreAuthorize("hasAuthority('sale:view')")
+    @PreAuthorize("hasAuthority('receipt:view')")
     public ResponseEntity<ApiResponseDto<Page<ReceiptResponseDto>>> getAll(
             @ParameterObject Pageable pageable
     ) {
@@ -115,7 +115,7 @@ public class ReceiptController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('sale:view')")
+    @PreAuthorize("hasAuthority('receipt:view')")
     public ResponseEntity<ApiResponseDto<ReceiptResponseDto>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDto.ok(service.findById(id)));
     }
@@ -134,7 +134,7 @@ public class ReceiptController {
             @ApiResponse(responseCode = "500", description = "伺服器錯誤")
     })
     @GetMapping("/order/{orderId}")
-    @PreAuthorize("hasAuthority('sale:view')")
+    @PreAuthorize("hasAuthority('receipt:view')")
     public ResponseEntity<ApiResponseDto<List<ReceiptResponseDto>>> getByOrder(@PathVariable Long orderId) {
         List<ReceiptResponseDto> list = service.findByOrderId(orderId);
         if (list.isEmpty()) {
@@ -213,7 +213,7 @@ public class ReceiptController {
     })
     @PageableAsQueryParam
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('sale:view')")
+    @PreAuthorize("hasAuthority('receipt:view')")
     public ResponseEntity<ApiResponseDto<Page<ReceiptResponseDto>>> searchReceipts(
             @ParameterObject ReceiptSearchRequest req,
             @ParameterObject Pageable pageable

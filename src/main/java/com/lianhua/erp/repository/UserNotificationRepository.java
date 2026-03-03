@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface UserNotificationRepository extends JpaRepository<UserNotification, Long> {
@@ -32,4 +33,6 @@ public interface UserNotificationRepository extends JpaRepository<UserNotificati
     @Query(value = "SELECT un FROM UserNotification un JOIN FETCH un.notification n WHERE un.userId = :userId",
             countQuery = "SELECT count(un) FROM UserNotification un WHERE un.userId = :userId")
     Page<UserNotification> findAllByUserIdWithFetch(@Param("userId") Long userId, Pageable pageable);
+
+    Optional<UserNotification> findByIdAndUserId(Long id, Long userId);
 }
