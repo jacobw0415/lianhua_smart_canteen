@@ -70,7 +70,8 @@ public class PasswordResetServiceImpl implements PasswordResetService {
 
         String resetLink = cleanBaseUrl + "/reset-password?token=" + token;
 
-        log.info("發送密碼重設郵件至: {}, 產生的連結: {}", user.getEmail(), resetLink);
+        // 為避免在日誌中洩漏重設 Token，僅記錄收件者，不輸出完整連結或 Token
+        log.info("發送密碼重設郵件至: {}", user.getEmail());
 
         // 5. 發送郵件 (傳送完整的 resetLink)
         emailService.sendPasswordResetEmail(user.getEmail(), resetLink);

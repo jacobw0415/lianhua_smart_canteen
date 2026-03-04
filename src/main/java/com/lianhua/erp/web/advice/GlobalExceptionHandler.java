@@ -4,6 +4,8 @@ import com.lianhua.erp.dto.error.*;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +23,11 @@ import java.util.stream.Collectors;
 
 @Hidden
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
+
+    @Value("${spring.profiles.active:}")
+    private String activeProfiles;
 
     // ============================================================
     // 400：參數或格式錯誤（含日期/型別錯誤）
@@ -143,10 +149,19 @@ public class GlobalExceptionHandler {
     // ============================================================
     @ExceptionHandler(Exception.class)
     public ResponseEntity<InternalServerErrorResponse> handleServerError(Exception ex) {
-        ex.printStackTrace(); // ✅ 開發階段方便除錯
-        String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+        // 開發環境：保留原有詳細訊息以利除錯
+        if (activeProfiles != null && activeProfiles.contains("dev")) {
+            ex.printStackTrace();
+            String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new InternalServerErrorResponse(msg));
+        }
+
+        // 正式等非 dev 環境：僅記錄詳細錯誤於伺服器日誌，對前端回傳泛用訊息避免洩漏實作細節
+        log.error("Unhandled server error", ex);
+        String genericMsg = "系統發生錯誤，請稍後再試或聯繫系統管理員。";
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new InternalServerErrorResponse(msg));
+                .body(new InternalServerErrorResponse(genericMsg));
     }
 
     @ExceptionHandler(ResponseStatusException.class)

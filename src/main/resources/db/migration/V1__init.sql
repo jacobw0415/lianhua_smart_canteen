@@ -242,6 +242,8 @@ CREATE TABLE users (
   employee_id BIGINT UNIQUE COMMENT '關聯員工表 ID',
   enabled BOOLEAN DEFAULT TRUE COMMENT '帳號是否啟用',
   last_login_at TIMESTAMP NULL COMMENT '最後登入時間',
+  mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否啟用多因子認證',
+  mfa_secret VARCHAR(512) NULL COMMENT 'TOTP 密鑰（建議以 AES 加密儲存）',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -452,6 +454,62 @@ CREATE TABLE password_reset_tokens (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_password_reset_token ON password_reset_tokens(token);
+
+-- ------------------------------------------------------------
+-- 18. Refresh Token 表（儲存不透明 Token，可撤銷）
+-- ------------------------------------------------------------
+CREATE TABLE refresh_tokens (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  token_hash VARCHAR(64) NOT NULL COMMENT 'Token 的 SHA-256 雜湊，不存明文',
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  revoked_at TIMESTAMP NULL,
+
+  CONSTRAINT fk_refresh_tokens_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE UNIQUE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+
+-- ------------------------------------------------------------
+-- 19. MFA 待驗證階段暫存（登入成功但尚未通過 MFA 時使用）
+-- ------------------------------------------------------------
+CREATE TABLE mfa_pending_sessions (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  token VARCHAR(64) NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_mfa_pending_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_mfa_pending_token ON mfa_pending_sessions(token);
+CREATE INDEX idx_mfa_pending_expires_at ON mfa_pending_sessions(expires_at);
+
+-- ------------------------------------------------------------
+-- 20. 財務操作稽核日誌表
+-- ------------------------------------------------------------
+CREATE TABLE financial_audit_logs (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  occurred_at TIMESTAMP NOT NULL COMMENT '操作發生時間（UTC）',
+  operator_id BIGINT NULL COMMENT '操作者使用者 ID，系統自動動作可為 NULL',
+  entity_type VARCHAR(50) NOT NULL COMMENT '實體類型：如 PAYMENT, PURCHASE, ORDER, RECEIPT',
+  entity_id BIGINT NOT NULL COMMENT '被操作實體的 ID',
+  action VARCHAR(50) NOT NULL COMMENT '操作類型：如 PAYMENT_VOID, PAYMENT_DELETE_ALL_FOR_PURCHASE',
+  details TEXT NULL COMMENT '變更摘要（JSON 或文字），不得含密碼或 Token 明文',
+
+  CONSTRAINT fk_fin_audit_operator
+    FOREIGN KEY (operator_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_fin_audit_occurred_at ON financial_audit_logs(occurred_at);
+CREATE INDEX idx_fin_audit_operator ON financial_audit_logs(operator_id);
+CREATE INDEX idx_fin_audit_entity ON financial_audit_logs(entity_type, entity_id);
 
 -- ============================================================
 --    Schema v2.7 完成：

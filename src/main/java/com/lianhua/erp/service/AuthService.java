@@ -1,7 +1,11 @@
 package com.lianhua.erp.service;
 
+import com.lianhua.erp.domain.User;
 import com.lianhua.erp.dto.auth.ForgotPasswordRequest;
+import com.lianhua.erp.dto.auth.MfaSetupResponse;
+import com.lianhua.erp.repository.UserRepository;
 import com.lianhua.erp.security.JwtUtils;
+import com.lianhua.erp.security.SensitiveDataMasker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -10,40 +14,46 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthService {
 
+    private static final String MFA_ISSUER = "Lianhua ERP";
+
     @Value("${app.frontend.default-url:http://localhost:5173}")
     private String defaultFrontendUrl;
 
     private final TokenBlacklistService tokenBlacklistService;
     private final JwtUtils jwtUtils;
+    private final RefreshTokenService refreshTokenService;
+    private final UserRepository userRepository;
+    private final MfaService mfaService;
 
-    public AuthService(TokenBlacklistService tokenBlacklistService, JwtUtils jwtUtils) {
+    public AuthService(TokenBlacklistService tokenBlacklistService,
+                       JwtUtils jwtUtils,
+                       RefreshTokenService refreshTokenService,
+                       UserRepository userRepository,
+                       MfaService mfaService) {
         this.tokenBlacklistService = tokenBlacklistService;
         this.jwtUtils = jwtUtils;
+        this.refreshTokenService = refreshTokenService;
+        this.userRepository = userRepository;
+        this.mfaService = mfaService;
     }
 
     /**
      * 處理忘記密碼邏輯：產生 Token 並發送動態網址信件
      */
     public void processForgotPassword(ForgotPasswordRequest request) {
-        // 1. 產生 Token (假設已有 tokenService)
-        // String token = tokenService.createToken(request.getEmail());
-        String token = "sample-token-123"; // 測試用佔位符
-
-        // 2. 決定 Base URL：優先使用前端傳來的，若無則使用設定檔預設值
+        // 1. 決定 Base URL：優先使用前端傳來的，若無則使用設定檔預設值
         String baseUrl = request.getResetLinkBaseUrl();
         if (baseUrl == null || baseUrl.isBlank()) {
             baseUrl = defaultFrontendUrl;
             log.info("ForgotPassword: Using default frontend URL: {}", baseUrl);
         }
 
-        // 3. 組合成完整重設連結 (處理結尾斜線並確保路徑正確)
-        String cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        String resetLink = cleanBaseUrl + "/reset-password?token=" + token;
-
-        log.info("ForgotPassword: Generated reset link for {}: {}", request.getEmail(), resetLink);
+        // 2. 實務上會在這裡產生 Token 並組合重設連結，傳給 EmailService 寄送
+        //    本範例僅記錄 log，不建立實際連結，也避免在 log 中輸出 Token 內容
+        log.info("ForgotPassword: Generated reset token for {}", request.getEmail());
 
         // 4. 調用郵件服務發送信件 (實作略)
-        // emailService.sendResetPasswordEmail(request.getEmail(), resetLink);
+        // emailService.sendPasswordResetEmail(request.getEmail(), resetLink);
     }
 
     /**
@@ -59,14 +69,57 @@ public class AuthService {
         String token = authHeader.substring(7).trim();
         if (token.isEmpty()) return;
 
-        // 2. 將 Token 加入黑名單，避免登出後仍被使用
+        // 2. 將 Access Token 加入黑名單，並撤銷該使用者所有 Refresh Token
         try {
             var claims = jwtUtils.getClaimsFromJwtToken(token);
             tokenBlacklistService.blacklist(token, claims.getExpiration());
-            log.info("Logout: Token 已加入黑名單 (前 8 碼): {}", token.substring(0, Math.min(8, token.length())));
+            Object uid = claims.get("uid");
+            if (uid instanceof Number) {
+                refreshTokenService.revokeAllForUser(((Number) uid).longValue());
+            }
+            log.info("Logout: Token 已加入黑名單 (前 8 碼): {}", SensitiveDataMasker.maskToken(token));
         } catch (Exception e) {
-            // 3. 捕捉所有例外，僅記錄日誌，防止回傳 500
             log.warn("Logout failed internally, but continuing: {}", e.getMessage());
         }
+    }
+
+    /**
+     * 取得 MFA 綁定設定（密鑰 + otpauth URL），並將密鑰暫存於使用者，待驗證通過後才設為啟用。
+     */
+    public MfaSetupResponse mfaSetup(Long userId) {
+        User user = userRepository.findByIdWithRoles(userId)
+                .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
+        MfaSetupResponse setup = mfaService.generateSetup(MFA_ISSUER, user.getUsername());
+        user.setMfaSecret(setup.getSecret());
+        user.setMfaEnabled(false);
+        userRepository.save(user);
+        return setup;
+    }
+
+    /**
+     * 以當前輸入的 6 碼確認啟用 MFA；通過後將 mfaEnabled 設為 true。
+     */
+    public void mfaConfirmEnable(Long userId, String code) {
+        User user = userRepository.findByIdWithRoles(userId)
+                .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
+        if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
+            throw new IllegalStateException("請先呼叫 MFA 設定 API 取得密鑰");
+        }
+        if (!mfaService.verifyCode(user.getMfaSecret(), code)) {
+            throw new IllegalArgumentException("驗證碼錯誤");
+        }
+        user.setMfaEnabled(true);
+        userRepository.save(user);
+    }
+
+    /**
+     * 關閉該使用者的 MFA（清除密鑰並設為未啟用）。
+     */
+    public void mfaDisable(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
+        user.setMfaSecret(null);
+        user.setMfaEnabled(false);
+        userRepository.save(user);
     }
 }

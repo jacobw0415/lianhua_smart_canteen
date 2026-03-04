@@ -37,8 +37,10 @@ public class JwtUtils {
             if (isDevProfile) {
                 log.warn("目前在 dev profile 正在使用預設 JWT Secret，請於正式環境設定 lianhua.app.jwtSecret 或環境變數 JWT_SECRET 以提高安全性。");
             } else {
-                log.error("偵測到在非 dev profile 使用預設 JWT Secret，為避免安全風險系統將停止啟動。請設定 lianhua.app.jwtSecret 或環境變數 JWT_SECRET。");
-                throw new IllegalStateException("JWT Secret 未正確設定，請參考 application.properties 中 lianhua.app.jwtSecret 說明。");
+                log.error(
+                        "偵測到在非 dev profile 使用預設 JWT Secret，為避免安全風險系統將停止啟動。請設定 lianhua.app.jwtSecret 或環境變數 JWT_SECRET。");
+                throw new IllegalStateException(
+                        "JWT Secret 未正確設定，請參考 application.properties 中 lianhua.app.jwtSecret 說明。");
             }
         }
 
@@ -48,7 +50,8 @@ public class JwtUtils {
     /**
      * 產生 JWT，並將 uid 與 authorities 寫入 Claims。
      * 註：claim 名稱為 "roles"，但內容為「角色 + 權限」合併的 authority 清單（如 ROLE_ADMIN, user:view），
-     * 供 Filter 還原為 Spring Security 的 GrantedAuthority，使 hasRole / hasAuthority 皆可正確運作。
+     * 供 Filter 還原為 Spring Security 的 GrantedAuthority，使 hasRole / hasAuthority
+     * 皆可正確運作。
      */
     public String generateJwtToken(Authentication authentication) {
         CustomUserDetails userPrincipal = (CustomUserDetails) authentication.getPrincipal();

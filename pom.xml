@@ -134,6 +134,19 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- TOTP for MFA (Google Authenticator compatible) -->
+        <dependency>
+            <groupId>com.eatthepath</groupId>
+            <artifactId>java-otp</artifactId>
+            <version>0.4.0</version>
+        </dependency>
+
+        <!-- Base32 編碼（TOTP 密鑰與 otpauth 用） -->
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -166,6 +179,17 @@
                 <version>2.23.0</version>
                 <configuration>
                     <configFile>${project.basedir}/eclipse-java-style.xml</configFile>
+                </configuration>
+            </plugin>
+
+            <!-- OWASP Dependency-Check：相依性弱點掃描 -->
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>9.2.0</version>
+                <configuration>
+                    <!-- CVSS 分數 >= 7.0 時讓建置失敗，可依實際容忍度調整 -->
+                    <failBuildOnCVSS>7.0</failBuildOnCVSS>
                 </configuration>
             </plugin>
         </plugins>
