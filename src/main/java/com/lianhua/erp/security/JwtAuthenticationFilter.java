@@ -1,5 +1,6 @@
 package com.lianhua.erp.security;
 
+import com.lianhua.erp.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -32,6 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final com.lianhua.erp.service.TokenBlacklistService tokenBlacklistService;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(
@@ -62,11 +64,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .map(SimpleGrantedAuthority::new)
                         .collect(Collectors.toList());
 
-                // 5. 從 JWT 取得 uid，組裝 CustomUserDetails 作為 Principal（供 /api/users/me、本人修改密碼等 API 取得 currentUserId）
+                // 5. 從 JWT 取得 uid，組裝 CustomUserDetails 作為 Principal（供 /api/users/me、通知中心等 API 取得 currentUserId）
                 Long uid = null;
                 Object uidClaim = claims.get("uid");
                 if (uidClaim instanceof Number) {
                     uid = ((Number) uidClaim).longValue();
+                }
+                // 若 JWT 無 uid 或為 0（舊版 token 或異常），依 username 查庫補齊，確保其他管理員也能正確取得 currentUserId（如查看通知）
+                if (uid == null || uid <= 0L) {
+                    uid = userRepository.findByUsername(username)
+                            .map(u -> u.getId())
+                            .orElse(0L);
+                    if (uid > 0L) {
+                        log.debug("JWT 缺少有效 uid，已依 username '{}' 補齊為 {}", username, uid);
+                    }
                 }
 
                 CustomUserDetails userDetails = new CustomUserDetails(

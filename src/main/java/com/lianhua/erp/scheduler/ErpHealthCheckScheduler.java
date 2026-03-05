@@ -2,13 +2,13 @@ package com.lianhua.erp.scheduler;
 
 import com.lianhua.erp.repository.ExpenseRepository; // 記得新增此 Repository 注入
 import com.lianhua.erp.repository.SalesRepository;
+import com.lianhua.erp.repository.UserRepository;
 import com.lianhua.erp.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -23,6 +23,9 @@ public class ErpHealthCheckScheduler {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private UserRepository userRepository;
+
     /**
      * 統一執行點：每天晚上 10:00 (22:00) 執行所有健康檢查
      */
@@ -30,7 +33,10 @@ public class ErpHealthCheckScheduler {
     @Scheduled(cron = "0 0 22 * * *")
     public void runDailyHealthCheck() {
         LocalDate today = LocalDate.now();
-        List<Long> adminIds = Collections.singletonList(1L); // 接收者設定
+        List<Long> adminIds = userRepository.findEnabledAdminIds();
+        if (adminIds.isEmpty()) {
+            return;
+        }
 
         // 執行第 4 項：今日銷售檢查
         checkDailySales(today, adminIds);

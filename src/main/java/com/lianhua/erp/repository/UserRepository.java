@@ -47,4 +47,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /** 統計「啟用中且具 ROLE_ADMIN」的使用者數量，排除指定使用者 id（用於更新時檢查：若將該使用者改為非管理員或停用，剩餘數量是否為 0） */
     @Query("SELECT COUNT(DISTINCT u.id) FROM User u JOIN u.roles r WHERE r.name = 'ROLE_ADMIN' AND u.enabled = true AND u.id <> :excludeUserId")
     long countEnabledUsersWithRoleAdminExcluding(@Param("excludeUserId") Long excludeUserId);
+
+    /** 取得所有「啟用中且具 ROLE_ADMIN」的使用者 ID，供系統通知（排程告警、作廢通知等）發送給所有管理員 */
+    @Query("SELECT DISTINCT u.id FROM User u JOIN u.roles r WHERE r.name = 'ROLE_ADMIN' AND u.enabled = true")
+    List<Long> findEnabledAdminIds();
 }

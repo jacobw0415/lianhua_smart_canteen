@@ -1,8 +1,9 @@
 package com.lianhua.erp.component;
 
+import com.lianhua.erp.event.ExpenseEvent;
 import com.lianhua.erp.event.PurchaseEvent;
 import com.lianhua.erp.event.ReceiptEvent;
-import com.lianhua.erp.event.ExpenseEvent; // 🚀 新增匯入
+import com.lianhua.erp.repository.UserRepository;
 import com.lianhua.erp.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import java.util.Map;
 public class NotificationEventListener {
 
     private final NotificationService notificationService;
+    private final UserRepository userRepository;
 
     /**
      * 1. 監聽採購相關事件 (進貨單)
@@ -38,9 +40,9 @@ public class NotificationEventListener {
             finalPayload.putAll(event.getPayload());
         }
 
-        List<Long> receiverIds = List.of(1L);
+        List<Long> receiverIds = userRepository.findEnabledAdminIds();
 
-        if ("PURCHASE_VOIDED".equals(action)) {
+        if ("PURCHASE_VOIDED".equals(action) && !receiverIds.isEmpty()) {
             notificationService.send("PURCHASE_VOID_ALERT", "purchases",
                     event.getPurchase().getId(), finalPayload, receiverIds);
         }
@@ -65,9 +67,9 @@ public class NotificationEventListener {
             finalPayload.putAll(event.getPayload());
         }
 
-        List<Long> receiverIds = List.of(1L);
+        List<Long> receiverIds = userRepository.findEnabledAdminIds();
 
-        if ("RECEIPT_VOIDED".equals(action)) {
+        if ("RECEIPT_VOIDED".equals(action) && !receiverIds.isEmpty()) {
             log.info("🚫 執行 [收款單作廢] 通知發送，原因: {}", finalPayload.getOrDefault("reason", "無"));
             notificationService.send(
                     "RECEIPT_VOID_ALERT",
@@ -111,10 +113,10 @@ public class NotificationEventListener {
             finalPayload.putAll(event.getPayload());
         }
 
-        List<Long> receiverIds = List.of(1L);
+        List<Long> receiverIds = userRepository.findEnabledAdminIds();
 
         // 3. 處理支出作廢通知
-        if ("EXPENSE_VOIDED".equals(action)) {
+        if ("EXPENSE_VOIDED".equals(action) && !receiverIds.isEmpty()) {
             log.info("🚫 執行 [支出作廢] 通知發送");
             notificationService.send(
                     "EXPENSE_VOID_ALERT",
