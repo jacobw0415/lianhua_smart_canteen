@@ -113,11 +113,17 @@ public class AuthService {
     }
 
     /**
-     * 關閉該使用者的 MFA（清除密鑰並設為未啟用）。
+     * 關閉該使用者的 MFA（須先驗證當前 TOTP 碼，通過後清除密鑰並設為未啟用）。
      */
-    public void mfaDisable(Long userId) {
+    public void mfaDisable(Long userId, String code) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
+        if (!Boolean.TRUE.equals(user.getMfaEnabled()) || user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
+            throw new IllegalStateException("此帳號尚未啟用 MFA");
+        }
+        if (!mfaService.verifyCode(user.getMfaSecret(), code)) {
+            throw new IllegalArgumentException("驗證碼錯誤，無法關閉 MFA");
+        }
         user.setMfaSecret(null);
         user.setMfaEnabled(false);
         userRepository.save(user);

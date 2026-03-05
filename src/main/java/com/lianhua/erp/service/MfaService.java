@@ -2,8 +2,6 @@ package com.lianhua.erp.service;
 
 import com.lianhua.erp.dto.auth.MfaSetupResponse;
 
-import java.security.SecureRandom;
-import java.util.Base64;
 
 /**
  * MFA（TOTP）服務：產生密鑰、產生 QR 用 otpauth URL、驗證 6 碼。

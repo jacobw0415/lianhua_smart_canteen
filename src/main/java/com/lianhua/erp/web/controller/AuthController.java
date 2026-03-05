@@ -214,6 +214,22 @@ public class AuthController {
         return ApiResponseDto.ok(body);
     }
 
+    @Operation(summary = "關閉 MFA", description = "已登入使用者關閉自己的雙因素認證；須提供當前 TOTP 驗證碼以確認身分，通過後清除密鑰並設為未啟用")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "MFA 已關閉"),
+            @ApiResponse(responseCode = "400", description = "驗證碼錯誤或格式不符", content = @Content(schema = @Schema(implementation = BadRequestResponse.class))),
+            @ApiResponse(responseCode = "401", description = "未登入", content = @Content(schema = @Schema(implementation = UnauthorizedResponse.class)))
+    })
+    @PostMapping("/mfa/disable")
+    public ApiResponseDto<String> mfaDisable(@Valid @RequestBody MfaDisableRequest request) {
+        Long userId = SecurityUtils.getCurrentUserIdOrNull();
+        if (userId == null) {
+            throw new IllegalStateException("請先登入");
+        }
+        authService.mfaDisable(userId, request.getCode());
+        return ApiResponseDto.ok("MFA 已關閉");
+    }
+
     // ============================================================
     // 📧 忘記密碼 (Forgot Password)
     // ============================================================

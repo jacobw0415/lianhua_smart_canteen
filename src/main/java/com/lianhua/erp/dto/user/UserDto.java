@@ -32,6 +32,9 @@ public class UserDto {
     @Schema(description = "是否啟用", example = "true")
     private Boolean enabled;
 
+    @Schema(description = "是否已啟用 MFA（雙因素認證）", example = "true")
+    private Boolean mfaEnabled;
+
     @Schema(description = "角色名稱清單", example = "[\"ROLE_ADMIN\", \"ROLE_USER\"]")
     private List<String> roles;
 
