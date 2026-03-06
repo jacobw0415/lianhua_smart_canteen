@@ -157,14 +157,14 @@ public class DataInitializer {
                 Role r = Role.builder()
                         .name("ROLE_USER")
                         .description("一般使用者：\n" +
-                                "僅能查看訂單、進銷存、費用、產品及儀表板報表等營運資料，嚴禁變更系統設定、帳號或角色。不具備任何資料之新增、修改、作廢與刪除權，確保數據僅供讀取與分析。")
+                                "僅能查看訂單、進銷存、費用、產品及儀表板報表等營運資料，嚴禁變更系統設定、帳號或角色。不具備任何資料之新增、修改、作廢與刪除權，確保數據僅供讀取。")
                         .permissions(new HashSet<>(viewOnlyPermissions))
                         .build();
                 log.info("   -> 建立角色: ROLE_USER");
                 return roleRepository.save(r);
             });
             userRole.setDescription("一般使用者：\n" +
-                    "僅能查看訂單、進銷存、費用、產品及儀表板報表等營運資料，嚴禁變更系統設定、帳號或角色。不具備任何資料之新增、修改、作廢與刪除權，確保數據僅供讀取與分析。");
+                    "僅能查看訂單、進銷存、費用、產品及儀表板報表等營運資料，嚴禁變更系統設定、帳號或角色。不具備任何資料之新增、修改、作廢與刪除權，確保數據僅供讀取。");
             syncRolePermissions(userRole, viewOnlyPermissions);
             roleRepository.save(userRole);
             log.info("   -> ROLE_USER 權限已同步: {}", userRole.getPermissions().stream()

@@ -1,8 +1,11 @@
 package com.lianhua.erp.config;
 
 import com.lianhua.erp.security.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -23,9 +26,14 @@ import org.springframework.web.cors.CorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final Environment environment;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private String corsAllowedOrigins;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, Environment environment) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.environment = environment;
     }
 
     @Bean
@@ -40,6 +48,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        boolean isDevProfile = environment.acceptsProfiles(Profiles.of("dev"));
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -47,7 +57,22 @@ public class SecurityConfig {
                 // 一般性安全標頭設定（大多在瀏覽器端生效）
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp
-                                .policyDirectives("default-src 'self'; frame-ancestors 'none'; object-src 'none';"))
+                                // 開發環境：放寬給 Swagger UI 使用 inline style / data:image SVG 等
+                                .policyDirectives(
+                                        isDevProfile
+                                                ? "default-src 'self'; " +
+                                                  "script-src 'self'; " +
+                                                  "style-src 'self' 'unsafe-inline'; " +
+                                                  "img-src 'self' data:; " +
+                                                  "frame-ancestors 'none'; " +
+                                                  "object-src 'none';"
+                                                : "default-src 'self'; " +
+                                                  "script-src 'self'; " +
+                                                  "style-src 'self'; " +
+                                                  "img-src 'self'; " +
+                                                  "frame-ancestors 'none'; " +
+                                                  "object-src 'none';"
+                                ))
                         .frameOptions(frame -> frame.deny())
                         .httpStrictTransportSecurity(hsts -> hsts
                                 .includeSubDomains(true)
@@ -57,25 +82,42 @@ public class SecurityConfig {
                 // ⭐ 啟用 CORS（搭配底下的 corsConfigurationSource）
                 .cors(Customizer.withDefaults())
 
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login", "/api/auth/register",
-                                "/api/auth/forgot-password", "/api/auth/reset-password",
-                                "/api/auth/refresh", "/api/auth/mfa/verify", "/api/auth/logout").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
-                        .anyRequest().authenticated()
-                )
+                .authorizeHttpRequests(auth -> {
+                    auth.requestMatchers("/api/auth/login", "/api/auth/register",
+                                    "/api/auth/forgot-password", "/api/auth/reset-password",
+                                    "/api/auth/refresh", "/api/auth/mfa/verify", "/api/auth/logout")
+                            .permitAll();
+
+                    // Swagger / OpenAPI：開發環境全開放，正式環境僅管理者可看，避免對外暴露完整 API 結構
+                    if (isDevProfile) {
+                        auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                                .permitAll();
+                    } else {
+                        auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                                .hasRole("ADMIN");
+                    }
+
+                    auth.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll();
+                    auth.anyRequest().authenticated();
+                })
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // ⭐ 全域 CORS 設定：允許前端 localhost:5173 存取所有 /api/**
+    // ⭐ 全域 CORS 設定：允許設定檔中指定的前端來源存取 API
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         var configuration = new org.springframework.web.cors.CorsConfiguration();
-        // 🌿 雲端環境若有不同網域，可從 properties 讀取或使用 List.of("http://localhost:5173", "https://erp.lianhua.com")
-        configuration.setAllowedOrigins(java.util.List.of("http://localhost:5173"));
+
+        java.util.List<String> origins = java.util.Arrays.stream(corsAllowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        if (origins.isEmpty()) {
+            origins = java.util.List.of("http://localhost:5173");
+        }
+        configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
         // 🌿 建議：允許所有 Header，避免搜尋時因特定的 X-Total-Count 或分頁 Header 被擋

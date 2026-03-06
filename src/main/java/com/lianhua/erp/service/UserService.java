@@ -3,15 +3,23 @@
     import com.lianhua.erp.dto.user.UserDto;
     import com.lianhua.erp.dto.user.UserRegisterDto;
     import com.lianhua.erp.dto.user.UserRequestDto;
+    import com.lianhua.erp.dto.user.UserSearchRequest;
+    import org.springframework.data.domain.Page;
+    import org.springframework.data.domain.Pageable;
     import java.util.List;
+    
+public interface UserService {
 
-    public interface UserService {
+    List<UserDto> getAllUsers();
 
-        List<UserDto> getAllUsers();
+    /**
+     * 搜尋使用者（支援分頁 + 多欄位模糊搜尋）。
+     */
+    Page<UserDto> searchUsers(UserSearchRequest request, Pageable pageable);
 
-        UserDto getUserById(Long id);
+    UserDto getUserById(Long id);
 
-        UserDto registerUser(UserRegisterDto dto);
+    UserDto registerUser(UserRegisterDto dto);
 
     UserDto createUser(UserRequestDto dto, Long currentUserId);
 

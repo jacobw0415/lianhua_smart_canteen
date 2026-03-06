@@ -8,6 +8,7 @@ import com.lianhua.erp.domain.UserAuditLog;
 import com.lianhua.erp.dto.user.UserDto;
 import com.lianhua.erp.dto.user.UserRegisterDto;
 import com.lianhua.erp.dto.user.UserRequestDto;
+import com.lianhua.erp.dto.user.UserSearchRequest;
 import com.lianhua.erp.mapper.UserMapper;
 import com.lianhua.erp.repository.RoleRepository;
 import com.lianhua.erp.repository.UserAuditLogRepository;
@@ -15,6 +16,11 @@ import com.lianhua.erp.repository.UserRepository;
 import com.lianhua.erp.security.SecurityUtils;
 import com.lianhua.erp.service.UserService;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -69,6 +75,65 @@ public class UserServiceImpl implements UserService {
         return userRepository.findAll().stream()
                 .map(userMapper::toDto)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 搜尋使用者（支援分頁 + 多欄位模糊搜尋）。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<UserDto> searchUsers(UserSearchRequest request, Pageable pageable) {
+        Pageable safePageable = normalizePageable(pageable);
+        Specification<User> spec = buildUserSpec(request);
+
+        Page<User> page = userRepository.findAll(spec, safePageable);
+        return page.map(userMapper::toDto);
+    }
+
+    private Specification<User> buildUserSpec(UserSearchRequest req) {
+        return (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+
+            if (hasText(req.getUsername())) {
+                predicates.add(cb.like(
+                        cb.lower(root.get("username")),
+                        "%" + req.getUsername().trim().toLowerCase() + "%"
+                ));
+            }
+
+            if (hasText(req.getFullName())) {
+                predicates.add(cb.like(
+                        cb.lower(root.get("fullName")),
+                        "%" + req.getFullName().trim().toLowerCase() + "%"
+                ));
+            }
+
+            if (hasText(req.getEmail())) {
+                predicates.add(cb.like(
+                        cb.lower(root.get("email")),
+                        "%" + req.getEmail().trim().toLowerCase() + "%"
+                ));
+            }
+
+            if (req.getEnabled() != null) {
+                predicates.add(cb.equal(root.get("enabled"), req.getEnabled()));
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+    }
+
+    private boolean hasText(String s) {
+        return s != null && !s.trim().isEmpty();
+    }
+
+    private Pageable normalizePageable(Pageable pageable) {
+        int page = Math.max(pageable.getPageNumber(), 0);
+        int size = pageable.getPageSize() <= 0 || pageable.getPageSize() > 200 ? 20 : pageable.getPageSize();
+        Sort sort = pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.ASC, "id");
+        return PageRequest.of(page, size, sort);
     }
 
     /** 取得單一使用者 - 🌿 引用 findByIdWithRoles 讓燈號亮起 */
