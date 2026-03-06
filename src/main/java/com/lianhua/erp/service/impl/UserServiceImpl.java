@@ -12,8 +12,10 @@ import com.lianhua.erp.mapper.UserMapper;
 import com.lianhua.erp.repository.RoleRepository;
 import com.lianhua.erp.repository.UserAuditLogRepository;
 import com.lianhua.erp.repository.UserRepository;
+import com.lianhua.erp.security.SecurityUtils;
 import com.lianhua.erp.service.UserService;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +54,8 @@ public class UserServiceImpl implements UserService {
     }
 
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
+    private static final String ROLE_SUPER_ADMIN = "ROLE_SUPER_ADMIN";
+    private static final String PERMISSION_ADMIN_MANAGE = "admin:manage";
     private static final String ACTION_USER_CREATE = "USER_CREATE";
     private static final String ACTION_USER_UPDATE = "USER_UPDATE";
     private static final String ACTION_USER_RESET_PASSWORD = "USER_RESET_PASSWORD";
@@ -85,10 +89,18 @@ public class UserServiceImpl implements UserService {
         return userMapper.toDto(user);
     }
 
-    /** 管理員建立使用者 - 🌿 引用 existsByUsername & existsByEmail 讓燈號亮起；寫入稽核 USER_CREATE */
+    /** 管理員建立使用者 - 🌿 引用 existsByUsername & existsByEmail 讓燈號亮起；寫入稽核 USER_CREATE。具管理員角色時需 admin:manage 權限。 */
     @Override
     @Transactional
     public UserDto createUser(UserRequestDto dto, Long currentUserId) {
+        // 若欲賦予管理員角色，僅具 admin:manage（SUPER_ADMIN）者可執行
+        if (dto.getRoleNames() != null && dto.getRoleNames().stream()
+                .anyMatch(name -> name != null && (ROLE_ADMIN.equals(name.toUpperCase()) || ROLE_SUPER_ADMIN.equals(name.toUpperCase())))) {
+            if (!SecurityUtils.hasAuthority(PERMISSION_ADMIN_MANAGE)) {
+                throw new AccessDeniedException("僅超級管理員可建立具系統管理員或超級管理員角色的帳號。");
+            }
+        }
+
         // 0. 建立使用者時密碼必填
         if (dto.getPassword() == null || dto.getPassword().isBlank()) {
             throw new IllegalArgumentException("建立使用者時密碼為必填");
@@ -153,12 +165,17 @@ public class UserServiceImpl implements UserService {
         return userMapper.toDto(userRepository.save(user));
     }
 
-    /** 更新使用者資訊（§4.1：R1 自己不可改角色/啟用、R2 保護最後一位管理員、稽核） */
+    /** 更新使用者資訊（§4.1：R1 自己不可改角色/啟用、R2 保護最後一位管理員、僅具 admin:manage 者可修改其他管理員、稽核） */
     @Override
     @Transactional
     public UserDto updateUser(Long id, UserRequestDto dto, Long currentUserId) {
         User user = userRepository.findByIdWithRoles(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+
+        // 目標為管理員（ROLE_ADMIN 或 ROLE_SUPER_ADMIN）時，僅具 admin:manage 者可修改
+        if (isAdminUser(user) && !SecurityUtils.hasAuthority(PERMISSION_ADMIN_MANAGE)) {
+            throw new AccessDeniedException("僅超級管理員可修改其他系統管理員的資訊。");
+        }
 
         // R1：自己改自己時，不允許更新 roleNames、enabled
         if (currentUserId != null && currentUserId.equals(id)) {
@@ -167,14 +184,13 @@ public class UserServiceImpl implements UserService {
             }
         }
 
-        // R2：若會將此使用者從「啟用中管理員」改為非管理員或停用，須確保至少還有一位啟用中管理員
-        boolean isCurrentlyEnabledAdmin = user.getRoles().stream()
-                .anyMatch(r -> ROLE_ADMIN.equals(r.getName())) && Boolean.TRUE.equals(user.getEnabled());
+        // R2：若會將此使用者從「啟用中管理員」改為非管理員或停用，須確保至少還有一位啟用中管理員（含 SUPER_ADMIN）
+        boolean isCurrentlyEnabledAdmin = isAdminUser(user) && Boolean.TRUE.equals(user.getEnabled());
         boolean changingToNonAdmin = dto.getRoleNames() != null && !dto.getRoleNames().stream()
-                .anyMatch(name -> name != null && ROLE_ADMIN.equals(name.toUpperCase()));
+                .anyMatch(name -> name != null && (ROLE_ADMIN.equals(name.toUpperCase()) || ROLE_SUPER_ADMIN.equals(name.toUpperCase())));
         boolean changingToDisabled = Boolean.FALSE.equals(dto.getEnabled());
         if (isCurrentlyEnabledAdmin && (changingToNonAdmin || changingToDisabled)) {
-            if (userRepository.countEnabledUsersWithRoleAdminExcluding(id) < 1) {
+            if (userRepository.countEnabledUsersWithAnyAdminRoleExcluding(id) < 1) {
                 throw new IllegalStateException("系統至少需保留一位啟用中的系統管理員。");
             }
         }
@@ -246,10 +262,14 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByIdWithRoles(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
 
-        // D2：不可刪除最後一位啟用中的系統管理員
-        boolean isEnabledAdmin = user.getRoles().stream()
-                .anyMatch(r -> ROLE_ADMIN.equals(r.getName())) && Boolean.TRUE.equals(user.getEnabled());
-        if (isEnabledAdmin && userRepository.countEnabledUsersWithRoleAdmin() <= 1) {
+        // 目標為管理員時，僅具 admin:manage 者可刪除
+        if (isAdminUser(user) && !SecurityUtils.hasAuthority(PERMISSION_ADMIN_MANAGE)) {
+            throw new AccessDeniedException("僅超級管理員可刪除其他系統管理員帳號。");
+        }
+
+        // D2：不可刪除最後一位啟用中的系統管理員（含 ROLE_ADMIN / ROLE_SUPER_ADMIN）
+        boolean isEnabledAdmin = isAdminUser(user) && Boolean.TRUE.equals(user.getEnabled());
+        if (isEnabledAdmin && userRepository.countEnabledUsersWithAnyAdminRole() <= 1) {
             throw new IllegalStateException("不可刪除最後一位系統管理員。");
         }
 
@@ -307,5 +327,12 @@ public class UserServiceImpl implements UserService {
     private static String escapeJson(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    /** 是否為系統管理員（具 ROLE_ADMIN 或 ROLE_SUPER_ADMIN） */
+    private boolean isAdminUser(User user) {
+        if (user == null || user.getRoles() == null) return false;
+        return user.getRoles().stream()
+                .anyMatch(r -> ROLE_ADMIN.equals(r.getName()) || ROLE_SUPER_ADMIN.equals(r.getName()));
     }
 }

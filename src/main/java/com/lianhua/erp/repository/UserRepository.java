@@ -48,7 +48,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT COUNT(DISTINCT u.id) FROM User u JOIN u.roles r WHERE r.name = 'ROLE_ADMIN' AND u.enabled = true AND u.id <> :excludeUserId")
     long countEnabledUsersWithRoleAdminExcluding(@Param("excludeUserId") Long excludeUserId);
 
-    /** 取得所有「啟用中且具 ROLE_ADMIN」的使用者 ID，供系統通知（排程告警、作廢通知等）發送給所有管理員 */
-    @Query("SELECT DISTINCT u.id FROM User u JOIN u.roles r WHERE r.name = 'ROLE_ADMIN' AND u.enabled = true")
+    /** 統計「啟用中且具 ROLE_ADMIN 或 ROLE_SUPER_ADMIN」的使用者數量（用於保護至少保留一位管理員） */
+    @Query("SELECT COUNT(DISTINCT u.id) FROM User u JOIN u.roles r WHERE r.name IN ('ROLE_ADMIN', 'ROLE_SUPER_ADMIN') AND u.enabled = true")
+    long countEnabledUsersWithAnyAdminRole();
+
+    /** 同上，排除指定使用者 id */
+    @Query("SELECT COUNT(DISTINCT u.id) FROM User u JOIN u.roles r WHERE r.name IN ('ROLE_ADMIN', 'ROLE_SUPER_ADMIN') AND u.enabled = true AND u.id <> :excludeUserId")
+    long countEnabledUsersWithAnyAdminRoleExcluding(@Param("excludeUserId") Long excludeUserId);
+
+    /** 取得所有「啟用中且具 ROLE_ADMIN 或 ROLE_SUPER_ADMIN」的使用者 ID，供系統通知發送給所有管理員 */
+    @Query("SELECT DISTINCT u.id FROM User u JOIN u.roles r WHERE r.name IN ('ROLE_ADMIN', 'ROLE_SUPER_ADMIN') AND u.enabled = true")
     List<Long> findEnabledAdminIds();
 }

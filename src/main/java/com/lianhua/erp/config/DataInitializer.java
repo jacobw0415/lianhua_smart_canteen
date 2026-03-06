@@ -39,6 +39,7 @@ public class DataInitializer {
             // 系統管理
             Permission pUserView = createPermissionIfNotFound("user:view", "查看使用者", "系統管理");
             Permission pUserEdit = createPermissionIfNotFound("user:edit", "編輯使用者", "系統管理");
+            Permission pAdminManage = createPermissionIfNotFound("admin:manage", "管理其他管理員（修改角色、啟停用、刪除等）", "系統管理");
             Permission pRoleView = createPermissionIfNotFound("role:view", "查看角色與權限", "系統管理");
             Permission pRoleEdit = createPermissionIfNotFound("role:edit", "編輯角色與權限", "系統管理");
             // 訂單
@@ -88,8 +89,19 @@ public class DataInitializer {
                         });
             });
 
-            // 3. 初始化角色並同步權限（每次啟動確保 ADMIN 全權限、USER 僅檢視）
+            // 3. 初始化角色並同步權限（SUPER_ADMIN 含 admin:manage；ADMIN 不含，僅能管理一般使用者）
             Set<Permission> allPermissions = Set.of(
+                    pUserView, pUserEdit, pAdminManage, pRoleView, pRoleEdit,
+                    pOrderView, pOrderEdit,
+                    pPurchaseView, pPurchaseEdit, pSupplierView, pPaymentView, pApView,
+                    pSaleView, pSaleEdit, pOrderCustomerView, pReceiptView, pArView,
+                    pExpenseView, pExpenseEdit, pExpenseCategoryView,
+                    pProductView, pProductEdit, pProductCategoryView,
+                    pEmployeeView,
+                    pReportView, pDashboardView,
+                    pNotificationView
+            );
+            Set<Permission> adminPermissions = Set.of(
                     pUserView, pUserEdit, pRoleView, pRoleEdit,
                     pOrderView, pOrderEdit,
                     pPurchaseView, pPurchaseEdit, pSupplierView, pPaymentView, pApView,
@@ -111,19 +123,34 @@ public class DataInitializer {
                     pNotificationView
             );
 
+            Role superAdminRole = roleRepository.findByName("ROLE_SUPER_ADMIN").orElseGet(() -> {
+                Role r = Role.builder()
+                        .name("ROLE_SUPER_ADMIN")
+                        .description("超級管理員：\n" +
+                                "具備所有權限（含 admin:manage），可管理其他管理員與一般使用者、變更角色與啟停用。僅少數帳號應擁有此角色。")
+                        .permissions(new HashSet<>(allPermissions))
+                        .build();
+                log.info("   -> 建立角色: ROLE_SUPER_ADMIN");
+                return roleRepository.save(r);
+            });
+            superAdminRole.setDescription("超級管理員：\n" +
+                    "具備所有權限（含 admin:manage），可管理其他管理員與一般使用者、變更角色與啟停用。僅少數帳號應擁有此角色。");
+            syncRolePermissions(superAdminRole, allPermissions);
+            roleRepository.save(superAdminRole);
+
             Role adminRole = roleRepository.findByName("ROLE_ADMIN").orElseGet(() -> {
                 Role r = Role.builder()
                         .name("ROLE_ADMIN")
                         .description("系統管理員：\n" +
-                                "擁有系統全功能權限，負責帳號、角色與權限配置，並具備所有模組之新增、修改、作廢與刪除權。掌握核心設定，可全面操控系統運作、維護數據完整與變更各項參數。")
-                        .permissions(new HashSet<>(allPermissions))
+                                "擁有除「管理其他管理員」外的全功能權限；可管理一般使用者與各模組，但不可修改或停用其他管理員帳號。")
+                        .permissions(new HashSet<>(adminPermissions))
                         .build();
                 log.info("   -> 建立角色: ROLE_ADMIN");
                 return roleRepository.save(r);
             });
             adminRole.setDescription("系統管理員：\n" +
-                    "擁有系統全功能權限，負責帳號、角色與權限配置，並具備所有模組之新增、修改、作廢與刪除權。掌握核心設定，可全面操控系統運作、維護數據完整與變更各項參數。");
-            syncRolePermissions(adminRole, allPermissions);
+                    "擁有除「管理其他管理員」外的全功能權限；可管理一般使用者與各模組，但不可修改或停用其他管理員帳號。");
+            syncRolePermissions(adminRole, adminPermissions);
             roleRepository.save(adminRole);
 
             Role userRole = roleRepository.findByName("ROLE_USER").orElseGet(() -> {
@@ -143,22 +170,31 @@ public class DataInitializer {
             log.info("   -> ROLE_USER 權限已同步: {}", userRole.getPermissions().stream()
                     .map(Permission::getName).sorted().toList());
 
-            // 4. 初始化管理員帳號 (Admin User)
-            // 必須確保具備 ROLE_ADMIN，JwtUtils 才能在 Claim 加入正確的 roles
-            if (!userRepository.existsByUsername("admin")) {
-                User admin = User.builder()
-                        .username("admin")
-                        .password(passwordEncoder.encode("admin123"))
-                        .fullName("系統管理員")
-                        .email("admin@lianhua.com")
-                        .enabled(true)
-                        .roles(new HashSet<>()) // 初始化集合避免 NullPointerException
-                        .build();
-
-                admin.addRole(adminRole); // 建立多對多關聯
-                userRepository.save(admin);
-                log.info("✅ 初始管理員帳號 'admin' 建立完成 (預設密碼: admin123)");
-            }
+            // 4. 初始化或升級超級管理員帳號：預設 admin 具備 ROLE_SUPER_ADMIN
+            userRepository.findByUsername("admin")
+                    .flatMap(u -> userRepository.findByIdWithRoles(u.getId()))
+                    .ifPresentOrElse(
+                    existingAdmin -> {
+                        if (existingAdmin.getRoles().stream().noneMatch(r -> "ROLE_SUPER_ADMIN".equals(r.getName()))) {
+                            existingAdmin.addRole(superAdminRole);
+                            userRepository.save(existingAdmin);
+                            log.info("✅ 已將既有 'admin' 帳號升級為 ROLE_SUPER_ADMIN");
+                        }
+                    },
+                    () -> {
+                        User admin = User.builder()
+                                .username("admin")
+                                .password(passwordEncoder.encode("admin123"))
+                                .fullName("系統管理員")
+                                .email("admin@lianhua.com")
+                                .enabled(true)
+                                .roles(new HashSet<>())
+                                .build();
+                        admin.addRole(superAdminRole);
+                        userRepository.save(admin);
+                        log.info("✅ 初始超級管理員帳號 'admin' 建立完成 (預設密碼: admin123，角色: ROLE_SUPER_ADMIN)");
+                    }
+            );
 
             log.info("🌿 系統數據初始化檢查結束。");
         };

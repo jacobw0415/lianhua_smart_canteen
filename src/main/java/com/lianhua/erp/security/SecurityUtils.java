@@ -1,7 +1,9 @@
 package com.lianhua.erp.security;
 
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+
 
 /**
  * 安全相關共用工具。
@@ -36,6 +38,33 @@ public final class SecurityUtils {
             return null;
         }
         return authentication.getName();
+    }
+
+    /**
+     * 判斷當前登入者是否擁有指定權限（含角色，如 ROLE_ADMIN、權限如 user:edit、admin:manage）。
+     */
+    public static boolean hasAuthority(String authority) {
+        if (authority == null || authority.isBlank()) {
+            return false;
+        }
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> authority.equals(a));
+    }
+
+    /**
+     * 判斷當前登入者是否擁有指定角色（會自動補上 ROLE_ 前綴若未提供）。
+     */
+    public static boolean hasRole(String role) {
+        if (role == null || role.isBlank()) {
+            return false;
+        }
+        String normalized = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+        return hasAuthority(normalized);
     }
 }
 

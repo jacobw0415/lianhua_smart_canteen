@@ -306,6 +306,22 @@ CREATE TABLE login_logs (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ------------------------------------------------------------
+-- 11.3 使用者管理操作稽核日誌 (與 UserAuditLog 實體對齊)
+-- ------------------------------------------------------------
+CREATE TABLE user_audit_logs (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  occurred_at TIMESTAMP(6) NOT NULL COMMENT '操作發生時間（UTC）',
+  operator_id BIGINT NOT NULL COMMENT '操作者使用者 id',
+  target_user_id BIGINT NOT NULL COMMENT '被操作的使用者 id',
+  action VARCHAR(50) NOT NULL COMMENT 'USER_CREATE, USER_UPDATE, USER_RESET_PASSWORD, USER_DELETE 等',
+  details TEXT NULL COMMENT '變更摘要（JSON 或文字），不得含密碼明文',
+  KEY idx_audit_occurred_at (occurred_at),
+  KEY idx_audit_operator (operator_id),
+  KEY idx_audit_target (target_user_id),
+  KEY idx_audit_action (action)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
 CREATE INDEX idx_role_permissions_role_id ON role_permissions(role_id);
 

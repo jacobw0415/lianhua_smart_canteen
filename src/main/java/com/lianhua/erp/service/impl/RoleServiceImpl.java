@@ -5,9 +5,11 @@ import com.lianhua.erp.domain.Role;
 import com.lianhua.erp.dto.user.RoleDto;
 import com.lianhua.erp.repository.PermissionRepository;
 import com.lianhua.erp.repository.RoleRepository;
+import com.lianhua.erp.security.SecurityUtils;
 import com.lianhua.erp.service.RoleService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,20 +48,37 @@ public class RoleServiceImpl implements RoleService {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("角色不存在"));
 
+        // 僅超級管理員可修改 ROLE_SUPER_ADMIN / ROLE_ADMIN 的權限設定，避免一般管理員變更管理員角色定義
+        if ("ROLE_SUPER_ADMIN".equals(role.getName()) || "ROLE_ADMIN".equals(role.getName())) {
+            if (!SecurityUtils.hasAuthority("admin:manage")) {
+                throw new AccessDeniedException("僅超級管理員可修改系統管理員或超級管理員角色的權限設定。");
+            }
+        }
+
+        // 🌿 保護 ROLE_SUPER_ADMIN：必須保留 admin:manage
+        if ("ROLE_SUPER_ADMIN".equals(role.getName())) {
+            if (permissionNames.stream().noneMatch(p -> p != null && p.equals("admin:manage"))) {
+                throw new IllegalStateException("不得移除 ROLE_SUPER_ADMIN 的 admin:manage 權限。");
+            }
+        }
+
         // 🌿 保護關鍵系統角色：避免透過 API 將 ROLE_ADMIN 的核心管理權限移除
         if ("ROLE_ADMIN".equals(role.getName())) {
-            // 核心權限：維護帳號與角色本身的能力
             String[] required = new String[] { "user:view", "user:edit", "role:view", "role:edit" };
             for (String requiredPerm : required) {
                 if (permissionNames.stream().noneMatch(p -> p != null && p.equals(requiredPerm))) {
                     throw new IllegalStateException("不得移除 ROLE_ADMIN 的核心權限：" + requiredPerm);
                 }
             }
+            // ROLE_ADMIN 不得被賦予 admin:manage（僅 SUPER_ADMIN 可管理其他管理員）
+            if (permissionNames.stream().anyMatch(p -> p != null && p.equals("admin:manage"))) {
+                throw new IllegalStateException("ROLE_ADMIN 不得被賦予 admin:manage，僅 ROLE_SUPER_ADMIN 可擁有此權限。");
+            }
         }
 
-        // 🌿 一般使用者角色：不得賦予使用者管理／角色管理權限，符合 ROLE_USER 權限設定報告
+        // 🌿 一般使用者角色：不得賦予使用者管理／角色管理權限
         if ("ROLE_USER".equals(role.getName())) {
-            String[] forbidden = new String[] { "user:view", "user:edit", "role:view", "role:edit" };
+            String[] forbidden = new String[] { "user:view", "user:edit", "role:view", "role:edit", "admin:manage" };
             for (String perm : forbidden) {
                 if (permissionNames.stream().anyMatch(p -> p != null && p.equals(perm))) {
                     throw new IllegalStateException("ROLE_USER 不得被賦予管理權限：" + perm + "，僅限一般業務權限（如 order:view、purchase:view 等）。");
