@@ -21,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -79,15 +80,51 @@ public class UserServiceImpl implements UserService {
 
     /**
      * 搜尋使用者（支援分頁 + 多欄位模糊搜尋）。
+     * 加入空條件攔截，確保安全性。
      */
     @Override
     @Transactional(readOnly = true)
     public Page<UserDto> searchUsers(UserSearchRequest request, Pageable pageable) {
+        // 1. 安全攔截：若搜尋條件皆為空，拋出 400 錯誤
+        if (isEmptySearch(request)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "搜尋條件不可全為空，請至少提供一項搜尋欄位"
+            );
+        }
+
+        // 2. 正規化分頁參數
         Pageable safePageable = normalizePageable(pageable);
+
+        // 3. 建立規格並查詢
         Specification<User> spec = buildUserSpec(request);
 
-        Page<User> page = userRepository.findAll(spec, safePageable);
-        return page.map(userMapper::toDto);
+        try {
+            Page<User> page = userRepository.findAll(spec, safePageable);
+
+            // 4. 若查無資料，回傳 404 (與 Supplier 風格一致)
+            if (page.isEmpty()) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "查無匹配的使用者資料"
+                );
+            }
+
+            return page.map(userMapper::toDto);
+        } catch (org.springframework.data.mapping.PropertyReferenceException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "無效排序欄位：" + ex.getPropertyName()
+            );
+        }
+    }
+
+    /**
+     * 🌿 新增空條件檢查工具方法
+     * 包含字串欄位的 hasText 檢查，以及 Boolean 欄位的 null 檢查
+     */
+    private boolean isEmptySearch(UserSearchRequest req) {
+        return !hasText(req.getUsername()) &&
+                !hasText(req.getFullName()) &&
+                !hasText(req.getEmail()) &&
+                req.getEnabled() == null; // 確保「只選啟用/停用」時不會被判定為空搜尋
     }
 
     private Specification<User> buildUserSpec(UserSearchRequest req) {

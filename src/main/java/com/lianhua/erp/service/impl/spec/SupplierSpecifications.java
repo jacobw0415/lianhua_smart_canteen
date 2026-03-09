@@ -53,6 +53,10 @@ public class SupplierSpecifications {
                 ));
             }
 
+            if (req.getActive() != null) {
+                predicates.add(cb.equal(root.get("active"), req.getActive()));
+            }
+
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }

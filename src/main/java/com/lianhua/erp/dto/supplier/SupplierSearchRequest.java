@@ -33,4 +33,7 @@ public class SupplierSearchRequest {
 
     @Schema(description = "備註內容（支援模糊搜尋）", example = "月底結帳")
     private String note;
+
+    @Schema(description = "供應商狀態（true=啟用, false=停用）", example = "true")
+    private Boolean active;
 }

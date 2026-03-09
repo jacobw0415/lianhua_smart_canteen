@@ -58,6 +58,7 @@ public class SupplierServiceImpl implements SupplierService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "供應商名稱已存在：" + dto.getName());
         }
         Supplier supplier = supplierMapper.toEntity(dto);
+        // 新增時預設啟用
         supplier.setActive(true);
         return supplierMapper.toDto(supplierRepository.save(supplier));
     }
@@ -74,11 +75,8 @@ public class SupplierServiceImpl implements SupplierService {
 
         supplierMapper.updateEntityFromDto(dto, supplier);
 
-        if (dto.getNote() != null) {
-            supplier.setNote(dto.getNote().trim());
-        } else {
-            supplier.setNote(null);
-        }
+        // 處理備註修剪
+        supplier.setNote(dto.getNote() != null ? dto.getNote().trim() : null);
 
         try {
             return supplierMapper.toDto(supplierRepository.save(supplier));
@@ -104,6 +102,7 @@ public class SupplierServiceImpl implements SupplierService {
     @Override
     public void deleteSupplier(Long id) {
         Supplier supplier = findSupplier(id);
+        // 檢查是否有業務關聯
         if (purchaseRepository.existsBySupplierId(id)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     String.format("無法刪除供應商：「%s」，因已存在進貨紀錄。請改為停用。", supplier.getName()));
@@ -114,12 +113,14 @@ public class SupplierServiceImpl implements SupplierService {
     @Override
     @Transactional(readOnly = true)
     public Page<SupplierResponseDto> searchSuppliers(SupplierSearchRequest req, Pageable pageable) {
+        // ⭐ 修改：現在 isEmptySearch 會檢查 active 欄位
         if (isEmptySearch(req)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "請至少提供一項搜尋條件");
         }
 
         Pageable safePageable = normalizePageable(pageable);
-        // ⭐ 使用抽離後的 Spec 類別
+
+        // 呼叫 Specifications 構建動態 SQL，確保內含 cb.equal(root.get("active"), req.getActive())
         Specification<Supplier> spec = SupplierSpecifications.bySearchRequest(req);
 
         try {
@@ -157,11 +158,15 @@ public class SupplierServiceImpl implements SupplierService {
         return PageRequest.of(pageable.getPageNumber(), pageSize, sort);
     }
 
+    /**
+     * ⭐ 正確修正：加入對 active 狀態的檢查
+     */
     private boolean isEmptySearch(SupplierSearchRequest req) {
         return !StringUtils.hasText(req.getSupplierName()) &&
                 !StringUtils.hasText(req.getContact()) &&
                 !StringUtils.hasText(req.getPhone()) &&
                 !StringUtils.hasText(req.getBillingCycle()) &&
-                !StringUtils.hasText(req.getNote());
+                !StringUtils.hasText(req.getNote()) &&
+                req.getActive() == null; // 若 active 有值 (true/false)，就不算空搜尋
     }
 }
