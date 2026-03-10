@@ -151,7 +151,7 @@ public class AuthController {
         body.setId(userId);
         body.setToken(jwt);
         body.setRefreshToken(refreshToken);
-        body.setExpiresIn(3600L); // 與 JwtUtils 一致，可改為從設定讀取
+        body.setExpiresIn(jwtUtils.getJwtExpirationSeconds());
         body.setType("Bearer");
         body.setUsername(principal.getUsername());
         body.setRoles(roles);

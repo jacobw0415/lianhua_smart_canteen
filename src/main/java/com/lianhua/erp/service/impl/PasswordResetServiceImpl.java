@@ -94,6 +94,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         passwordPolicyValidator.validate(request.getNewPassword());
         User user = resetToken.getUser();
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setCredentialsChangedAt(LocalDateTime.now());
         userRepository.save(user);
 
         // 4. 刪除已使用的 Token，確保單次有效

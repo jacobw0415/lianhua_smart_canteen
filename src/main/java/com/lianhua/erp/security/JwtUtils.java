@@ -65,9 +65,14 @@ public class JwtUtils {
                 .claim("uid", userPrincipal.getId())
                 .claim("roles", roles)
                 .setIssuer("Lianhua-ERP-System")
+                .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    public long getJwtExpirationSeconds() {
+        return jwtExpirationMs / 1000L;
     }
 
     /**

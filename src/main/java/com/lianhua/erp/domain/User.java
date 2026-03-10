@@ -47,6 +47,13 @@ public class User {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt; // 🌿 新增：紀錄登入時間
 
+    /**
+     * 用於集中失效舊 Token：當密碼變更、重要權限異動或強制登出時更新此欄位，
+     * 在 JWT Filter 中比對簽發時間，早於此時間的 Token 一律視為無效。
+     */
+    @Column(name = "credentials_changed_at")
+    private LocalDateTime credentialsChangedAt;
+
     @Column(name = "mfa_enabled", nullable = false)
     @Builder.Default
     private Boolean mfaEnabled = false;

@@ -1,5 +1,6 @@
 package com.lianhua.erp.config;
 
+import com.lianhua.erp.security.ApiRateLimitFilter;
 import com.lianhua.erp.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -26,13 +27,17 @@ import org.springframework.web.cors.CorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiRateLimitFilter apiRateLimitFilter;
     private final Environment environment;
 
     @Value("${app.cors.allowed-origins:http://localhost:5173}")
     private String corsAllowedOrigins;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, Environment environment) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          ApiRateLimitFilter apiRateLimitFilter,
+                          Environment environment) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.apiRateLimitFilter = apiRateLimitFilter;
         this.environment = environment;
     }
 
@@ -100,6 +105,9 @@ public class SecurityConfig {
                     auth.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll();
                     auth.anyRequest().authenticated();
                 })
+                // 先在 UsernamePasswordAuthenticationFilter 之前套用 API Rate Limit
+                .addFilterBefore(apiRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+                // 再在同一位置之前套用 JWT 驗證 Filter（順序由註冊先後決定）
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

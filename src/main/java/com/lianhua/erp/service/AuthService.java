@@ -4,6 +4,7 @@ import com.lianhua.erp.domain.User;
 import com.lianhua.erp.dto.auth.ForgotPasswordRequest;
 import com.lianhua.erp.dto.auth.MfaSetupResponse;
 import com.lianhua.erp.repository.UserRepository;
+import com.lianhua.erp.security.EncryptionService;
 import com.lianhua.erp.security.JwtUtils;
 import com.lianhua.erp.security.SensitiveDataMasker;
 import lombok.extern.slf4j.Slf4j;
@@ -24,17 +25,20 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final UserRepository userRepository;
     private final MfaService mfaService;
+    private final EncryptionService encryptionService;
 
     public AuthService(TokenBlacklistService tokenBlacklistService,
                        JwtUtils jwtUtils,
                        RefreshTokenService refreshTokenService,
                        UserRepository userRepository,
-                       MfaService mfaService) {
+                       MfaService mfaService,
+                       EncryptionService encryptionService) {
         this.tokenBlacklistService = tokenBlacklistService;
         this.jwtUtils = jwtUtils;
         this.refreshTokenService = refreshTokenService;
         this.userRepository = userRepository;
         this.mfaService = mfaService;
+        this.encryptionService = encryptionService;
     }
 
     /**
@@ -75,7 +79,13 @@ public class AuthService {
             tokenBlacklistService.blacklist(token, claims.getExpiration());
             Object uid = claims.get("uid");
             if (uid instanceof Number) {
-                refreshTokenService.revokeAllForUser(((Number) uid).longValue());
+                Long userId = ((Number) uid).longValue();
+                refreshTokenService.revokeAllForUser(userId);
+                // 強制使該使用者所有既有 Access Token 失效：更新 credentialsChangedAt
+                userRepository.findById(userId).ifPresent(user -> {
+                    user.setCredentialsChangedAt(java.time.LocalDateTime.now());
+                    userRepository.save(user);
+                });
             }
             log.info("Logout: Token 已加入黑名單 (前 8 碼): {}", SensitiveDataMasker.maskToken(token));
         } catch (Exception e) {
@@ -90,7 +100,8 @@ public class AuthService {
         User user = userRepository.findByIdWithRoles(userId)
                 .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
         MfaSetupResponse setup = mfaService.generateSetup(MFA_ISSUER, user.getUsername());
-        user.setMfaSecret(setup.getSecret());
+        String encryptedSecret = encryptionService.encrypt(setup.getSecret());
+        user.setMfaSecret(encryptedSecret);
         user.setMfaEnabled(false);
         userRepository.save(user);
         return setup;
@@ -105,7 +116,8 @@ public class AuthService {
         if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
             throw new IllegalStateException("請先呼叫 MFA 設定 API 取得密鑰");
         }
-        if (!mfaService.verifyCode(user.getMfaSecret(), code)) {
+        String decrypted = encryptionService.decrypt(user.getMfaSecret());
+        if (decrypted == null || !mfaService.verifyCode(decrypted, code)) {
             throw new IllegalArgumentException("驗證碼錯誤");
         }
         user.setMfaEnabled(true);
@@ -121,7 +133,8 @@ public class AuthService {
         if (!Boolean.TRUE.equals(user.getMfaEnabled()) || user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
             throw new IllegalStateException("此帳號尚未啟用 MFA");
         }
-        if (!mfaService.verifyCode(user.getMfaSecret(), code)) {
+        String decrypted = encryptionService.decrypt(user.getMfaSecret());
+        if (decrypted == null || !mfaService.verifyCode(decrypted, code)) {
             throw new IllegalArgumentException("驗證碼錯誤，無法關閉 MFA");
         }
         user.setMfaSecret(null);

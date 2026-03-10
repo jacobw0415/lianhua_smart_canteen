@@ -43,9 +43,6 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Value("${lianhua.app.mfaPendingExpirationSeconds:300}")
     private long mfaPendingExpirationSeconds;
 
-    @Value("${lianhua.app.jwtExpirationMs:3600000}")
-    private long jwtExpirationMs;
-
     private static String hashToken(String plain) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -116,7 +113,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         JwtResponse response = new JwtResponse();
         response.setToken(accessToken);
         response.setType("Bearer");
-        response.setExpiresIn(jwtExpirationMs / 1000);
+        response.setExpiresIn(jwtUtils.getJwtExpirationSeconds());
         response.setId(user.getId());
         response.setUsername(user.getUsername());
         response.setRoles(authorities.stream().map(GrantedAuthority::getAuthority).toList());
@@ -211,7 +208,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         response.setToken(accessToken);
         response.setRefreshToken(newRefreshToken);
         response.setType("Bearer");
-        response.setExpiresIn(jwtExpirationMs / 1000);
+        response.setExpiresIn(jwtUtils.getJwtExpirationSeconds());
         response.setId(user.getId());
         response.setUsername(user.getUsername());
         response.setRoles(authorities.stream().map(GrantedAuthority::getAuthority).toList());

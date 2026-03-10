@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Date;
 
@@ -16,19 +18,39 @@ public class TokenBlacklistService {
 
     private final BlacklistedTokenRepository blacklistedTokenRepository;
 
+    private String hash(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("產生 Token 雜湊失敗，將直接略過黑名單寫入：{}", e.getMessage());
+            return null;
+        }
+    }
+
     public void blacklist(String token, Date expiresAt) {
         if (token == null || token.isBlank()) {
             return;
         }
 
-        if (blacklistedTokenRepository.existsByToken(token)) {
+        String tokenHash = hash(token);
+        if (tokenHash == null) {
+            return;
+        }
+
+        if (blacklistedTokenRepository.existsByTokenHash(tokenHash)) {
             return;
         }
 
         Instant expiry = expiresAt != null ? expiresAt.toInstant() : Instant.now().plusSeconds(3600);
 
         BlacklistedToken entity = BlacklistedToken.builder()
-                .token(token)
+                .tokenHash(tokenHash)
                 .expiresAt(expiry)
                 .build();
 
@@ -49,7 +71,11 @@ public class TokenBlacklistService {
         if (token == null || token.isBlank()) {
             return false;
         }
-        return blacklistedTokenRepository.existsByToken(token);
+        String tokenHash = hash(token);
+        if (tokenHash == null) {
+            return false;
+        }
+        return blacklistedTokenRepository.existsByTokenHash(tokenHash);
     }
 }
 

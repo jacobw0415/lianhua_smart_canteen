@@ -36,4 +36,11 @@ public interface UserService {
 
     /** 登入成功時更新該使用者的最後登入時間（last_login_at） */
     void updateLastLoginAt(Long userId);
+
+    /**
+     * 強制指定使用者的所有存取憑證失效：
+     * - 撤銷該使用者所有 Refresh Token
+     * - 更新 credentialsChangedAt，讓既有 Access Token 也立即失效
+     */
+    void forceLogoutUser(Long targetUserId, Long operatorUserId);
 }

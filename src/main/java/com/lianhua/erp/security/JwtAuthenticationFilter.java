@@ -18,6 +18,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -70,15 +71,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (uidClaim instanceof Number) {
                     uid = ((Number) uidClaim).longValue();
                 }
-                // 若 JWT 無 uid 或為 0（舊版 token 或異常），依 username 查庫補齊，確保其他管理員也能正確取得 currentUserId（如查看通知）
+                // 若 JWT 無 uid 或為 0（舊版 token 或異常），依 username 查庫補齊，並順便做 credentialsChangedAt 檢查
+                var userOpt = userRepository.findByUsername(username);
                 if (uid == null || uid <= 0L) {
-                    uid = userRepository.findByUsername(username)
-                            .map(u -> u.getId())
-                            .orElse(0L);
+                    uid = userOpt.map(u -> u.getId()).orElse(0L);
                     if (uid > 0L) {
                         log.debug("JWT 缺少有效 uid，已依 username '{}' 補齊為 {}", username, uid);
                     }
                 }
+
+                // 若使用者曾更新密碼或被強制登出，且 credentialsChangedAt 晚於 Token 簽發時間，則拒絕此 Token
+                userOpt.ifPresent(user -> {
+                    if (user.getCredentialsChangedAt() != null) {
+                        Instant issuedAt = claims.getIssuedAt() != null ? claims.getIssuedAt().toInstant() : null;
+                        if (issuedAt != null && issuedAt.isBefore(user.getCredentialsChangedAt().atZone(java.time.ZoneId.systemDefault()).toInstant())) {
+                            throw new RuntimeException("Token 已因憑證更新而失效");
+                        }
+                    }
+                });
 
                 CustomUserDetails userDetails = new CustomUserDetails(
                         uid != null ? uid : 0L,
@@ -110,10 +120,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private String parseJwt(HttpServletRequest request) {
+        // 優先從 Authorization Header 取得 Bearer Token（一般 REST API 使用）
         String headerAuth = request.getHeader("Authorization");
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
+            return headerAuth.substring(7).trim();
         }
+
+        // 若無 Authorization，則嘗試從 query parameter 讀取 token（給 SSE 等長連線使用）
+        String paramToken = request.getParameter("token");
+        if (StringUtils.hasText(paramToken)) {
+            return paramToken.trim();
+        }
+
         return null;
     }
 }

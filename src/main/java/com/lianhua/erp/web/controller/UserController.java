@@ -149,4 +149,17 @@ public class UserController {
                 userService.deleteUser(id, currentUserId);
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         }
+
+        @Operation(summary = "強制登出指定使用者", description = "撤銷該使用者所有 Refresh Token 並立即讓既有 Access Token 失效。僅超級管理員可執行。")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "204", description = "強制登出已執行"),
+                        @ApiResponse(responseCode = "403", description = "權限不足（需超級管理員）", content = @Content(schema = @Schema(implementation = ForbiddenResponse.class)))
+        })
+        @PostMapping("/{id}/force_logout")
+        @PreAuthorize("hasRole('SUPER_ADMIN')")
+        public ResponseEntity<Void> forceLogoutUser(@PathVariable Long id) {
+                Long currentUserId = SecurityUtils.getCurrentUserIdOrNull();
+                userService.forceLogoutUser(id, currentUserId);
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        }
 }

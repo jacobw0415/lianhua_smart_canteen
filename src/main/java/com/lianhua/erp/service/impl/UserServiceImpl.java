@@ -14,6 +14,7 @@ import com.lianhua.erp.repository.RoleRepository;
 import com.lianhua.erp.repository.UserAuditLogRepository;
 import com.lianhua.erp.repository.UserRepository;
 import com.lianhua.erp.security.SecurityUtils;
+import com.lianhua.erp.service.RefreshTokenService;
 import com.lianhua.erp.service.UserService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
@@ -43,6 +44,8 @@ public class UserServiceImpl implements UserService {
     private final UserAuditLogRepository userAuditLogRepository;
     private final ObjectMapper objectMapper;
     private final com.lianhua.erp.service.PasswordPolicyValidator passwordPolicyValidator;
+    private final RefreshTokenService refreshTokenService;
+    private final com.lianhua.erp.security.SseSessionService sseSessionService;
 
     public UserServiceImpl(UserRepository userRepository,
                            RoleRepository roleRepository,
@@ -50,7 +53,9 @@ public class UserServiceImpl implements UserService {
                            UserMapper userMapper,
                            UserAuditLogRepository userAuditLogRepository,
                            ObjectMapper objectMapper,
-                           com.lianhua.erp.service.PasswordPolicyValidator passwordPolicyValidator) {
+                           com.lianhua.erp.service.PasswordPolicyValidator passwordPolicyValidator,
+                           RefreshTokenService refreshTokenService,
+                           com.lianhua.erp.security.SseSessionService sseSessionService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -58,6 +63,8 @@ public class UserServiceImpl implements UserService {
         this.userAuditLogRepository = userAuditLogRepository;
         this.objectMapper = objectMapper;
         this.passwordPolicyValidator = passwordPolicyValidator;
+        this.refreshTokenService = refreshTokenService;
+        this.sseSessionService = sseSessionService;
     }
 
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
@@ -402,6 +409,7 @@ public class UserServiceImpl implements UserService {
         }
         passwordPolicyValidator.validate(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setCredentialsChangedAt(LocalDateTime.now());
         userRepository.save(user);
         saveAudit(currentUserId, currentUserId, ACTION_USER_CHANGE_OWN_PASSWORD, "{\"password\":\"changed\"}");
     }
@@ -415,6 +423,30 @@ public class UserServiceImpl implements UserService {
             user.setLastLoginAt(LocalDateTime.now());
             userRepository.save(user);
         }
+    }
+
+    @Override
+    @Transactional
+    public void forceLogoutUser(Long targetUserId, Long operatorUserId) {
+        // 僅超級管理員可強制登出其他系統管理員或一般使用者
+        if (!SecurityUtils.hasRole("SUPER_ADMIN")) {
+            throw new AccessDeniedException("僅超級管理員可執行強制登出。");
+        }
+
+        User user = userRepository.findByIdWithRoles(targetUserId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + targetUserId));
+
+        // 撤銷目標使用者所有 Refresh Token，並更新 credentialsChangedAt 使 Access Token 立即失效
+        refreshTokenService.revokeAllForUser(targetUserId);
+        user.setCredentialsChangedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        // 即時推送 FORCE_LOGOUT 事件給該使用者的所有 SSE 連線
+        sseSessionService.sendForceLogout(targetUserId);
+
+        // 記錄稽核
+        String details = "{\"action\":\"FORCE_LOGOUT\"}";
+        saveAudit(operatorUserId != null ? operatorUserId : targetUserId, targetUserId, ACTION_USER_UPDATE, details);
     }
 
     private void saveAudit(Long operatorId, Long targetUserId, String action, String details) {
