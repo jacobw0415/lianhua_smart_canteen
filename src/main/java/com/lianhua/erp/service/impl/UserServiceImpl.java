@@ -250,6 +250,10 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("該帳號名稱已被註冊");
         }
 
+        if (userRepository.existsByEmail(dto.getEmail())) {
+            throw new IllegalArgumentException("Email 已被使用");
+        }
+
         passwordPolicyValidator.validate(dto.getPassword());
 
         Role defaultRole = roleRepository.findByName("ROLE_USER")
@@ -259,6 +263,7 @@ public class UserServiceImpl implements UserService {
                 .username(dto.getUsername())
                 .password(passwordEncoder.encode(dto.getPassword()))
                 .fullName(dto.getFullName())
+                .email(dto.getEmail())
                 .enabled(true)
                 .roles(new HashSet<>())
                 .build();
@@ -311,7 +316,12 @@ public class UserServiceImpl implements UserService {
             user.setEmail(dto.getEmail());
         }
 
-        if (dto.getUsername() != null) user.setUsername(dto.getUsername());
+        if (dto.getUsername() != null && !dto.getUsername().equals(user.getUsername())) {
+            if (userRepository.existsByUsername(dto.getUsername())) {
+                throw new IllegalArgumentException("新的帳號名稱已被其他帳號使用");
+            }
+            user.setUsername(dto.getUsername());
+        }
         if (dto.getFullName() != null) user.setFullName(dto.getFullName());
         if (dto.getEnabled() != null) user.setEnabled(dto.getEnabled());
 
