@@ -2,20 +2,24 @@ package com.lianhua.erp.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lianhua.erp.config.WebSocketConnectionListener;
 import com.lianhua.erp.domain.Role;
 import com.lianhua.erp.domain.User;
 import com.lianhua.erp.domain.UserAuditLog;
+import com.lianhua.erp.dto.user.OnlineUserDto;
 import com.lianhua.erp.dto.user.UserDto;
+import com.lianhua.erp.dto.user.UserOnlineEventDto;
 import com.lianhua.erp.dto.user.UserRegisterDto;
 import com.lianhua.erp.dto.user.UserRequestDto;
 import com.lianhua.erp.dto.user.UserSearchRequest;
-import com.lianhua.erp.mapper.UserMapper;
 import com.lianhua.erp.repository.RoleRepository;
 import com.lianhua.erp.repository.UserAuditLogRepository;
 import com.lianhua.erp.repository.UserRepository;
 import com.lianhua.erp.security.SecurityUtils;
+import com.lianhua.erp.service.OnlineUserStore;
 import com.lianhua.erp.service.RefreshTokenService;
 import com.lianhua.erp.service.UserService;
+import com.lianhua.erp.mapper.UserMapper;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,6 +28,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +51,8 @@ public class UserServiceImpl implements UserService {
     private final com.lianhua.erp.service.PasswordPolicyValidator passwordPolicyValidator;
     private final RefreshTokenService refreshTokenService;
     private final com.lianhua.erp.security.SseSessionService sseSessionService;
+    private final OnlineUserStore onlineUserStore;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public UserServiceImpl(UserRepository userRepository,
                            RoleRepository roleRepository,
@@ -55,7 +62,9 @@ public class UserServiceImpl implements UserService {
                            ObjectMapper objectMapper,
                            com.lianhua.erp.service.PasswordPolicyValidator passwordPolicyValidator,
                            RefreshTokenService refreshTokenService,
-                           com.lianhua.erp.security.SseSessionService sseSessionService) {
+                           com.lianhua.erp.security.SseSessionService sseSessionService,
+                           OnlineUserStore onlineUserStore,
+                           SimpMessagingTemplate messagingTemplate) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -65,6 +74,8 @@ public class UserServiceImpl implements UserService {
         this.passwordPolicyValidator = passwordPolicyValidator;
         this.refreshTokenService = refreshTokenService;
         this.sseSessionService = sseSessionService;
+        this.onlineUserStore = onlineUserStore;
+        this.messagingTemplate = messagingTemplate;
     }
 
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
@@ -444,9 +455,27 @@ public class UserServiceImpl implements UserService {
         // 即時推送 FORCE_LOGOUT 事件給該使用者的所有 SSE 連線
         sseSessionService.sendForceLogout(targetUserId);
 
+        // 正式登出（強制）：自線上列表移除並廣播 OFFLINE
+        OnlineUserDto removed = onlineUserStore.unregisterByUserId(targetUserId);
+        if (removed != null) {
+            UserOnlineEventDto payload = UserOnlineEventDto.builder()
+                    .eventType("OFFLINE")
+                    .userId(removed.getId())
+                    .username(removed.getUsername())
+                    .fullName(removed.getFullName())
+                    .at(LocalDateTime.now())
+                    .build();
+            messagingTemplate.convertAndSend(WebSocketConnectionListener.TOPIC_ONLINE_USERS, payload);
+        }
+
         // 記錄稽核
         String details = "{\"action\":\"FORCE_LOGOUT\"}";
         saveAudit(operatorUserId != null ? operatorUserId : targetUserId, targetUserId, ACTION_USER_UPDATE, details);
+    }
+
+    @Override
+    public List<OnlineUserDto> getOnlineUsers() {
+        return onlineUserStore.getOnlineUsers();
     }
 
     private void saveAudit(Long operatorId, Long targetUserId, String action, String details) {

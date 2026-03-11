@@ -1,15 +1,21 @@
 package com.lianhua.erp.service;
 
+import com.lianhua.erp.config.WebSocketConnectionListener;
 import com.lianhua.erp.domain.User;
 import com.lianhua.erp.dto.auth.ForgotPasswordRequest;
 import com.lianhua.erp.dto.auth.MfaSetupResponse;
+import com.lianhua.erp.dto.user.OnlineUserDto;
+import com.lianhua.erp.dto.user.UserOnlineEventDto;
 import com.lianhua.erp.repository.UserRepository;
 import com.lianhua.erp.security.EncryptionService;
 import com.lianhua.erp.security.JwtUtils;
 import com.lianhua.erp.security.SensitiveDataMasker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 
 @Slf4j
 @Service
@@ -26,19 +32,25 @@ public class AuthService {
     private final UserRepository userRepository;
     private final MfaService mfaService;
     private final EncryptionService encryptionService;
+    private final OnlineUserStore onlineUserStore;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public AuthService(TokenBlacklistService tokenBlacklistService,
                        JwtUtils jwtUtils,
                        RefreshTokenService refreshTokenService,
                        UserRepository userRepository,
                        MfaService mfaService,
-                       EncryptionService encryptionService) {
+                       EncryptionService encryptionService,
+                       OnlineUserStore onlineUserStore,
+                       SimpMessagingTemplate messagingTemplate) {
         this.tokenBlacklistService = tokenBlacklistService;
         this.jwtUtils = jwtUtils;
         this.refreshTokenService = refreshTokenService;
         this.userRepository = userRepository;
         this.mfaService = mfaService;
         this.encryptionService = encryptionService;
+        this.onlineUserStore = onlineUserStore;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -86,6 +98,19 @@ public class AuthService {
                     user.setCredentialsChangedAt(java.time.LocalDateTime.now());
                     userRepository.save(user);
                 });
+                // 正式登出：自線上列表移除並廣播 OFFLINE，讓其他客戶端即時更新
+                OnlineUserDto removed = onlineUserStore.unregisterByUserId(userId);
+                if (removed != null) {
+                    UserOnlineEventDto payload = UserOnlineEventDto.builder()
+                            .eventType("OFFLINE")
+                            .userId(removed.getId())
+                            .username(removed.getUsername())
+                            .fullName(removed.getFullName())
+                            .at(LocalDateTime.now())
+                            .build();
+                    messagingTemplate.convertAndSend(WebSocketConnectionListener.TOPIC_ONLINE_USERS, payload);
+                    log.info("正式登出，已自線上列表移除並廣播 OFFLINE: {} (id={})", removed.getUsername(), removed.getId());
+                }
             }
             log.info("Logout: Token 已加入黑名單 (前 8 碼): {}", SensitiveDataMasker.maskToken(token));
         } catch (Exception e) {

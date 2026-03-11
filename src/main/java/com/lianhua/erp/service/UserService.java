@@ -43,4 +43,10 @@ public interface UserService {
      * - 更新 credentialsChangedAt，讓既有 Access Token 也立即失效
      */
     void forceLogoutUser(Long targetUserId, Long operatorUserId);
+
+    /**
+     * 取得目前線上使用者清單（含自己），依上線時間排序。
+     * 資料來源為 WebSocket 連線狀態，未連線者不會出現在列表中。
+     */
+    List<com.lianhua.erp.dto.user.OnlineUserDto> getOnlineUsers();
 }

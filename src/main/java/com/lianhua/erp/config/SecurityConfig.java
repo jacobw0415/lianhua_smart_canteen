@@ -88,10 +88,17 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
 
                 .authorizeHttpRequests(auth -> {
+                    // ✅ 完全公開的認證相關端點（登入 / 註冊 / 刷新 Token 等）
                     auth.requestMatchers("/api/auth/login", "/api/auth/register",
                                     "/api/auth/forgot-password", "/api/auth/reset-password",
                                     "/api/auth/refresh", "/api/auth/mfa/verify", "/api/auth/logout")
                             .permitAll();
+
+                    // ✅ WebSocket / SockJS 端點：握手 HTTP 階段一律放行，實際 JWT 驗證在 STOMP CONNECT 的 ChannelInterceptor
+                    auth.requestMatchers("/ws/**").permitAll();
+
+                    // ✅ Spring Boot 預設錯誤頁，也需放行，避免在處理 403/401 時再次被攔截造成額外例外
+                    auth.requestMatchers("/error", "/error/**").permitAll();
 
                     // Swagger / OpenAPI：開發環境全開放，正式環境僅管理者可看，避免對外暴露完整 API 結構
                     if (isDevProfile) {
@@ -102,7 +109,10 @@ public class SecurityConfig {
                                 .hasRole("ADMIN");
                     }
 
+                    // ✅ CORS Preflight
                     auth.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll();
+
+                    // 其餘所有請求一律需通過 JWT 驗證
                     auth.anyRequest().authenticated();
                 })
                 // 先在 UsernamePasswordAuthenticationFilter 之前套用 API Rate Limit

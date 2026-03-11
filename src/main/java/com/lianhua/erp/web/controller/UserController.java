@@ -162,4 +162,18 @@ public class UserController {
                 userService.forceLogoutUser(id, currentUserId);
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         }
+
+        @Operation(summary = "取得目前線上使用者清單", description = "含自己與其他已透過 WebSocket 連線的使用者，供使用者群組即時顯示上線狀態")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "成功取得線上使用者列表"),
+                        @ApiResponse(responseCode = "401", description = "未授權", content = @Content(schema = @Schema(implementation = UnauthorizedResponse.class)))
+        })
+        @GetMapping("/online")
+        public ResponseEntity<ApiResponseDto<List<OnlineUserDto>>> getOnlineUsers() {
+                if (SecurityUtils.getCurrentUserIdOrNull() == null) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                        .body(ApiResponseDto.error(401, "請先登入"));
+                }
+                return ResponseEntity.ok(ApiResponseDto.ok(userService.getOnlineUsers()));
+        }
 }
