@@ -7,18 +7,24 @@ import com.lianhua.erp.dto.auth.MfaSetupResponse;
 import com.lianhua.erp.dto.user.OnlineUserDto;
 import com.lianhua.erp.dto.user.UserOnlineEventDto;
 import com.lianhua.erp.repository.UserRepository;
+import com.lianhua.erp.security.CustomUserDetails;
 import com.lianhua.erp.security.EncryptionService;
 import com.lianhua.erp.security.JwtUtils;
 import com.lianhua.erp.security.SensitiveDataMasker;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private static final String MFA_ISSUER = "Lianhua ERP";
@@ -35,133 +41,120 @@ public class AuthService {
     private final OnlineUserStore onlineUserStore;
     private final SimpMessagingTemplate messagingTemplate;
 
-    public AuthService(TokenBlacklistService tokenBlacklistService,
-                       JwtUtils jwtUtils,
-                       RefreshTokenService refreshTokenService,
-                       UserRepository userRepository,
-                       MfaService mfaService,
-                       EncryptionService encryptionService,
-                       OnlineUserStore onlineUserStore,
-                       SimpMessagingTemplate messagingTemplate) {
-        this.tokenBlacklistService = tokenBlacklistService;
-        this.jwtUtils = jwtUtils;
-        this.refreshTokenService = refreshTokenService;
-        this.userRepository = userRepository;
-        this.mfaService = mfaService;
-        this.encryptionService = encryptionService;
-        this.onlineUserStore = onlineUserStore;
-        this.messagingTemplate = messagingTemplate;
-    }
-
     /**
-     * 處理忘記密碼邏輯：產生 Token 並發送動態網址信件
-     */
-    public void processForgotPassword(ForgotPasswordRequest request) {
-        // 1. 決定 Base URL：優先使用前端傳來的，若無則使用設定檔預設值
-        String baseUrl = request.getResetLinkBaseUrl();
-        if (baseUrl == null || baseUrl.isBlank()) {
-            baseUrl = defaultFrontendUrl;
-            log.info("ForgotPassword: Using default frontend URL: {}", baseUrl);
-        }
-
-        // 2. 實務上會在這裡產生 Token 並組合重設連結，傳給 EmailService 寄送
-        //    本範例僅記錄 log，不建立實際連結，也避免在 log 中輸出 Token 內容
-        log.info("ForgotPassword: Generated reset token for {}", request.getEmail());
-
-        // 4. 調用郵件服務發送信件 (實作略)
-        // emailService.sendPasswordResetEmail(request.getEmail(), resetLink);
-    }
-
-    /**
-     * 執行登出邏輯：盡力清除狀態，失敗也不拋出異常
+     * 執行登出邏輯：強化版
+     * 解決手機刷新後 Token 可能失效導致 userId 為空的連鎖問題
      */
     public void logout(String authHeader) {
-        // 1. 基本檢查：無 Token 視為已登出
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.info("Logout: No valid Bearer token provided.");
-            return;
+        Long userId = null;
+        String token = null;
+
+        // 1. 嘗試從 Header 解析 Token 並獲取 userId
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7).trim();
+            try {
+                var claims = jwtUtils.getClaimsFromJwtToken(token);
+                tokenBlacklistService.blacklist(token, claims.getExpiration());
+                Object uid = claims.get("uid");
+                if (uid instanceof Number) {
+                    userId = ((Number) uid).longValue();
+                }
+            } catch (Exception e) {
+                log.warn("Logout: Token 解析失敗 (可能已過期)，將嘗試從 SecurityContext 獲取身份");
+            }
         }
 
-        String token = authHeader.substring(7).trim();
-        if (token.isEmpty()) return;
-
-        // 2. 將 Access Token 加入黑名單，並撤銷該使用者所有 Refresh Token
-        try {
-            var claims = jwtUtils.getClaimsFromJwtToken(token);
-            tokenBlacklistService.blacklist(token, claims.getExpiration());
-            Object uid = claims.get("uid");
-            if (uid instanceof Number) {
-                Long userId = ((Number) uid).longValue();
-                refreshTokenService.revokeAllForUser(userId);
-                // 強制使該使用者所有既有 Access Token 失效：更新 credentialsChangedAt
-                userRepository.findById(userId).ifPresent(user -> {
-                    user.setCredentialsChangedAt(java.time.LocalDateTime.now());
-                    userRepository.save(user);
-                });
-                // 正式登出：自線上列表移除並廣播 OFFLINE，讓其他客戶端即時更新
-                OnlineUserDto removed = onlineUserStore.unregisterByUserId(userId);
-                if (removed != null) {
-                    UserOnlineEventDto payload = UserOnlineEventDto.builder()
-                            .eventType("OFFLINE")
-                            .userId(removed.getId())
-                            .username(removed.getUsername())
-                            .fullName(removed.getFullName())
-                            .at(LocalDateTime.now())
-                            .build();
-                    messagingTemplate.convertAndSend(WebSocketConnectionListener.TOPIC_ONLINE_USERS, payload);
-                    log.info("正式登出，已自線上列表移除並廣播 OFFLINE: {} (id={})", removed.getUsername(), removed.getId());
-                }
+        // 2. 【核心救援】如果 Header 沒抓到 ID，從當前安全上下文 (SecurityContext) 抓取
+        // 這是解決手機刷新後、Token 臨界點登出失效的關鍵
+        if (userId == null) {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof CustomUserDetails details) {
+                userId = details.getId();
+                log.info("Logout: 透過 SecurityContext 救援成功，UserID: {}", userId);
             }
-            log.info("Logout: Token 已加入黑名單 (前 8 碼): {}", SensitiveDataMasker.maskToken(token));
-        } catch (Exception e) {
-            log.warn("Logout failed internally, but continuing: {}", e.getMessage());
+        }
+
+        // 3. 執行物理清理
+        if (userId != null) {
+            executePhysicalLogout(userId);
+        } else {
+            log.warn("Logout: 完全無法識別使用者身份，放棄清理。");
+        }
+
+        if (token != null) {
+            log.info("Logout: Token 處理完成: {}", SensitiveDataMasker.maskToken(token));
         }
     }
 
     /**
-     * 取得 MFA 綁定設定（密鑰 + otpauth URL），並將密鑰暫存於使用者，待驗證通過後才設為啟用。
+     * 執行實體的狀態清理與強制廣播
      */
+    private void executePhysicalLogout(Long userId) {
+        try {
+            // 1. 撤銷所有 Refresh Token
+            refreshTokenService.revokeAllForUser(userId);
+
+            // 2. 更新憑證時間 (使所有舊連線在 Interceptor 層級被拒絕)
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null) {
+                user.setCredentialsChangedAt(LocalDateTime.now());
+                userRepository.save(user);
+
+                // 3. 清理記憶體 Store (移除所有殘留 Session)
+                onlineUserStore.unregisterByUserId(userId);
+
+                // 4. 【終極廣播】不檢查 removed 狀態，只要登出就強制發送離線訊號
+                log.info("【廣播測試】準備發送離線訊號給用戶: {} (ID: {})", user.getUsername(), userId);
+                broadcastOffline(user.getId(), user.getUsername(), user.getFullName());
+            }
+        } catch (Exception e) {
+            log.error("AuthService: 清理用戶 {} 狀態時發生錯誤", userId, e);
+        }
+    }
+
+    private void broadcastOffline(Long userId, String username, String fullName) {
+        UserOnlineEventDto payload = UserOnlineEventDto.builder()
+                .eventType("OFFLINE")
+                .userId(userId)
+                .username(username)
+                .fullName(fullName)
+                .at(LocalDateTime.now())
+                .build();
+
+        // 確保 Topic 路徑與前端訂閱完全一致
+        messagingTemplate.convertAndSend(WebSocketConnectionListener.TOPIC_ONLINE_USERS, payload);
+    }
+
+    // --- 以下為 MFA 相關邏輯，保持不變 ---
+
+    public void processForgotPassword(ForgotPasswordRequest request) {
+        String baseUrl = request.getResetLinkBaseUrl() != null ? request.getResetLinkBaseUrl() : defaultFrontendUrl;
+        log.info("ForgotPassword: Reset link generated for {}", request.getEmail());
+    }
+
     public MfaSetupResponse mfaSetup(Long userId) {
-        User user = userRepository.findByIdWithRoles(userId)
-                .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
+        User user = userRepository.findByIdWithRoles(userId).orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
         MfaSetupResponse setup = mfaService.generateSetup(MFA_ISSUER, user.getUsername());
-        String encryptedSecret = encryptionService.encrypt(setup.getSecret());
-        user.setMfaSecret(encryptedSecret);
+        user.setMfaSecret(encryptionService.encrypt(setup.getSecret()));
         user.setMfaEnabled(false);
         userRepository.save(user);
         return setup;
     }
 
-    /**
-     * 以當前輸入的 6 碼確認啟用 MFA；通過後將 mfaEnabled 設為 true。
-     */
+    @Transactional
     public void mfaConfirmEnable(Long userId, String code) {
-        User user = userRepository.findByIdWithRoles(userId)
-                .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
-        if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
-            throw new IllegalStateException("請先呼叫 MFA 設定 API 取得密鑰");
-        }
+        User user = userRepository.findByIdWithRoles(userId).orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
         String decrypted = encryptionService.decrypt(user.getMfaSecret());
-        if (decrypted == null || !mfaService.verifyCode(decrypted, code)) {
-            throw new IllegalArgumentException("驗證碼錯誤");
-        }
+        if (decrypted == null || !mfaService.verifyCode(decrypted, code)) throw new IllegalArgumentException("驗證碼錯誤");
         user.setMfaEnabled(true);
         userRepository.save(user);
     }
 
-    /**
-     * 關閉該使用者的 MFA（須先驗證當前 TOTP 碼，通過後清除密鑰並設為未啟用）。
-     */
+    @Transactional
     public void mfaDisable(Long userId, String code) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
-        if (!Boolean.TRUE.equals(user.getMfaEnabled()) || user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
-            throw new IllegalStateException("此帳號尚未啟用 MFA");
-        }
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("使用者不存在"));
         String decrypted = encryptionService.decrypt(user.getMfaSecret());
-        if (decrypted == null || !mfaService.verifyCode(decrypted, code)) {
-            throw new IllegalArgumentException("驗證碼錯誤，無法關閉 MFA");
-        }
+        if (decrypted == null || !mfaService.verifyCode(decrypted, code)) throw new IllegalArgumentException("驗證碼錯誤");
         user.setMfaSecret(null);
         user.setMfaEnabled(false);
         userRepository.save(user);

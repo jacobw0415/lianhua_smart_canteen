@@ -1,5 +1,6 @@
 package com.lianhua.erp.config;
 
+import com.lianhua.erp.dto.user.OnlineUserDto;
 import com.lianhua.erp.dto.user.UserOnlineEventDto;
 import com.lianhua.erp.repository.UserRepository;
 import com.lianhua.erp.security.CustomUserDetails;
@@ -18,9 +19,9 @@ import java.time.LocalDateTime;
 
 /**
  * 監聽 WebSocket 連線/斷線，更新線上使用者狀態。
- * - 連線：登記至線上列表並廣播 ONLINE 至 /topic/online-users。
- * - 斷線：僅自線上列表移除（不廣播 OFFLINE），僅正式登出時才由 AuthService 廣播 OFFLINE。
- * 使用 @EventListener 且未加 @Async，故為同步執行，無異步延遲。
+ * 修復重點：
+ * 1. 透過 unregister 回傳值判斷是否廣播 OFFLINE，解決登出/異常關閉後仍顯示在線的問題。
+ * 2. 只有當用戶最後一個分頁/連線斷開時才發送離線消息，避免閒置誤判。
  */
 @Slf4j
 @Component
@@ -33,49 +34,71 @@ public class WebSocketConnectionListener {
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
 
-    /** 同步處理：STOMP CONNECT 成功後立即觸發，無異步延遲 */
     @EventListener
     public void handleSessionConnected(SessionConnectedEvent event) {
-        log.info("SessionConnectedEvent 已觸發，開始處理上線狀態");
         try {
             StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
             String sessionId = accessor.getSessionId();
             Authentication auth = (Authentication) accessor.getUser();
+
             if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails)) {
-                log.warn("WebSocket 連線無已驗證使用者，sessionId={}，略過上線登記", sessionId);
+                log.warn("WebSocket 連線無驗證資訊，sessionId={}", sessionId);
                 return;
             }
+
             CustomUserDetails user = (CustomUserDetails) auth.getPrincipal();
+
+            // 取得顯示名稱（優先從 DB，否則用 Username）
             String fullName = userRepository.findById(user.getId())
                     .map(u -> u.getFullName() != null ? u.getFullName() : user.getUsername())
                     .orElse(user.getUsername());
+
+            // 1. 登記連線
             onlineUserStore.register(sessionId, user.getId(), user.getUsername(), fullName);
-            UserOnlineEventDto payload = UserOnlineEventDto.builder()
-                    .eventType("ONLINE")
-                    .userId(user.getId())
-                    .username(user.getUsername())
-                    .fullName(fullName)
-                    .at(LocalDateTime.now())
-                    .build();
-            messagingTemplate.convertAndSend(TOPIC_ONLINE_USERS, payload);
-            log.info("使用者上線已登記並廣播: {} (id={}), sessionId={}", user.getUsername(), user.getId(), sessionId);
+
+            // 2. 廣播上線消息
+            broadcastEvent("ONLINE", user.getId(), user.getUsername(), fullName);
+
+            log.info("使用者上線廣播: {} (ID: {}), Session: {}", user.getUsername(), user.getId(), sessionId);
         } catch (Exception e) {
-            log.error("處理 SessionConnectedEvent 時發生錯誤", e);
-            throw e;
+            log.error("處理 SessionConnectedEvent 錯誤", e);
         }
     }
 
-    /** 同步處理：連線關閉時僅自線上列表移除，不廣播 OFFLINE（僅正式登出時才廣播） */
     @EventListener
     public void handleSessionDisconnected(SessionDisconnectEvent event) {
-        log.debug("SessionDisconnectEvent 已觸發，自線上列表移除 session（不廣播 OFFLINE）");
         try {
             StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
             String sessionId = accessor.getSessionId();
-            onlineUserStore.unregister(sessionId);
+
+            // 1. 核心修正：直接執行 unregister 並取得回傳值
+            // 若回傳非 null，代表這已經是該使用者的最後一個連線，系統應該視為完全下線
+            OnlineUserDto departedUser = onlineUserStore.unregister(sessionId);
+
+            // 2. 判斷是否需要發送離線廣播
+            if (departedUser != null) {
+                broadcastEvent("OFFLINE", departedUser.getId(), departedUser.getUsername(), departedUser.getFullName());
+                log.info("使用者 {} 已完全斷開所有連線，廣播離線消息", departedUser.getUsername());
+            } else {
+                // 如果回傳 null，表示 userToSessions 裡該用戶還有其他 sessionId 存在
+                log.debug("Session {} 已斷開，但使用者仍有其他連線，不廣播離線", sessionId);
+            }
         } catch (Exception e) {
-            log.error("處理 SessionDisconnectEvent 時發生錯誤", e);
-            throw e;
+            log.error("處理 SessionDisconnectEvent 錯誤", e);
         }
+    }
+
+    /**
+     * 統一廣播邏輯
+     */
+    private void broadcastEvent(String eventType, Long userId, String username, String fullName) {
+        UserOnlineEventDto payload = UserOnlineEventDto.builder()
+                .eventType(eventType)
+                .userId(userId)
+                .username(username)
+                .fullName(fullName)
+                .at(LocalDateTime.now())
+                .build();
+        messagingTemplate.convertAndSend(TOPIC_ONLINE_USERS, payload);
     }
 }

@@ -1,19 +1,16 @@
 package com.lianhua.erp.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
-/**
- * WebSocket + STOMP 設定。
- * - 端點：/ws（支援 SockJS，可加 query token=xxx 或於 CONNECT frame 帶 token）
- * - 訂閱：/topic/online-users（即時收到上線/下線事件）
- * - 應用前綴：/app（若前端要送訊息給後端可走此外綴）
- */
 @Configuration
 @EnableWebSocketMessageBroker
 @RequiredArgsConstructor
@@ -31,8 +28,25 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/topic");
+        // 使用受 Spring 管理的 TaskScheduler
+        config.enableSimpleBroker("/topic")
+                .setHeartbeatValue(new long[]{20000, 20000}) // 對齊前端
+                .setTaskScheduler(heartbeatScheduler()); // 使用 Bean 注入
+
         config.setApplicationDestinationPrefixes("/app");
+    }
+
+    /**
+     * 定義一個受管服務，確保執行緒池被正確關閉與回收。
+     * 解決 ECONNRESET 導致的殭屍連線堆積問題。
+     */
+    @Bean
+    public TaskScheduler heartbeatScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("ws-heartbeat-thread-");
+        scheduler.initialize();
+        return scheduler;
     }
 
     @Override
