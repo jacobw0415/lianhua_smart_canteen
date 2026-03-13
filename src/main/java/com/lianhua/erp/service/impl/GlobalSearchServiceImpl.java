@@ -40,9 +40,9 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
         validateRequest(request);
 
         String keyword = request.getKeyword().trim();
-        // 取得會計期間參數 (由前端傳入，例如 "2026-01")
         String period = request.getPeriod();
-        int limit = request.getLimit() != null ? request.getLimit() : 5;
+        int requestedLimit = request.getLimit() != null ? request.getLimit() : 5;
+        int limit = Math.max(1, Math.min(requestedLimit, 50));
         List<String> scopes = request.getScopes();
 
         List<GlobalSearchItemDto> results = new ArrayList<>();

@@ -240,9 +240,10 @@ public interface DashboardRepository extends JpaRepository<Order, Long> {
             SUM(total_amount) AS totalAmount
         FROM orders
         WHERE record_status = 'ACTIVE'
+          AND (:period IS NULL OR accounting_period = :period)
         GROUP BY order_status
         """, nativeQuery = true)
-    List<Object[]> getOrderFunnel();
+    List<Object[]> getOrderFunnel(@Param("period") String period);
 
     /* =========================================================
      * 3. 核心決策圖表 (v3.0 財務三表與深度分析)

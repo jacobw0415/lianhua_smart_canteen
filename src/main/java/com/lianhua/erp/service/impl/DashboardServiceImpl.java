@@ -71,7 +71,8 @@ public class DashboardServiceImpl implements DashboardService {
     // =========================================================
     @Override
     public List<TrendPointDto> getSalesTrendData(int days) {
-        LocalDate startDate = LocalDate.now().minusDays(days);
+        int safeDays = Math.max(1, Math.min(days, 365));
+        LocalDate startDate = LocalDate.now().minusDays(safeDays);
         return dashboardRepository.getCombinedTrend(startDate).stream()
                 .map(row -> new TrendPointDto(
                         parseLocalDate(row[0]),    // date
@@ -122,7 +123,7 @@ public class DashboardServiceImpl implements DashboardService {
     /** 訂單轉化漏斗分析 */
     @Override
     public List<OrderFunnelDto> getOrderFunnel(String period) {
-        return dashboardRepository.getOrderFunnel().stream()
+        return dashboardRepository.getOrderFunnel(period).stream()
                 .map(row -> new OrderFunnelDto(
                         (String) row[0],           // stage (status)
                         ((Number) row[1]).intValue(), // orderCount
