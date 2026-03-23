@@ -3,6 +3,9 @@ package com.lianhua.erp.service;
 import com.lianhua.erp.dto.ap.APAgingFilterDto;
 import com.lianhua.erp.dto.ap.APAgingPurchaseDetailDto;
 import com.lianhua.erp.dto.ap.APAgingSummaryDto;
+import com.lianhua.erp.dto.export.ExportPayload;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,6 +34,16 @@ public interface APAgingService {
     // 🔥 第 1 層（不分頁）給匯出 / 報表專用
     // ======================================================
     List<APAgingSummaryDto> getAgingSummaryAll();
+
+    // ======================================================
+    // 🔥 匯出（含篩選、支援 page/all）
+    // ======================================================
+    ExportPayload exportAgingSummary(
+            APAgingFilterDto filter,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    );
 
     // ======================================================
     // 🔥 第 2 層：取得某供應商逐筆應付明細

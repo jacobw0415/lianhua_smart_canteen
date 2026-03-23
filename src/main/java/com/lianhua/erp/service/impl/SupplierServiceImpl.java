@@ -1,10 +1,15 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.Supplier;
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.supplier.SupplierResponseDto;
 import com.lianhua.erp.dto.supplier.SupplierRequestDto;
 import com.lianhua.erp.dto.supplier.SupplierSearchRequest;
 import com.lianhua.erp.mapper.SupplierMapper;
+import com.lianhua.erp.export.ExportFilenameUtils;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
+import com.lianhua.erp.export.TabularExporter;
 import com.lianhua.erp.repository.SupplierRepository;
 import com.lianhua.erp.repository.PurchaseRepository;
 import com.lianhua.erp.service.SupplierService;
@@ -22,6 +27,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -31,6 +37,13 @@ public class SupplierServiceImpl implements SupplierService {
     private final SupplierRepository supplierRepository;
     private final SupplierMapper supplierMapper;
     private final PurchaseRepository purchaseRepository;
+
+    private static final String[] SUPPLIER_EXPORT_HEADERS = new String[]{
+            "供應商名稱", "聯絡人", "電話", "結帳週期", "狀態", "備註"
+    };
+
+    @org.springframework.beans.factory.annotation.Value("${app.export.max-rows:50000}")
+    private int maxExportRows;
 
     @Override
     @Transactional(readOnly = true)
@@ -142,6 +155,77 @@ public class SupplierServiceImpl implements SupplierService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "目前沒有啟用的供應商");
         }
         return suppliers.stream().map(supplierMapper::toDto).toList();
+    }
+
+    // ================================================================
+    // ✅ 供應商匯出
+    // ================================================================
+    @Override
+    @Transactional(readOnly = true)
+    public ExportPayload exportSuppliers(
+            SupplierSearchRequest request,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    ) {
+        SupplierSearchRequest req = request == null ? new SupplierSearchRequest() : request;
+        // 匯出按鈕通常是從「列表目前顯示的資料」直接觸發。
+        // 若前端沒有帶任何搜尋條件（例如 active 預設在 UI 固定），這裡不應阻擋匯出；
+        // 預設改以 active=true 匯出，避免一次匯出全量資料造成誤用。
+        if (isEmptySearch(req)) {
+            req.setActive(true);
+        }
+
+        ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
+        ExportScope safeScope = scope == null ? ExportScope.PAGE : scope;
+
+        Specification<Supplier> spec = SupplierSpecifications.bySearchRequest(req);
+
+        List<SupplierResponseDto> list;
+        if (safeScope == ExportScope.ALL) {
+            long total = supplierRepository.count(spec);
+            if (total > maxExportRows) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+            }
+            list = supplierRepository.findAll(spec).stream()
+                    .map(supplierMapper::toDto)
+                    .toList();
+        } else {
+            Pageable p = pageable == null ? PageRequest.of(0, 25) : normalizePageable(pageable);
+            list = supplierRepository.findAll(spec, p).stream()
+                    .map(supplierMapper::toDto)
+                    .toList();
+        }
+
+        List<String[]> rows = list.stream()
+                .map(SupplierServiceImpl::toSupplierExportRow)
+                .collect(Collectors.toList());
+
+        byte[] data = switch (safeFormat) {
+            case XLSX -> TabularExporter.toXlsx("suppliers", SUPPLIER_EXPORT_HEADERS, rows);
+            case CSV -> TabularExporter.toCsvUtf8Bom(SUPPLIER_EXPORT_HEADERS, rows);
+        };
+
+        String filename = ExportFilenameUtils.build("suppliers", safeFormat);
+        return new ExportPayload(data, filename, safeFormat.mediaType());
+    }
+
+    private static String[] toSupplierExportRow(SupplierResponseDto s) {
+        String status = s.getActive() == null ? "" : (s.getActive() ? "啟用" : "停用");
+        return new String[]{
+                nz(s.getName()),
+                nz(s.getContact()),
+                nz(s.getPhone()),
+                nz(s.getBillingCycle()),
+                status,
+                nz(s.getNote())
+        };
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     // ================= Private Helpers =================

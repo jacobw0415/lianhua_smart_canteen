@@ -2,8 +2,13 @@ package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.*;
 import com.lianhua.erp.dto.receipt.*;
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.event.ReceiptEvent;
 import com.lianhua.erp.mapper.ReceiptMapper;
+import com.lianhua.erp.export.ExportFilenameUtils;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
+import com.lianhua.erp.export.TabularExporter;
 import com.lianhua.erp.repository.OrderRepository;
 import com.lianhua.erp.repository.ReceiptRepository;
 import com.lianhua.erp.service.OrderService; // 🚀 補齊匯入
@@ -34,6 +39,14 @@ import java.util.Map;
 @Transactional
 @Slf4j
 public class ReceiptServiceImpl implements ReceiptService {
+
+    private static final String[] RECEIPT_EXPORT_HEADERS = new String[]{
+            "訂單編號", "客戶名稱", "收款狀態", "付款方式", "收款金額",
+            "收款日期", "會計期間", "參考號碼", "備註"
+    };
+
+    @org.springframework.beans.factory.annotation.Value("${app.export.max-rows:50000}")
+    private int maxExportRows;
 
     private final ReceiptRepository receiptRepository;
     private final OrderRepository orderRepository;
@@ -229,6 +242,63 @@ public class ReceiptServiceImpl implements ReceiptService {
         }
         Specification<Receipt> spec = ReceiptSpecifications.build(req);
         return receiptRepository.findAll(spec, pageable).map(mapper::toDto);
+    }
+
+    // =====================================================
+    // ✅ 收款紀錄匯出（與 searchReceipts 相同條件）
+    // =====================================================
+    @Override
+    @Transactional(readOnly = true)
+    public ExportPayload exportReceipts(
+            ReceiptSearchRequest req,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    ) {
+        ReceiptSearchRequest request = req == null ? new ReceiptSearchRequest() : req;
+        Pageable p = scope == ExportScope.ALL ? Pageable.unpaged() : pageable;
+
+        Specification<Receipt> spec = ReceiptSpecifications.build(request);
+
+        if (scope == ExportScope.ALL) {
+            long total = receiptRepository.count(spec);
+            if (total > maxExportRows) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+            }
+        }
+
+        Page<ReceiptResponseDto> page = receiptRepository.findAll(spec, p).map(mapper::toDto);
+        List<String[]> rows = page.getContent().stream()
+                .map(ReceiptServiceImpl::toReceiptExportRow)
+                .toList();
+
+        byte[] data = switch (format) {
+            case XLSX -> TabularExporter.toXlsx("收款紀錄", RECEIPT_EXPORT_HEADERS, rows);
+            case CSV -> TabularExporter.toCsvUtf8Bom(RECEIPT_EXPORT_HEADERS, rows);
+        };
+
+        String filename = ExportFilenameUtils.build("receipts", format);
+        return new ExportPayload(data, filename, format.mediaType());
+    }
+
+    private static String[] toReceiptExportRow(ReceiptResponseDto r) {
+        return new String[]{
+                nz(r.getOrderNo()),
+                nz(r.getCustomerName()),
+                nz(r.getStatus()),
+                nz(r.getMethod()),
+                r.getAmount() == null ? "" : r.getAmount().toPlainString(),
+                r.getReceivedDate() == null ? "" : r.getReceivedDate().toString(),
+                nz(r.getAccountingPeriod()),
+                nz(r.getReferenceNo()),
+                nz(r.getNote())
+        };
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     // =====================================================

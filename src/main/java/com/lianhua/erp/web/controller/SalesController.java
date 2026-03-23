@@ -2,7 +2,10 @@ package com.lianhua.erp.web.controller;
 
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
 import com.lianhua.erp.dto.error.*;
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.sale.*;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
 import com.lianhua.erp.service.SalesService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,10 +23,15 @@ import org.springdoc.core.converters.models.PageableAsQueryParam;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * 銷售管理 API
@@ -187,5 +195,46 @@ public class SalesController {
     ) {
         Page<SalesResponseDto> page = salesService.search(req, pageable);
         return ResponseEntity.ok(ApiResponseDto.ok(page));
+    }
+
+    // ============================================================
+    // 匯出銷售紀錄（篩選條件與 /search 相同）
+    // ============================================================
+    @Operation(
+            summary = "匯出銷售紀錄",
+            description = """
+                    篩選條件與 GET /api/sales/search 相同。
+                    - scope=page（預設）：匯出目前列表分頁。
+                    - scope=all：匯出全部符合條件資料（受 app.export.max-rows 限制）。
+                    - format：xlsx（預設）或 csv。
+                    """
+    )
+    @PageableAsQueryParam
+    @GetMapping(value = "/export", produces = {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv; charset=UTF-8"
+    })
+    @PreAuthorize("hasAuthority('sale:view')")
+    public ResponseEntity<byte[]> exportSales(
+            @ParameterObject @ModelAttribute SaleSearchRequestDto req,
+            @ParameterObject Pageable pageable,
+            @RequestParam(required = false) String format,
+            @RequestParam(required = false) String scope
+    ) {
+        ExportPayload payload = salesService.exportSales(
+                req,
+                pageable,
+                ExportFormat.fromQueryParam(format),
+                ExportScope.fromQueryParam(scope)
+        );
+
+        ContentDisposition disposition = ContentDisposition.builder("attachment")
+                .filename(payload.filename(), StandardCharsets.UTF_8)
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.parseMediaType(payload.mediaType()))
+                .body(payload.data());
     }
 }

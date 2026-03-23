@@ -1,6 +1,7 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.*;
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.payment.PaymentResponseDto;
 import com.lianhua.erp.dto.payment.PaymentSearchRequest;
 import com.lianhua.erp.mapper.PaymentMapper;
@@ -8,6 +9,10 @@ import com.lianhua.erp.repository.PaymentRepository;
 import com.lianhua.erp.repository.PurchaseRepository;
 import com.lianhua.erp.service.PaymentService;
 import com.lianhua.erp.service.impl.spec.PaymentSpecifications;
+import com.lianhua.erp.export.ExportFilenameUtils;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
+import com.lianhua.erp.export.TabularExporter;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
@@ -34,6 +41,21 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final PurchaseRepository purchaseRepository;
     private final PaymentMapper paymentMapper;
+
+    private static final String[] PAYMENT_EXPORT_HEADERS = new String[]{
+            "進貨單編號",
+            "供應商",
+            "品項摘要",
+            "付款方式",
+            "付款金額",
+            "付款日期",
+            "會計期間",
+            "付款狀態",
+            "備註"
+    };
+
+    @org.springframework.beans.factory.annotation.Value("${app.export.max-rows:50000}")
+    private int maxExportRows;
 
     /* =======================================================
      * 📌 React-Admin PaymentList 使用：分頁查詢所有付款紀錄
@@ -121,6 +143,110 @@ public class PaymentServiceImpl implements PaymentService {
 
         // ===== 3. 轉 DTO =====
         return result.map(paymentMapper::toDto);
+    }
+
+    // =======================================================
+    // ✅ 付款匯出（支援 format/scope；與 searchPayments 相同條件）
+    // =======================================================
+    @Override
+    @Transactional(readOnly = true)
+    public ExportPayload exportPayments(
+            PaymentSearchRequest req,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    ) {
+        PaymentSearchRequest request = req == null ? new PaymentSearchRequest() : req;
+
+        ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
+        ExportScope safeScope = scope == null ? ExportScope.PAGE : scope;
+
+        Specification<Payment> spec = PaymentSpecifications.build(request);
+
+        Sort safeSort = pageable != null && pageable.getSort() != null && pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.ASC, "id");
+
+        List<String[]> rows = new java.util.ArrayList<>();
+
+        if (safeScope == ExportScope.ALL) {
+            long total = paymentRepository.count(spec);
+            if (total > maxExportRows) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+            }
+
+            int step = 1000;
+            if (pageable != null && pageable.getPageSize() > 0 && pageable.getPageSize() <= 200) {
+                step = Math.max(50, pageable.getPageSize());
+            }
+
+            int pages = (int) ((total + step - 1) / step);
+            try {
+                for (int p = 0; p < pages; p++) {
+                    Page<Payment> page = paymentRepository.findAll(spec, PageRequest.of(p, step, safeSort));
+                    for (Payment payment : page.getContent()) {
+                        PaymentResponseDto dto = paymentMapper.toDto(payment);
+                        rows.add(toPaymentExportRow(dto));
+                    }
+                }
+            } catch (PropertyReferenceException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "無效排序欄位：" + ex.getPropertyName());
+            }
+        } else {
+            Pageable p = pageable == null
+                    ? PageRequest.of(0, 25, safeSort)
+                    : normalizeForExport(pageable, safeSort);
+            try {
+                Page<Payment> page = paymentRepository.findAll(spec, p);
+                for (Payment payment : page.getContent()) {
+                    PaymentResponseDto dto = paymentMapper.toDto(payment);
+                    rows.add(toPaymentExportRow(dto));
+                }
+            } catch (PropertyReferenceException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "無效排序欄位：" + ex.getPropertyName());
+            }
+        }
+
+        byte[] data = switch (safeFormat) {
+            case XLSX -> TabularExporter.toXlsx("payments", PAYMENT_EXPORT_HEADERS, rows);
+            case CSV -> TabularExporter.toCsvUtf8Bom(PAYMENT_EXPORT_HEADERS, rows);
+        };
+
+        String filename = ExportFilenameUtils.build("payments", safeFormat);
+        return new ExportPayload(data, filename, safeFormat.mediaType());
+    }
+
+    private Pageable normalizeForExport(Pageable pageable, Sort safeSort) {
+        if (pageable.getPageNumber() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page 無效");
+        }
+        int size = pageable.getPageSize();
+        if (size <= 0 || size > 200) size = 25;
+        return PageRequest.of(pageable.getPageNumber(), size, safeSort);
+    }
+
+    private static String[] toPaymentExportRow(PaymentResponseDto p) {
+        return new String[]{
+                nz(p.getPurchaseNo()),
+                nz(p.getSupplierName()),
+                nz(p.getItem()),
+                nz(p.getMethod()),
+                p.getAmount() == null ? "" : p.getAmount().toPlainString(),
+                p.getPayDate() == null ? "" : p.getPayDate().toString(),
+                nz(p.getAccountingPeriod()),
+                nz(p.getStatus()),
+                nz(p.getNote())
+        };
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     /* =======================================================

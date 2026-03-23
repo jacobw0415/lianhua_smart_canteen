@@ -2,8 +2,11 @@ package com.lianhua.erp.web.controller;
 
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
 import com.lianhua.erp.dto.error.*;
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.orderCustomer.OrderCustomerRequestDto;
 import com.lianhua.erp.dto.orderCustomer.OrderCustomerResponseDto;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
 import com.lianhua.erp.service.OrderCustomerService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,10 +24,15 @@ import org.springdoc.core.converters.models.PageableAsQueryParam;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * 訂單客戶管理 API
@@ -215,5 +223,46 @@ public class OrderCustomerController {
     ) {
         Page<OrderCustomerResponseDto> page = service.search(request, pageable);
         return ResponseEntity.ok(ApiResponseDto.ok(page));
+    }
+
+    // ============================================================
+    // 匯出訂單客戶（篩選條件與 /search 相同）
+    // ============================================================
+    @Operation(
+            summary = "匯出訂單客戶列表",
+            description = """
+                    篩選條件與 GET /api/order_customers/search 相同。
+                    - scope=page（預設）：匯出目前列表分頁。
+                    - scope=all：匯出全部符合條件資料（受 app.export.max-rows 限制）。
+                    - format：xlsx（預設）或 csv。
+                    """
+    )
+    @PageableAsQueryParam
+    @GetMapping(value = "/export", produces = {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv; charset=UTF-8"
+    })
+    @PreAuthorize("hasAuthority('order_customer:view')")
+    public ResponseEntity<byte[]> exportCustomers(
+            @ParameterObject @ModelAttribute OrderCustomerRequestDto request,
+            @ParameterObject Pageable pageable,
+            @RequestParam(required = false) String format,
+            @RequestParam(required = false) String scope
+    ) {
+        ExportPayload payload = service.exportCustomers(
+                request,
+                pageable,
+                ExportFormat.fromQueryParam(format),
+                ExportScope.fromQueryParam(scope)
+        );
+
+        ContentDisposition disposition = ContentDisposition.builder("attachment")
+                .filename(payload.filename(), StandardCharsets.UTF_8)
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.parseMediaType(payload.mediaType()))
+                .body(payload.data());
     }
 }

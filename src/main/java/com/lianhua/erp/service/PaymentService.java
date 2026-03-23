@@ -1,7 +1,10 @@
 package com.lianhua.erp.service;
 
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.payment.PaymentResponseDto;
 import com.lianhua.erp.dto.payment.PaymentSearchRequest;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -16,6 +19,16 @@ public interface PaymentService {
      * 模糊搜尋 + 分頁查詢付款紀錄（支援 supplierName、item、method、accountingPeriod、日期區間）
      */
     Page<PaymentResponseDto> searchPayments(PaymentSearchRequest req, Pageable pageable);
+
+    /**
+     * 匯出付款紀錄（篩選條件與 searchPayments 相同；scope=all 時不分頁）。
+     */
+    ExportPayload exportPayments(
+            PaymentSearchRequest req,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    );
 
     /**
      * 依進貨單 ID 查詢其付款紀錄（常用於 PurchaseEdit Drawer）

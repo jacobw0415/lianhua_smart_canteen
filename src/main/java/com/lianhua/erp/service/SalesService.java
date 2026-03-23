@@ -1,6 +1,9 @@
 package com.lianhua.erp.service;
 
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.sale.*;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -32,6 +35,16 @@ public interface SalesService {
     Page<SalesResponseDto> search(
             SaleSearchRequestDto req,
             Pageable pageable
+    );
+
+    /**
+     * 匯出銷售列表（篩選條件與 {@link #search} 相同；scope=all 時不分頁）。
+     */
+    ExportPayload exportSales(
+            SaleSearchRequestDto req,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
     );
 
     // ============================================================

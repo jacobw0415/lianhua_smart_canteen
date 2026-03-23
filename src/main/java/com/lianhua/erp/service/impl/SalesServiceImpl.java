@@ -2,7 +2,12 @@ package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.Product;
 import com.lianhua.erp.domain.Sale;
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.sale.*;
+import com.lianhua.erp.export.ExportFilenameUtils;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
+import com.lianhua.erp.export.TabularExporter;
 import com.lianhua.erp.mapper.SalesMapper;
 import com.lianhua.erp.repository.ProductRepository;
 import com.lianhua.erp.repository.SalesRepository;
@@ -10,12 +15,15 @@ import com.lianhua.erp.service.SalesService;
 import com.lianhua.erp.service.impl.spec.SaleSpecifications;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,9 +36,16 @@ import java.util.stream.Collectors;
 @Transactional
 public class SalesServiceImpl implements SalesService {
 
+    private static final String[] SALES_EXPORT_HEADERS = new String[]{
+            "銷售日期", "商品名稱", "銷售數量", "付款方式", "銷售金額"
+    };
+
     private final SalesRepository repository;
     private final ProductRepository productRepository;
     private final SalesMapper mapper;
+
+    @Value("${app.export.max-rows:50000}")
+    private int maxExportRows;
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
 
@@ -121,6 +136,55 @@ public class SalesServiceImpl implements SalesService {
 
         return repository.findAll(spec, pageable)
                 .map(mapper::toDto);
+    }
+
+    // === 匯出銷售列表 ===
+    @Override
+    @Transactional(readOnly = true)
+    public ExportPayload exportSales(
+            SaleSearchRequestDto req,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    ) {
+        SaleSearchRequestDto request = req == null ? new SaleSearchRequestDto() : req;
+        Pageable p = scope == ExportScope.ALL ? Pageable.unpaged() : pageable;
+
+        if (scope == ExportScope.ALL) {
+            long total = repository.count(SaleSpecifications.build(request));
+            if (total > maxExportRows) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+            }
+        }
+
+        Page<SalesResponseDto> page = search(request, p);
+        List<String[]> rows = page.getContent().stream()
+                .map(SalesServiceImpl::toSalesExportRow)
+                .toList();
+
+        byte[] data = switch (format) {
+            case XLSX -> TabularExporter.toXlsx("銷售", SALES_EXPORT_HEADERS, rows);
+            case CSV -> TabularExporter.toCsvUtf8Bom(SALES_EXPORT_HEADERS, rows);
+        };
+
+        String filename = ExportFilenameUtils.build("sales", format);
+        return new ExportPayload(data, filename, format.mediaType());
+    }
+
+    private static String[] toSalesExportRow(SalesResponseDto s) {
+        return new String[]{
+                s.getSaleDate() == null ? "" : s.getSaleDate().toString(),
+                nz(s.getProductName()),
+                s.getQty() == null ? "" : String.valueOf(s.getQty()),
+                nz(s.getPayMethod()),
+                s.getAmount() == null ? "" : s.getAmount().toPlainString()
+        };
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     // === 刪除銷售紀錄 ===

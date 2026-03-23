@@ -1,7 +1,12 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.OrderCustomer;
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.orderCustomer.*;
+import com.lianhua.erp.export.ExportFilenameUtils;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
+import com.lianhua.erp.export.TabularExporter;
 import com.lianhua.erp.mapper.OrderCustomerMapper;
 import com.lianhua.erp.repository.OrderCustomerRepository;
 import com.lianhua.erp.repository.OrderRepository;
@@ -10,6 +15,7 @@ import com.lianhua.erp.service.impl.spec.OrderCustomerSpecifications;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -18,11 +24,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Transactional
 @Slf4j
 public class OrderCustomerServiceImpl implements OrderCustomerService {
+
+    private static final String[] CUSTOMER_EXPORT_HEADERS = new String[]{
+            "客戶名稱", "聯絡人", "電話", "地址", "結帳週期", "備註"
+    };
+
+    @Value("${app.export.max-rows:50000}")
+    private int maxExportRows;
 
     private final OrderCustomerRepository repository;
     private final OrderCustomerMapper mapper;
@@ -155,6 +170,55 @@ public class OrderCustomerServiceImpl implements OrderCustomerService {
 
         return repository.findAll(spec, pageable)
                 .map(mapper::toResponseDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExportPayload exportCustomers(
+            OrderCustomerRequestDto request,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    ) {
+        OrderCustomerRequestDto req = request == null ? new OrderCustomerRequestDto() : request;
+        Pageable p = scope == ExportScope.ALL ? Pageable.unpaged() : pageable;
+
+        if (scope == ExportScope.ALL) {
+            long total = repository.count(OrderCustomerSpecifications.bySearchRequest(req));
+            if (total > maxExportRows) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+            }
+        }
+
+        Page<OrderCustomerResponseDto> page = search(req, p);
+        List<String[]> rows = page.getContent().stream()
+                .map(OrderCustomerServiceImpl::toCustomerExportRow)
+                .toList();
+
+        byte[] data = switch (format) {
+            case XLSX -> TabularExporter.toXlsx("客戶", CUSTOMER_EXPORT_HEADERS, rows);
+            case CSV -> TabularExporter.toCsvUtf8Bom(CUSTOMER_EXPORT_HEADERS, rows);
+        };
+
+        String filename = ExportFilenameUtils.build("order_customers", format);
+        return new ExportPayload(data, filename, format.mediaType());
+    }
+
+    private static String[] toCustomerExportRow(OrderCustomerResponseDto c) {
+        return new String[]{
+                nz(c.getName()),
+                nz(c.getContactPerson()),
+                nz(c.getPhone()),
+                nz(c.getAddress()),
+                nz(c.getBillingCycle()),
+                nz(c.getNote())
+        };
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     /**

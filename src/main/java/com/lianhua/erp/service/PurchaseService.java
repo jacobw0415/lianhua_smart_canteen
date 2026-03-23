@@ -1,6 +1,9 @@
 package com.lianhua.erp.service;
 
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.purchase.*;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -15,6 +18,16 @@ public interface PurchaseService {
     PurchaseResponseDto updateStatus(Long id, String status);
     void deletePurchase(Long id);
     Page<PurchaseResponseDto> searchPurchases(PurchaseSearchRequest req, Pageable pageable);
+
+    /**
+     * 匯出進貨單（篩選條件與 searchPurchases 相同；scope=all 時不分頁）
+     */
+    ExportPayload exportPurchases(
+            PurchaseSearchRequest req,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    );
     
     /**
      * 作廢進貨單

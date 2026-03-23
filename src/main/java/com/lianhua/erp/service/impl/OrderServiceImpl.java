@@ -1,8 +1,13 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.*;
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.order.*;
 import com.lianhua.erp.dto.orderItem.OrderItemRequestDto;
+import com.lianhua.erp.export.ExportFilenameUtils;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
+import com.lianhua.erp.export.TabularExporter;
 import com.lianhua.erp.mapper.*;
 import com.lianhua.erp.repository.*;
 import com.lianhua.erp.service.OrderService;
@@ -11,6 +16,7 @@ import com.lianhua.erp.numbering.OrderNoGenerator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -29,6 +35,13 @@ import java.util.List;
 @Transactional
 @Slf4j
 public class OrderServiceImpl implements OrderService {
+
+    private static final String[] ORDER_EXPORT_HEADERS = new String[]{
+            "訂單編號", "客戶", "訂單狀態", "收款狀態", "訂單金額", "訂單日期", "交貨日期"
+    };
+
+    @Value("${app.export.max-rows:50000}")
+    private int maxExportRows;
 
     private final OrderRepository orderRepository;
     private final OrderCustomerRepository customerRepository;
@@ -63,6 +76,59 @@ public class OrderServiceImpl implements OrderService {
 
         return orderRepository.findAll(spec, pageable)
                 .map(order -> orderMapper.toResponseDto(order, itemMapper));
+    }
+
+    // ================================
+    // 匯出（與 search 相同篩選）
+    // ================================
+    @Override
+    @Transactional(readOnly = true)
+    public ExportPayload exportOrders(
+            OrderSearchRequest searchRequest,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope) {
+
+        OrderSearchRequest req = searchRequest == null ? new OrderSearchRequest() : searchRequest;
+        Pageable p = scope == ExportScope.ALL ? Pageable.unpaged() : pageable;
+
+        if (scope == ExportScope.ALL) {
+            long total = orderRepository.count(OrderSpecifications.bySearchRequest(req));
+            if (total > maxExportRows) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+            }
+        }
+
+        Page<OrderResponseDto> page = search(req, p);
+        List<String[]> rows = page.getContent().stream()
+                .map(OrderServiceImpl::toOrderExportRow)
+                .toList();
+
+        byte[] data = switch (format) {
+            case XLSX -> TabularExporter.toXlsx("訂單", ORDER_EXPORT_HEADERS, rows);
+            case CSV -> TabularExporter.toCsvUtf8Bom(ORDER_EXPORT_HEADERS, rows);
+        };
+
+        String filename = ExportFilenameUtils.build("orders", format);
+        return new ExportPayload(data, filename, format.mediaType());
+    }
+
+    private static String[] toOrderExportRow(OrderResponseDto o) {
+        return new String[]{
+                nz(o.getOrderNo()),
+                nz(o.getCustomerName()),
+                o.getOrderStatus() == null ? "" : o.getOrderStatus().name(),
+                o.getPaymentStatus() == null ? "" : o.getPaymentStatus().name(),
+                o.getTotalAmount() == null ? "" : o.getTotalAmount().toPlainString(),
+                o.getOrderDate() == null ? "" : o.getOrderDate().toString(),
+                o.getDeliveryDate() == null ? "" : o.getDeliveryDate().toString()
+        };
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     // ================================

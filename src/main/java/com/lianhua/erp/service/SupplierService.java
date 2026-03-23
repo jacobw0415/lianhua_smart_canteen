@@ -1,8 +1,11 @@
 package com.lianhua.erp.service;
 
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.supplier.SupplierResponseDto;
 import com.lianhua.erp.dto.supplier.SupplierRequestDto;
 import com.lianhua.erp.dto.supplier.SupplierSearchRequest;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -27,6 +30,16 @@ public interface SupplierService {
 
     void deleteSupplier(Long id);
     Page<SupplierResponseDto> searchSuppliers(SupplierSearchRequest request, Pageable pageable);
+
+    /**
+     * 匯出供應商列表（篩選條件與 searchSuppliers 相同；scope=all 時不分頁）
+     */
+    ExportPayload exportSuppliers(
+            SupplierSearchRequest request,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    );
 
     List<SupplierResponseDto> getActiveSuppliers();
 

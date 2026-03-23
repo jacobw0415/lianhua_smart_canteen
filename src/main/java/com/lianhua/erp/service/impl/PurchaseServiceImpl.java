@@ -14,6 +14,11 @@ import com.lianhua.erp.repository.PaymentRepository;
 import com.lianhua.erp.repository.SupplierRepository;
 import com.lianhua.erp.service.PurchaseService;
 import com.lianhua.erp.service.impl.spec.PurchaseSpecifications;
+import com.lianhua.erp.dto.export.ExportPayload;
+import com.lianhua.erp.export.ExportFilenameUtils;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
+import com.lianhua.erp.export.TabularExporter;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +44,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
 
+import org.springframework.beans.factory.annotation.Value;
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -56,6 +63,20 @@ public class PurchaseServiceImpl implements PurchaseService {
     private final PurchaseItemRepository purchaseItemRepository;
 
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
+
+    private static final String[] PURCHASE_EXPORT_HEADERS = new String[]{
+            "進貨單編號",
+            "供應商",
+            "進貨狀態",
+            "進貨金額",
+            "已付款金額",
+            "未付款餘額",
+            "進貨日期",
+            "備註"
+    };
+
+    @Value("${app.export.max-rows:50000}")
+    private int maxExportRows;
 
     // ================================
     // 取得所有進貨單（含分頁與排序防呆）
@@ -796,6 +817,127 @@ public class PurchaseServiceImpl implements PurchaseService {
         }
 
         return result.map(purchaseMapper::toResponseDto);
+    }
+
+    // ================================
+    // ✅ 進貨匯出（與 searchPurchases 相同條件）
+    // ================================
+    @Override
+    @Transactional(readOnly = true)
+    public ExportPayload exportPurchases(
+            PurchaseSearchRequest req,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    ) {
+        PurchaseSearchRequest request = req == null ? new PurchaseSearchRequest() : req;
+
+        // 避免與 searchPurchases 的「條件不可全空」衝突：
+        // 若前端未帶任何條件（常見於列表匯出），預設用本月會計期間匯出，避免直接 400。
+        boolean empty = isEmptySearch(request);
+        if (empty) {
+            request.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
+        }
+
+        ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
+        ExportScope safeScope = scope == null ? ExportScope.PAGE : scope;
+
+        Specification<Purchase> spec = PurchaseSpecifications.build(request);
+
+        Sort safeSort = pageable != null && pageable.getSort() != null && pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.ASC, "id");
+
+        List<String[]> rows = new ArrayList<>();
+
+        if (safeScope == ExportScope.ALL) {
+            try {
+                long total = purchaseRepository.count(spec);
+                if (total > maxExportRows) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+                }
+
+                int step = 1000;
+                if (pageable != null && pageable.getPageSize() > 0 && pageable.getPageSize() <= 200) {
+                    step = Math.max(50, pageable.getPageSize());
+                }
+
+                int pages = (int) ((total + step - 1) / step);
+                for (int p = 0; p < pages; p++) {
+                    Page<Purchase> page = purchaseRepository.findAll(spec, PageRequest.of(p, step, safeSort));
+                    for (Purchase purchase : page.getContent()) {
+                        PurchaseResponseDto dto = purchaseMapper.toResponseDto(purchase);
+                        rows.add(toPurchaseExportRow(dto));
+                    }
+                }
+            } catch (PropertyReferenceException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "無效排序欄位：" + ex.getPropertyName());
+            }
+        } else {
+            try {
+                Pageable p = pageable == null ? PageRequest.of(0, 25, safeSort) : normalizeForExport(pageable, safeSort);
+                Page<Purchase> page = purchaseRepository.findAll(spec, p);
+                for (Purchase purchase : page.getContent()) {
+                    PurchaseResponseDto dto = purchaseMapper.toResponseDto(purchase);
+                    rows.add(toPurchaseExportRow(dto));
+                }
+            } catch (PropertyReferenceException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "無效排序欄位：" + ex.getPropertyName());
+            }
+        }
+
+        byte[] data = switch (safeFormat) {
+            case XLSX -> TabularExporter.toXlsx("purchases", PURCHASE_EXPORT_HEADERS, rows);
+            case CSV -> TabularExporter.toCsvUtf8Bom(PURCHASE_EXPORT_HEADERS, rows);
+        };
+
+        String filename = ExportFilenameUtils.build("purchases", safeFormat);
+        return new ExportPayload(data, filename, safeFormat.mediaType());
+    }
+
+    private Pageable normalizeForExport(Pageable pageable, Sort safeSort) {
+        if (pageable.getPageNumber() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page 無效");
+        }
+        int pageSize = pageable.getPageSize();
+        if (pageSize <= 0 || pageSize > 200) {
+            pageSize = 25;
+        }
+        return PageRequest.of(pageable.getPageNumber(), pageSize, safeSort);
+    }
+
+    private static String[] toPurchaseExportRow(PurchaseResponseDto p) {
+        return new String[]{
+                nz(p.getPurchaseNo()),
+                nz(p.getSupplierName()),
+                p.getStatus() == null ? "" : p.getStatus(),
+                p.getTotalAmount() == null ? "" : p.getTotalAmount().toPlainString(),
+                p.getPaidAmount() == null ? "" : p.getPaidAmount().toPlainString(),
+                p.getBalance() == null ? "" : p.getBalance().toPlainString(),
+                p.getPurchaseDate() == null ? "" : p.getPurchaseDate().toString(),
+                nz(p.getNote())
+        };
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
+    }
+
+    private boolean isEmptySearch(PurchaseSearchRequest req) {
+        return isEmpty(req.getSupplierName()) &&
+                req.getSupplierId() == null &&
+                isEmpty(req.getItem()) &&
+                isEmpty(req.getStatus()) &&
+                isEmpty(req.getAccountingPeriod()) &&
+                isEmpty(req.getPurchaseNo()) &&
+                isEmpty(req.getFromDate()) &&
+                isEmpty(req.getToDate());
     }
 
     private boolean isEmpty(String s) {

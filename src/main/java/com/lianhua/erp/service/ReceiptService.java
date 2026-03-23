@@ -1,6 +1,9 @@
 package com.lianhua.erp.service;
 
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.receipt.*;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -21,6 +24,16 @@ public interface ReceiptService {
      */
     Page<ReceiptResponseDto> searchReceipts(ReceiptSearchRequest req, Pageable pageable);
     
+    /**
+     * 匯出收款紀錄（篩選條件與 searchReceipts 相同；scope=all 時不分頁）。
+     */
+    ExportPayload exportReceipts(
+            ReceiptSearchRequest req,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    );
+
     List<ReceiptResponseDto> findByOrderId(Long orderId);
     ReceiptResponseDto findById(Long id);
     
