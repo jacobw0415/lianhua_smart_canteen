@@ -88,11 +88,12 @@ public class APAgingController {
             @RequestParam(required = false) String format,
             @RequestParam(required = false) String scope
     ) {
+        String resolvedScope = (scope == null || scope.isBlank()) ? "all" : scope;
         ExportPayload payload = agingService.exportAgingSummary(
                 filter,
                 pageable,
                 ExportFormat.fromQueryParam(format),
-                ExportScope.fromQueryParam(scope)
+                ExportScope.fromQueryParam(resolvedScope)
         );
 
         ContentDisposition disposition = ContentDisposition.builder("attachment")

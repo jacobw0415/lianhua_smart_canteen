@@ -19,8 +19,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +33,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -256,31 +260,55 @@ public class ReceiptServiceImpl implements ReceiptService {
             ExportScope scope
     ) {
         ReceiptSearchRequest request = req == null ? new ReceiptSearchRequest() : req;
-        Pageable p = scope == ExportScope.ALL ? Pageable.unpaged() : pageable;
+        ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
+        ExportScope safeScope = scope == null ? ExportScope.ALL : scope;
+        Sort safeSort = pageable != null && pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.DESC, "receivedDate");
 
         Specification<Receipt> spec = ReceiptSpecifications.build(request);
+        List<String[]> rows = new ArrayList<>();
 
-        if (scope == ExportScope.ALL) {
-            long total = receiptRepository.count(spec);
-            if (total > maxExportRows) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+        try {
+            if (safeScope == ExportScope.ALL) {
+                long total = receiptRepository.count(spec);
+                if (total > maxExportRows) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+                }
+                int step = 1000;
+                int pages = (int) ((total + step - 1) / step);
+                for (int p = 0; p < pages; p++) {
+                    Page<Receipt> page = receiptRepository.findAll(spec, PageRequest.of(p, step, safeSort));
+                    for (Receipt receipt : page.getContent()) {
+                        rows.add(toReceiptExportRow(mapper.toDto(receipt)));
+                    }
+                }
+            } else {
+                Pageable p = pageable == null ? PageRequest.of(0, 25, safeSort) : PageRequest.of(
+                        Math.max(pageable.getPageNumber(), 0),
+                        pageable.getPageSize() <= 0 || pageable.getPageSize() > 200 ? 25 : pageable.getPageSize(),
+                        safeSort
+                );
+                Page<Receipt> page = receiptRepository.findAll(spec, p);
+                for (Receipt receipt : page.getContent()) {
+                    rows.add(toReceiptExportRow(mapper.toDto(receipt)));
+                }
             }
+        } catch (PropertyReferenceException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "無效排序欄位：" + ex.getPropertyName());
         }
 
-        Page<ReceiptResponseDto> page = receiptRepository.findAll(spec, p).map(mapper::toDto);
-        List<String[]> rows = page.getContent().stream()
-                .map(ReceiptServiceImpl::toReceiptExportRow)
-                .toList();
-
-        byte[] data = switch (format) {
+        byte[] data = switch (safeFormat) {
             case XLSX -> TabularExporter.toXlsx("收款紀錄", RECEIPT_EXPORT_HEADERS, rows);
             case CSV -> TabularExporter.toCsvUtf8Bom(RECEIPT_EXPORT_HEADERS, rows);
         };
 
-        String filename = ExportFilenameUtils.build("receipts", format);
-        return new ExportPayload(data, filename, format.mediaType());
+        String filename = ExportFilenameUtils.build("receipts", safeFormat);
+        return new ExportPayload(data, filename, safeFormat.mediaType());
     }
 
     private static String[] toReceiptExportRow(ReceiptResponseDto r) {

@@ -232,8 +232,8 @@ public class OrderCustomerController {
             summary = "匯出訂單客戶列表",
             description = """
                     篩選條件與 GET /api/order_customers/search 相同。
-                    - scope=page（預設）：匯出目前列表分頁。
-                    - scope=all：匯出全部符合條件資料（受 app.export.max-rows 限制）。
+                    - scope=all（預設）：匯出全部符合條件資料（受 app.export.max-rows 限制）。
+                    - scope=page：匯出目前列表分頁。
                     - format：xlsx（預設）或 csv。
                     """
     )
@@ -249,11 +249,12 @@ public class OrderCustomerController {
             @RequestParam(required = false) String format,
             @RequestParam(required = false) String scope
     ) {
+        String resolvedScope = (scope == null || scope.isBlank()) ? "all" : scope;
         ExportPayload payload = service.exportCustomers(
                 request,
                 pageable,
                 ExportFormat.fromQueryParam(format),
-                ExportScope.fromQueryParam(scope)
+                ExportScope.fromQueryParam(resolvedScope)
         );
 
         ContentDisposition disposition = ContentDisposition.builder("attachment")

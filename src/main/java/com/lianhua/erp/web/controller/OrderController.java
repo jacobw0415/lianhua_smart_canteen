@@ -104,8 +104,8 @@ public class OrderController {
             summary = "匯出訂單列表",
             description = """
                     篩選條件與 GET /api/orders/search 相同（含訂單日／交貨日區間、狀態等）。
-                    - scope=page（預設）：與目前列表相同的 page / size / sort，只匯出本頁。
-                    - scope=all：依篩選條件匯出全部符合列（受 app.export.max-rows 限制）。
+                    - scope=all（預設）：依篩選條件匯出全部符合列（受 app.export.max-rows 限制）。
+                    - scope=page：與目前列表相同的 page / size / sort，只匯出本頁。
                     - format：xlsx（預設）或 csv。
                     """
     )
@@ -121,11 +121,12 @@ public class OrderController {
             @RequestParam(required = false) String format,
             @RequestParam(required = false) String scope
     ) {
+        String resolvedScope = (scope == null || scope.isBlank()) ? "all" : scope;
         ExportPayload payload = service.exportOrders(
                 searchRequest,
                 pageable,
                 ExportFormat.fromQueryParam(format),
-                ExportScope.fromQueryParam(scope));
+                ExportScope.fromQueryParam(resolvedScope));
 
         ContentDisposition disposition = ContentDisposition.builder("attachment")
                 .filename(payload.filename(), StandardCharsets.UTF_8)

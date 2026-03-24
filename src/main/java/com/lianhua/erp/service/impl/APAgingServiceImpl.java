@@ -24,7 +24,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -82,11 +81,11 @@ public class APAgingServiceImpl implements APAgingService {
         APAgingFilterDto req = filter == null ? new APAgingFilterDto() : filter;
 
         ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
-        ExportScope safeScope = scope == null ? ExportScope.PAGE : scope;
+        ExportScope safeScope = scope == null ? ExportScope.ALL : scope;
 
         int pageSize = pageable == null || pageable.getPageSize() <= 0 ? 20 : pageable.getPageSize();
 
-        List<APAgingSummaryDto> all;
+        List<String[]> rows = new ArrayList<>();
         if (safeScope == ExportScope.ALL) {
             int step = Math.min(Math.max(pageSize, 50), 2000);
 
@@ -99,24 +98,30 @@ public class APAgingServiceImpl implements APAgingService {
                         "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
             }
 
-            all = new ArrayList<>((int) Math.min(total, Integer.MAX_VALUE));
-            all.addAll(first.getContent());
+            for (APAgingSummaryDto item : first.getContent()) {
+                rows.add(toAgingExportRow(item));
+            }
 
             for (int p = 1; p < first.getTotalPages(); p++) {
                 Page<APAgingSummaryDto> page =
                         getAgingSummary(req, PageRequest.of(p, step));
-                all.addAll(page.getContent());
+                for (APAgingSummaryDto item : page.getContent()) {
+                    rows.add(toAgingExportRow(item));
+                }
             }
         } else {
+            int safePageSize = pageSize > 200 ? 200 : pageSize;
             Pageable p = pageable == null
-                    ? PageRequest.of(0, pageSize)
-                    : pageable;
-            all = getAgingSummary(req, p).getContent();
+                    ? PageRequest.of(0, safePageSize)
+                    : PageRequest.of(
+                            Math.max(pageable.getPageNumber(), 0),
+                            pageable.getPageSize() <= 0 || pageable.getPageSize() > 200 ? safePageSize : pageable.getPageSize(),
+                            pageable.getSort()
+                    );
+            for (APAgingSummaryDto item : getAgingSummary(req, p).getContent()) {
+                rows.add(toAgingExportRow(item));
+            }
         }
-
-        List<String[]> rows = all.stream()
-                .map(APAgingServiceImpl::toAgingExportRow)
-                .collect(Collectors.toList());
 
         byte[] data = switch (safeFormat) {
             case XLSX -> TabularExporter.toXlsx("ap_aging", AP_AGING_EXPORT_HEADERS, rows);

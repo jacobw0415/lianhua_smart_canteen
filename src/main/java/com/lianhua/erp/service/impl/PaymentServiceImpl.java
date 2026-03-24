@@ -159,7 +159,7 @@ public class PaymentServiceImpl implements PaymentService {
         PaymentSearchRequest request = req == null ? new PaymentSearchRequest() : req;
 
         ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
-        ExportScope safeScope = scope == null ? ExportScope.PAGE : scope;
+        ExportScope safeScope = scope == null ? ExportScope.ALL : scope;
 
         Specification<Payment> spec = PaymentSpecifications.build(request);
 
@@ -167,7 +167,7 @@ public class PaymentServiceImpl implements PaymentService {
                 ? pageable.getSort()
                 : Sort.by(Sort.Direction.ASC, "id");
 
-        List<String[]> rows = new java.util.ArrayList<>();
+        List<String[]> rows;
 
         if (safeScope == ExportScope.ALL) {
             long total = paymentRepository.count(spec);
@@ -176,6 +176,7 @@ public class PaymentServiceImpl implements PaymentService {
                         HttpStatus.BAD_REQUEST,
                         "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
             }
+            rows = new java.util.ArrayList<>((int) Math.min(total, Integer.MAX_VALUE));
 
             int step = 1000;
             if (pageable != null && pageable.getPageSize() > 0 && pageable.getPageSize() <= 200) {
@@ -187,8 +188,7 @@ public class PaymentServiceImpl implements PaymentService {
                 for (int p = 0; p < pages; p++) {
                     Page<Payment> page = paymentRepository.findAll(spec, PageRequest.of(p, step, safeSort));
                     for (Payment payment : page.getContent()) {
-                        PaymentResponseDto dto = paymentMapper.toDto(payment);
-                        rows.add(toPaymentExportRow(dto));
+                        rows.add(toPaymentExportRow(paymentMapper.toDto(payment)));
                     }
                 }
             } catch (PropertyReferenceException ex) {
@@ -197,14 +197,14 @@ public class PaymentServiceImpl implements PaymentService {
                         "無效排序欄位：" + ex.getPropertyName());
             }
         } else {
+            rows = new java.util.ArrayList<>();
             Pageable p = pageable == null
                     ? PageRequest.of(0, 25, safeSort)
                     : normalizeForExport(pageable, safeSort);
             try {
                 Page<Payment> page = paymentRepository.findAll(spec, p);
                 for (Payment payment : page.getContent()) {
-                    PaymentResponseDto dto = paymentMapper.toDto(payment);
-                    rows.add(toPaymentExportRow(dto));
+                    rows.add(toPaymentExportRow(paymentMapper.toDto(payment)));
                 }
             } catch (PropertyReferenceException ex) {
                 throw new ResponseStatusException(

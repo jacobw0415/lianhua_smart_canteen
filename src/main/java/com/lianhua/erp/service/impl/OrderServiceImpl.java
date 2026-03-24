@@ -18,8 +18,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -90,29 +94,55 @@ public class OrderServiceImpl implements OrderService {
             ExportScope scope) {
 
         OrderSearchRequest req = searchRequest == null ? new OrderSearchRequest() : searchRequest;
-        Pageable p = scope == ExportScope.ALL ? Pageable.unpaged() : pageable;
+        ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
+        ExportScope safeScope = scope == null ? ExportScope.ALL : scope;
+        Sort safeSort = pageable != null && pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.ASC, "id");
 
-        if (scope == ExportScope.ALL) {
-            long total = orderRepository.count(OrderSpecifications.bySearchRequest(req));
-            if (total > maxExportRows) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+        Specification<Order> spec = OrderSpecifications.bySearchRequest(req);
+        List<String[]> rows = new ArrayList<>();
+
+        try {
+            if (safeScope == ExportScope.ALL) {
+                long total = orderRepository.count(spec);
+                if (total > maxExportRows) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+                }
+                int step = 1000;
+                int pages = (int) ((total + step - 1) / step);
+                for (int p = 0; p < pages; p++) {
+                    Page<Order> page = orderRepository.findAll(spec, PageRequest.of(p, step, safeSort));
+                    for (Order order : page.getContent()) {
+                        rows.add(toOrderExportRow(orderMapper.toResponseDto(order, itemMapper)));
+                    }
+                }
+            } else {
+                Pageable p = pageable == null ? PageRequest.of(0, 25, safeSort) : PageRequest.of(
+                        Math.max(pageable.getPageNumber(), 0),
+                        pageable.getPageSize() <= 0 || pageable.getPageSize() > 200 ? 25 : pageable.getPageSize(),
+                        safeSort
+                );
+                Page<Order> page = orderRepository.findAll(spec, p);
+                for (Order order : page.getContent()) {
+                    rows.add(toOrderExportRow(orderMapper.toResponseDto(order, itemMapper)));
+                }
             }
+        } catch (PropertyReferenceException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "無效排序欄位：" + ex.getPropertyName());
         }
 
-        Page<OrderResponseDto> page = search(req, p);
-        List<String[]> rows = page.getContent().stream()
-                .map(OrderServiceImpl::toOrderExportRow)
-                .toList();
-
-        byte[] data = switch (format) {
+        byte[] data = switch (safeFormat) {
             case XLSX -> TabularExporter.toXlsx("訂單", ORDER_EXPORT_HEADERS, rows);
             case CSV -> TabularExporter.toCsvUtf8Bom(ORDER_EXPORT_HEADERS, rows);
         };
 
-        String filename = ExportFilenameUtils.build("orders", format);
-        return new ExportPayload(data, filename, format.mediaType());
+        String filename = ExportFilenameUtils.build("orders", safeFormat);
+        return new ExportPayload(data, filename, safeFormat.mediaType());
     }
 
     private static String[] toOrderExportRow(OrderResponseDto o) {

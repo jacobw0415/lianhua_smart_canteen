@@ -832,15 +832,8 @@ public class PurchaseServiceImpl implements PurchaseService {
     ) {
         PurchaseSearchRequest request = req == null ? new PurchaseSearchRequest() : req;
 
-        // 避免與 searchPurchases 的「條件不可全空」衝突：
-        // 若前端未帶任何條件（常見於列表匯出），預設用本月會計期間匯出，避免直接 400。
-        boolean empty = isEmptySearch(request);
-        if (empty) {
-            request.setAccountingPeriod(LocalDate.now().format(PERIOD_FORMAT));
-        }
-
         ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
-        ExportScope safeScope = scope == null ? ExportScope.PAGE : scope;
+        ExportScope safeScope = scope == null ? ExportScope.ALL : scope;
 
         Specification<Purchase> spec = PurchaseSpecifications.build(request);
 
@@ -848,7 +841,7 @@ public class PurchaseServiceImpl implements PurchaseService {
                 ? pageable.getSort()
                 : Sort.by(Sort.Direction.ASC, "id");
 
-        List<String[]> rows = new ArrayList<>();
+        List<String[]> rows;
 
         if (safeScope == ExportScope.ALL) {
             try {
@@ -858,6 +851,7 @@ public class PurchaseServiceImpl implements PurchaseService {
                             HttpStatus.BAD_REQUEST,
                             "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
                 }
+                rows = new ArrayList<>((int) Math.min(total, Integer.MAX_VALUE));
 
                 int step = 1000;
                 if (pageable != null && pageable.getPageSize() > 0 && pageable.getPageSize() <= 200) {
@@ -868,8 +862,7 @@ public class PurchaseServiceImpl implements PurchaseService {
                 for (int p = 0; p < pages; p++) {
                     Page<Purchase> page = purchaseRepository.findAll(spec, PageRequest.of(p, step, safeSort));
                     for (Purchase purchase : page.getContent()) {
-                        PurchaseResponseDto dto = purchaseMapper.toResponseDto(purchase);
-                        rows.add(toPurchaseExportRow(dto));
+                        rows.add(toPurchaseExportRow(purchaseMapper.toResponseDto(purchase)));
                     }
                 }
             } catch (PropertyReferenceException ex) {
@@ -878,12 +871,12 @@ public class PurchaseServiceImpl implements PurchaseService {
                         "無效排序欄位：" + ex.getPropertyName());
             }
         } else {
+            rows = new ArrayList<>();
             try {
                 Pageable p = pageable == null ? PageRequest.of(0, 25, safeSort) : normalizeForExport(pageable, safeSort);
                 Page<Purchase> page = purchaseRepository.findAll(spec, p);
                 for (Purchase purchase : page.getContent()) {
-                    PurchaseResponseDto dto = purchaseMapper.toResponseDto(purchase);
-                    rows.add(toPurchaseExportRow(dto));
+                    rows.add(toPurchaseExportRow(purchaseMapper.toResponseDto(purchase)));
                 }
             } catch (PropertyReferenceException ex) {
                 throw new ResponseStatusException(
@@ -927,17 +920,6 @@ public class PurchaseServiceImpl implements PurchaseService {
 
     private static String nz(String s) {
         return s == null ? "" : s;
-    }
-
-    private boolean isEmptySearch(PurchaseSearchRequest req) {
-        return isEmpty(req.getSupplierName()) &&
-                req.getSupplierId() == null &&
-                isEmpty(req.getItem()) &&
-                isEmpty(req.getStatus()) &&
-                isEmpty(req.getAccountingPeriod()) &&
-                isEmpty(req.getPurchaseNo()) &&
-                isEmpty(req.getFromDate()) &&
-                isEmpty(req.getToDate());
     }
 
     private boolean isEmpty(String s) {

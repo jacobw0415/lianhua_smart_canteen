@@ -1,8 +1,11 @@
 package com.lianhua.erp.service;
 
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.expense.ExpenseDto;
 import com.lianhua.erp.dto.expense.ExpenseRequestDto;
 import com.lianhua.erp.dto.expense.ExpenseSearchRequest;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -27,5 +30,15 @@ public interface ExpenseService {
      * @return 分頁結果
      */
     Page<ExpenseDto> searchExpenses(ExpenseSearchRequest req, Pageable pageable);
+
+    /**
+     * 匯出支出紀錄（篩選條件與 searchExpenses 相同；scope=all 時匯出全部符合條件資料）。
+     */
+    ExportPayload exportExpenses(
+            ExpenseSearchRequest req,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    );
 }
 

@@ -11,7 +11,8 @@ import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.BorderStyle;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,6 +25,7 @@ import java.util.List;
 public final class TabularExporter {
 
     private static final short LIANHUA_GREEN = IndexedColors.GREEN.getIndex();
+    private static final int AUTO_SIZE_ROW_THRESHOLD = 2000;
 
     private TabularExporter() {
     }
@@ -33,8 +35,12 @@ public final class TabularExporter {
                 ? "Sheet1"
                 : sheetName.substring(0, Math.min(31, sheetName.length()));
 
-        try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+        try (SXSSFWorkbook wb = new SXSSFWorkbook(200); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            wb.setCompressTempFiles(true);
             Sheet sh = wb.createSheet(safeName);
+            if (sh instanceof SXSSFSheet sxssfSheet) {
+                sxssfSheet.trackAllColumnsForAutoSizing();
+            }
             CellStyle headerStyle = createHeaderStyle(wb);
             CellStyle bodyStyle = createBodyStyle(wb);
 
@@ -57,7 +63,7 @@ public final class TabularExporter {
 
             // 固定表頭，捲動時仍可辨識欄位。
             sh.createFreezePane(0, 1);
-            autoSizeColumns(sh, headers);
+            adjustColumns(sh, headers, rows.size());
 
             wb.write(out);
             return out.toByteArray();
@@ -95,6 +101,14 @@ public final class TabularExporter {
         return style;
     }
 
+    private static void adjustColumns(Sheet sh, String[] headers, int rowCount) {
+        if (rowCount <= AUTO_SIZE_ROW_THRESHOLD) {
+            autoSizeColumns(sh, headers);
+            return;
+        }
+        fallbackColumnWidth(sh, headers);
+    }
+
     private static void autoSizeColumns(Sheet sh, String[] headers) {
         int columnCount = headers == null ? 0 : headers.length;
         int maxWidth = 255 * 256; // Excel 欄寬上限（POI 單位：字元寬度 * 256）
@@ -111,6 +125,16 @@ public final class TabularExporter {
             int padded = currentWidth + 4 * 256;
             int width = Math.max(padded, targetWidth);
             sh.setColumnWidth(c, Math.min(width, maxWidth));
+        }
+    }
+
+    private static void fallbackColumnWidth(Sheet sh, String[] headers) {
+        int columnCount = headers == null ? 0 : headers.length;
+        for (int c = 0; c < columnCount; c++) {
+            int headerLen = headers[c] == null ? 0 : headers[c].length();
+            int targetChars = Math.max(headerLen + 6, 14);
+            int width = Math.min(targetChars * 256, 60 * 256);
+            sh.setColumnWidth(c, width);
         }
     }
 
@@ -144,11 +168,26 @@ public final class TabularExporter {
     }
 
     private static String escapeCsvField(String v) {
-        boolean needQuote = v.indexOf(',') >= 0 || v.indexOf('"') >= 0 || v.indexOf('\n') >= 0 || v.indexOf('\r') >= 0;
-        String escaped = v.replace("\"", "\"\"");
+        String safe = sanitizeCsvFormula(v);
+        if (safe.isEmpty()) {
+            return safe;
+        }
+        boolean needQuote = safe.indexOf(',') >= 0 || safe.indexOf('"') >= 0 || safe.indexOf('\n') >= 0 || safe.indexOf('\r') >= 0;
+        String escaped = safe.replace("\"", "\"\"");
         if (needQuote) {
             return "\"" + escaped + "\"";
         }
         return escaped;
+    }
+
+    private static String sanitizeCsvFormula(String v) {
+        if (v.isEmpty()) {
+            return v;
+        }
+        char first = v.charAt(0);
+        if (first == '=' || first == '+' || first == '-' || first == '@') {
+            return "'" + v;
+        }
+        return v;
     }
 }

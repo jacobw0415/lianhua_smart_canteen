@@ -27,7 +27,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -169,39 +168,44 @@ public class SupplierServiceImpl implements SupplierService {
             ExportScope scope
     ) {
         SupplierSearchRequest req = request == null ? new SupplierSearchRequest() : request;
-        // 匯出按鈕通常是從「列表目前顯示的資料」直接觸發。
-        // 若前端沒有帶任何搜尋條件（例如 active 預設在 UI 固定），這裡不應阻擋匯出；
-        // 預設改以 active=true 匯出，避免一次匯出全量資料造成誤用。
-        if (isEmptySearch(req)) {
-            req.setActive(true);
-        }
-
         ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
-        ExportScope safeScope = scope == null ? ExportScope.PAGE : scope;
+        ExportScope safeScope = scope == null ? ExportScope.ALL : scope;
 
         Specification<Supplier> spec = SupplierSpecifications.bySearchRequest(req);
 
-        List<SupplierResponseDto> list;
-        if (safeScope == ExportScope.ALL) {
-            long total = supplierRepository.count(spec);
-            if (total > maxExportRows) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
-            }
-            list = supplierRepository.findAll(spec).stream()
-                    .map(supplierMapper::toDto)
-                    .toList();
-        } else {
-            Pageable p = pageable == null ? PageRequest.of(0, 25) : normalizePageable(pageable);
-            list = supplierRepository.findAll(spec, p).stream()
-                    .map(supplierMapper::toDto)
-                    .toList();
-        }
+        Sort safeSort = pageable != null && pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.ASC, "id");
+        List<String[]> rows = new java.util.ArrayList<>();
 
-        List<String[]> rows = list.stream()
-                .map(SupplierServiceImpl::toSupplierExportRow)
-                .collect(Collectors.toList());
+        try {
+            if (safeScope == ExportScope.ALL) {
+                long total = supplierRepository.count(spec);
+                if (total > maxExportRows) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+                }
+                int step = 1000;
+                int pages = (int) ((total + step - 1) / step);
+                for (int p = 0; p < pages; p++) {
+                    Page<Supplier> page = supplierRepository.findAll(spec, PageRequest.of(p, step, safeSort));
+                    for (Supplier supplier : page.getContent()) {
+                        rows.add(toSupplierExportRow(supplierMapper.toDto(supplier)));
+                    }
+                }
+            } else {
+                Pageable p = pageable == null ? PageRequest.of(0, 25, safeSort) : normalizePageable(pageable);
+                Page<Supplier> page = supplierRepository.findAll(spec, p);
+                for (Supplier supplier : page.getContent()) {
+                    rows.add(toSupplierExportRow(supplierMapper.toDto(supplier)));
+                }
+            }
+        } catch (PropertyReferenceException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "無效排序欄位：" + ex.getPropertyName());
+        }
 
         byte[] data = switch (safeFormat) {
             case XLSX -> TabularExporter.toXlsx("suppliers", SUPPLIER_EXPORT_HEADERS, rows);

@@ -1,7 +1,12 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.*;
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.expense.*;
+import com.lianhua.erp.export.ExportFilenameUtils;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
+import com.lianhua.erp.export.TabularExporter;
 import com.lianhua.erp.mapper.ExpenseMapper;
 import com.lianhua.erp.repository.*;
 import com.lianhua.erp.service.ExpenseService;
@@ -11,8 +16,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +30,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +48,19 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     // ✅ 統一格式化器（會計期間）
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
+
+    private static final String[] EXPENSE_EXPORT_HEADERS = new String[]{
+            "支出日期",
+            "會計期間",
+            "費用類別",
+            "支出金額",
+            "員工",
+            "狀態",
+            "備註"
+    };
+
+    @org.springframework.beans.factory.annotation.Value("${app.export.max-rows:50000}")
+    private int maxExportRows;
 
     /**
      * 計算指定日期所在週的開始日期（週一）和結束日期（週日）
@@ -523,11 +545,115 @@ public class ExpenseServiceImpl implements ExpenseService {
         try {
             Page<Expense> result = repository.findAll(spec, pageable);
             return result.map(mapper::toDto);
-        } catch (org.springframework.data.mapping.PropertyReferenceException ex) {
+        } catch (PropertyReferenceException ex) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "無效排序欄位：" + ex.getPropertyName());
         }
+    }
+
+    // ============================================
+    // 匯出支出紀錄（與 searchExpenses 相同條件）
+    // ============================================
+    @Override
+    @Transactional(readOnly = true)
+    public ExportPayload exportExpenses(
+            ExpenseSearchRequest req,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    ) {
+        ExpenseSearchRequest request = req == null ? new ExpenseSearchRequest() : req;
+
+        ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
+        ExportScope safeScope = scope == null ? ExportScope.ALL : scope;
+
+        Specification<Expense> spec = ExpenseSpecifications.build(request);
+
+        Sort safeSort = pageable != null && pageable.getSort() != null && pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.DESC, "expenseDate");
+
+        List<String[]> rows;
+
+        if (safeScope == ExportScope.ALL) {
+            try {
+                long total = repository.count(spec);
+                if (total > maxExportRows) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+                }
+                rows = new ArrayList<>((int) Math.min(total, Integer.MAX_VALUE));
+
+                int step = 1000;
+                if (pageable != null && pageable.getPageSize() > 0 && pageable.getPageSize() <= 200) {
+                    step = Math.max(50, pageable.getPageSize());
+                }
+
+                int pages = (int) ((total + step - 1) / step);
+                for (int p = 0; p < pages; p++) {
+                    Page<Expense> page = repository.findAll(spec, PageRequest.of(p, step, safeSort));
+                    for (Expense e : page.getContent()) {
+                        rows.add(toExpenseExportRow(mapper.toDto(e)));
+                    }
+                }
+            } catch (PropertyReferenceException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "無效排序欄位：" + ex.getPropertyName());
+            }
+        } else {
+            rows = new ArrayList<>();
+            try {
+                Pageable p = pageable == null
+                        ? PageRequest.of(0, 25, safeSort)
+                        : normalizeForExport(pageable, safeSort);
+                Page<Expense> page = repository.findAll(spec, p);
+                for (Expense e : page.getContent()) {
+                    rows.add(toExpenseExportRow(mapper.toDto(e)));
+                }
+            } catch (PropertyReferenceException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "無效排序欄位：" + ex.getPropertyName());
+            }
+        }
+
+        byte[] data = switch (safeFormat) {
+            case XLSX -> TabularExporter.toXlsx("expenses", EXPENSE_EXPORT_HEADERS, rows);
+            case CSV -> TabularExporter.toCsvUtf8Bom(EXPENSE_EXPORT_HEADERS, rows);
+        };
+
+        String filename = ExportFilenameUtils.build("expenses", safeFormat);
+        return new ExportPayload(data, filename, safeFormat.mediaType());
+    }
+
+    private Pageable normalizeForExport(Pageable pageable, Sort safeSort) {
+        if (pageable.getPageNumber() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page 無效");
+        }
+        int size = pageable.getPageSize();
+        if (size <= 0 || size > 200) {
+            size = 25;
+        }
+        return PageRequest.of(pageable.getPageNumber(), size, safeSort);
+    }
+
+    private static String[] toExpenseExportRow(ExpenseDto e) {
+        return new String[]{
+                e.getExpenseDate() == null ? "" : e.getExpenseDate().toString(),
+                nz(e.getAccountingPeriod()),
+                nz(e.getCategoryName()),
+                e.getAmount() == null ? "" : e.getAmount().toPlainString(),
+                nz(e.getEmployeeName()),
+                e.getStatus() == null ? "" : e.getStatus().name(),
+                nz(e.getNote())
+        };
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     private boolean isEmpty(String s) {

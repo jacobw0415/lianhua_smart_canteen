@@ -1,7 +1,12 @@
 package com.lianhua.erp.service.impl;
 
 import com.lianhua.erp.domain.Employee;
+import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.employee.*;
+import com.lianhua.erp.export.ExportFilenameUtils;
+import com.lianhua.erp.export.ExportFormat;
+import com.lianhua.erp.export.ExportScope;
+import com.lianhua.erp.export.TabularExporter;
 import com.lianhua.erp.mapper.EmployeeMapper;
 import com.lianhua.erp.repository.EmployeeRepository;
 import com.lianhua.erp.repository.ExpenseRepository;
@@ -33,6 +38,17 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final EmployeeRepository repository;
     private final EmployeeMapper mapper;
     private final ExpenseRepository expenseRepository;
+
+    private static final String[] EMPLOYEE_EXPORT_HEADERS = new String[]{
+            "員工姓名",
+            "職位",
+            "薪資",
+            "聘用日期",
+            "狀態"
+    };
+
+    @org.springframework.beans.factory.annotation.Value("${app.export.max-rows:50000}")
+    private int maxExportRows;
     
     @Override
     @Transactional(readOnly = true)
@@ -225,6 +241,79 @@ public class EmployeeServiceImpl implements EmployeeService {
         
         return page.map(mapper::toDto);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExportPayload exportEmployees(
+            EmployeeSearchRequest request,
+            Pageable pageable,
+            ExportFormat format,
+            ExportScope scope
+    ) {
+        EmployeeSearchRequest req = request == null ? new EmployeeSearchRequest() : request;
+        ExportFormat safeFormat = format == null ? ExportFormat.XLSX : format;
+        ExportScope safeScope = scope == null ? ExportScope.ALL : scope;
+
+        Specification<Employee> spec = buildEmployeeSpec(req);
+        Sort safeSort = pageable != null && pageable.getSort() != null && pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.ASC, "id");
+
+        List<String[]> rows;
+
+        if (safeScope == ExportScope.ALL) {
+            long total = repository.count(spec);
+            if (total > maxExportRows) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "匯出筆數超過上限 (" + maxExportRows + ")，請縮小篩選條件");
+            }
+            rows = new ArrayList<>((int) Math.min(total, Integer.MAX_VALUE));
+
+            int step = 1000;
+            if (pageable != null && pageable.getPageSize() > 0 && pageable.getPageSize() <= 200) {
+                step = Math.max(50, pageable.getPageSize());
+            }
+
+            int pages = (int) ((total + step - 1) / step);
+            try {
+                for (int p = 0; p < pages; p++) {
+                    Page<Employee> page = repository.findAll(spec, PageRequest.of(p, step, safeSort));
+                    for (Employee employee : page.getContent()) {
+                        rows.add(toEmployeeExportRow(mapper.toDto(employee)));
+                    }
+                }
+            } catch (PropertyReferenceException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "無效排序欄位：" + ex.getPropertyName());
+            }
+        } else {
+            rows = new ArrayList<>();
+            Pageable p = pageable == null
+                    ? PageRequest.of(0, 25, safeSort)
+                    : normalizeForExport(pageable, safeSort);
+
+            try {
+                Page<Employee> page = repository.findAll(spec, p);
+                for (Employee employee : page.getContent()) {
+                    rows.add(toEmployeeExportRow(mapper.toDto(employee)));
+                }
+            } catch (PropertyReferenceException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "無效排序欄位：" + ex.getPropertyName());
+            }
+        }
+
+        byte[] data = switch (safeFormat) {
+            case XLSX -> TabularExporter.toXlsx("employees", EMPLOYEE_EXPORT_HEADERS, rows);
+            case CSV -> TabularExporter.toCsvUtf8Bom(EMPLOYEE_EXPORT_HEADERS, rows);
+        };
+
+        String filename = ExportFilenameUtils.build("employees", safeFormat);
+        return new ExportPayload(data, filename, safeFormat.mediaType());
+    }
     
     @Override
     public EmployeeResponseDto activate(Long id) {
@@ -301,12 +390,37 @@ public class EmployeeServiceImpl implements EmployeeService {
         
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
     }
+
+    private Pageable normalizeForExport(Pageable pageable, Sort safeSort) {
+        if (pageable.getPageNumber() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page 不可小於 0");
+        }
+        int size = pageable.getPageSize();
+        if (size <= 0 || size > 200) {
+            size = 25;
+        }
+        return PageRequest.of(pageable.getPageNumber(), size, safeSort);
+    }
     
     // ================================================================
     // 工具方法
     // ================================================================
     private boolean hasText(String s) {
         return s != null && !s.trim().isEmpty();
+    }
+
+    private static String[] toEmployeeExportRow(EmployeeResponseDto e) {
+        return new String[]{
+                nz(e.getFullName()),
+                nz(e.getPosition()),
+                e.getSalary() == null ? "" : e.getSalary().toPlainString(),
+                e.getHireDate() == null ? "" : e.getHireDate().toString(),
+                nz(e.getStatus())
+        };
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
     
     private boolean isEmptySearch(EmployeeSearchRequest req) {

@@ -223,8 +223,8 @@ public class SupplierController {
             summary = "匯出供應商列表",
             description = """
                     篩選條件與 GET /api/suppliers/search 相同。
-                    - scope=page（預設）：匯出目前列表分頁。
-                    - scope=all：匯出全部符合條件資料（受 app.export.max-rows 限制）。
+                    - scope=all（預設）：匯出全部符合條件資料（受 app.export.max-rows 限制）。
+                    - scope=page：匯出目前列表分頁。
                     - format：xlsx（預設）或 csv。
                     """
     )
@@ -240,11 +240,12 @@ public class SupplierController {
             @RequestParam(required = false) String format,
             @RequestParam(required = false) String scope
     ) {
+        String resolvedScope = (scope == null || scope.isBlank()) ? "all" : scope;
         ExportPayload payload = supplierService.exportSuppliers(
                 req,
                 pageable,
                 ExportFormat.fromQueryParam(format),
-                ExportScope.fromQueryParam(scope)
+                ExportScope.fromQueryParam(resolvedScope)
         );
 
         ContentDisposition disposition = ContentDisposition.builder("attachment")

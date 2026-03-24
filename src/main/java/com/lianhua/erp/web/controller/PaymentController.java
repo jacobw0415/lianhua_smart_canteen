@@ -141,8 +141,8 @@ public class PaymentController {
             summary = "匯出付款紀錄",
             description = """
                 篩選條件與 GET /api/payments/search 相同（供應商/品項摘要/付款方式/會計期間/付款日期區間）。
-                - scope=page（預設）：匯出目前列表分頁
-                - scope=all：匯出全部符合條件資料（受 app.export.max-rows 限制）
+                - scope=all（預設）：匯出全部符合條件資料（受 app.export.max-rows 限制）
+                - scope=page：匯出目前列表分頁
                 - format：xlsx（預設）或 csv
                 """
     )
@@ -158,11 +158,12 @@ public class PaymentController {
             @RequestParam(required = false) String format,
             @RequestParam(required = false) String scope
     ) {
+        String resolvedScope = (scope == null || scope.isBlank()) ? "all" : scope;
         ExportPayload payload = paymentService.exportPayments(
                 req,
                 pageable,
                 ExportFormat.fromQueryParam(format),
-                ExportScope.fromQueryParam(scope)
+                ExportScope.fromQueryParam(resolvedScope)
         );
 
         ContentDisposition disposition = ContentDisposition.builder("attachment")
