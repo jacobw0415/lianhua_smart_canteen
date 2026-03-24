@@ -213,10 +213,12 @@ public class PaymentServiceImpl implements PaymentService {
             }
         }
 
-        byte[] data = switch (safeFormat) {
-            case XLSX -> TabularExporter.toXlsx("payments", PAYMENT_EXPORT_HEADERS, rows);
-            case CSV -> TabularExporter.toCsvUtf8Bom(PAYMENT_EXPORT_HEADERS, rows);
-        };
+        byte[] data;
+        if (safeFormat == ExportFormat.CSV) {
+            data = TabularExporter.toCsvUtf8Bom(PAYMENT_EXPORT_HEADERS, rows);
+        } else {
+            data = TabularExporter.toXlsx("payments", PAYMENT_EXPORT_HEADERS, rows);
+        }
 
         String filename = ExportFilenameUtils.build("payments", safeFormat);
         return new ExportPayload(data, filename, safeFormat.mediaType());
