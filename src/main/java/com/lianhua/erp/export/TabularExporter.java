@@ -18,6 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 將表格式資料（表頭 + 每列字串陣列）寫成 xlsx 或 CSV。
@@ -26,6 +27,16 @@ public final class TabularExporter {
 
     private static final short LIANHUA_GREEN = IndexedColors.GREEN.getIndex();
     private static final int AUTO_SIZE_ROW_THRESHOLD = 2000;
+    /**
+     * 大量列時取樣筆數，用於估算欄寬（避免全表掃描）。
+     */
+    private static final int WIDTH_SAMPLE_ROW_CAP = 800;
+    /** Excel 欄寬上限（POI：字元寬度 × 256） */
+    private static final int MAX_COL_WIDTH_UNITS = 255 * 256;
+    /** 中日文等欄位最小「顯示單位」對應欄寬（字元）之下限，避免表頭被截成「…」 */
+    private static final int MIN_WIDTH_CHARS_FLOOR = 16;
+    /** 在內容估算寬度上再預留的字元數 */
+    private static final int WIDTH_PADDING_CHARS = 6;
 
     private TabularExporter() {
     }
@@ -63,7 +74,7 @@ public final class TabularExporter {
 
             // 固定表頭，捲動時仍可辨識欄位。
             sh.createFreezePane(0, 1);
-            adjustColumns(sh, headers, rows.size());
+            adjustColumns(sh, headers, rows);
 
             wb.write(out);
             return out.toByteArray();
@@ -101,39 +112,96 @@ public final class TabularExporter {
         return style;
     }
 
-    private static void adjustColumns(Sheet sh, String[] headers, int rowCount) {
+    private static void adjustColumns(Sheet sh, String[] headers, List<String[]> rows) {
+        int rowCount = rows == null ? 0 : rows.size();
         if (rowCount <= AUTO_SIZE_ROW_THRESHOLD) {
-            autoSizeColumns(sh, headers);
+            autoSizeColumns(sh, headers, rows);
             return;
         }
-        fallbackColumnWidth(sh, headers);
+        fallbackColumnWidth(sh, headers, rows);
     }
 
-    private static void autoSizeColumns(Sheet sh, String[] headers) {
+    /**
+     * 粗略估算儲存格在 Excel 中的「顯示寬度」：CJK 等全形字元權重 2，ASCII 數字等權重 1。
+     * （POI autoSize 對中文常低估，需手動補足。）
+     */
+    private static int estimateDisplayWidthUnits(String s) {
+        if (s == null || s.isEmpty()) {
+            return 0;
+        }
+        int units = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if (isWideChar(ch)) {
+                units += 2;
+            } else {
+                units += 1;
+            }
+        }
+        return units;
+    }
+
+    private static boolean isWideChar(char ch) {
+        if (ch >= 0x4E00 && ch <= 0x9FFF) {
+            return true;
+        }
+        if (ch >= 0x3400 && ch <= 0x4DBF) {
+            return true;
+        }
+        if (ch >= 0xAC00 && ch <= 0xD7AF) {
+            return true;
+        }
+        if (ch >= 0x3000 && ch <= 0x303F) {
+            return true;
+        }
+        return ch > 0x00FF;
+    }
+
+    private static int maxContentDisplayUnits(String[] headers, List<String[]> rows, int col) {
+        String h = headers != null && col < headers.length ? headers[col] : "";
+        int max = estimateDisplayWidthUnits(h);
+        if (rows == null || rows.isEmpty()) {
+            return max;
+        }
+        int limit = Math.min(rows.size(), WIDTH_SAMPLE_ROW_CAP);
+        for (int r = 0; r < limit; r++) {
+            String[] row = rows.get(r);
+            String v = row != null && col < row.length && row[col] != null ? row[col] : "";
+            max = Math.max(max, estimateDisplayWidthUnits(v));
+        }
+        return max;
+    }
+
+    private static int toPoiWidthChars(int displayUnits) {
+        int chars = displayUnits + WIDTH_PADDING_CHARS;
+        chars = Math.max(chars, MIN_WIDTH_CHARS_FLOOR);
+        // 長字串（如「合計 (yyyy-MM-dd ~ yyyy-MM-dd)」）需要較高上限
+        chars = Math.min(chars, 100);
+        return chars * 256;
+    }
+
+    private static void autoSizeColumns(Sheet sh, String[] headers, List<String[]> rows) {
+        Objects.requireNonNull(rows, "rows");
         int columnCount = headers == null ? 0 : headers.length;
-        int maxWidth = 255 * 256; // Excel 欄寬上限（POI 單位：字元寬度 * 256）
         for (int c = 0; c < columnCount; c++) {
             sh.autoSizeColumn(c);
-            int currentWidth = sh.getColumnWidth(c);
+            int autoBased = sh.getColumnWidth(c);
 
-            // POI 單位為「字元寬度的 1/256」；中文/表頭通常需要更大的最小寬度
-            int headerLen = headers[c] == null ? 0 : headers[c].length();
-            int targetChars = Math.max(headerLen + 6, 12); // 最少給 12 字元
-            int targetWidth = Math.min(targetChars * 256, 60 * 256); // 上限避免爆寬
+            int contentUnits = maxContentDisplayUnits(headers, rows, c);
+            int minFromContent = toPoiWidthChars(contentUnits);
 
-            // 再額外加 padding，避免看起來仍偏窄
-            int padded = currentWidth + 4 * 256;
-            int width = Math.max(padded, targetWidth);
-            sh.setColumnWidth(c, Math.min(width, maxWidth));
+            // 在 autoSize 結果上再加寬，並以「表頭＋資料」估算為下限
+            int padded = autoBased + 8 * 256;
+            int width = Math.max(padded, minFromContent);
+            sh.setColumnWidth(c, Math.min(width, MAX_COL_WIDTH_UNITS));
         }
     }
 
-    private static void fallbackColumnWidth(Sheet sh, String[] headers) {
+    private static void fallbackColumnWidth(Sheet sh, String[] headers, List<String[]> rows) {
         int columnCount = headers == null ? 0 : headers.length;
         for (int c = 0; c < columnCount; c++) {
-            int headerLen = headers[c] == null ? 0 : headers[c].length();
-            int targetChars = Math.max(headerLen + 6, 14);
-            int width = Math.min(targetChars * 256, 60 * 256);
+            int contentUnits = maxContentDisplayUnits(headers, rows, c);
+            int width = Math.min(toPoiWidthChars(contentUnits), MAX_COL_WIDTH_UNITS);
             sh.setColumnWidth(c, width);
         }
     }

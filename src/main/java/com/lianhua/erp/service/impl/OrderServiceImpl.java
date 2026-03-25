@@ -4,6 +4,7 @@ import com.lianhua.erp.domain.*;
 import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.order.*;
 import com.lianhua.erp.dto.orderItem.OrderItemRequestDto;
+import com.lianhua.erp.export.ExportDisplayZh;
 import com.lianhua.erp.export.ExportFilenameUtils;
 import com.lianhua.erp.export.ExportFormat;
 import com.lianhua.erp.export.ExportScope;
@@ -149,8 +150,8 @@ public class OrderServiceImpl implements OrderService {
         return new String[]{
                 nz(o.getOrderNo()),
                 nz(o.getCustomerName()),
-                o.getOrderStatus() == null ? "" : o.getOrderStatus().name(),
-                o.getPaymentStatus() == null ? "" : o.getPaymentStatus().name(),
+                o.getOrderStatus() == null ? "" : ExportDisplayZh.orderLifecycle(o.getOrderStatus().name()),
+                o.getPaymentStatus() == null ? "" : ExportDisplayZh.orderCollection(o.getPaymentStatus().name()),
                 o.getTotalAmount() == null ? "" : o.getTotalAmount().toPlainString(),
                 o.getOrderDate() == null ? "" : o.getOrderDate().toString(),
                 o.getDeliveryDate() == null ? "" : o.getDeliveryDate().toString()

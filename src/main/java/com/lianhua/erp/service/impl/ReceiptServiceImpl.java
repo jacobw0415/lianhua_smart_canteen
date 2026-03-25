@@ -5,6 +5,7 @@ import com.lianhua.erp.dto.receipt.*;
 import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.event.ReceiptEvent;
 import com.lianhua.erp.mapper.ReceiptMapper;
+import com.lianhua.erp.export.ExportDisplayZh;
 import com.lianhua.erp.export.ExportFilenameUtils;
 import com.lianhua.erp.export.ExportFormat;
 import com.lianhua.erp.export.ExportScope;
@@ -46,7 +47,7 @@ public class ReceiptServiceImpl implements ReceiptService {
 
     private static final String[] RECEIPT_EXPORT_HEADERS = new String[]{
             "訂單編號", "客戶名稱", "收款狀態", "付款方式", "收款金額",
-            "收款日期", "會計期間", "參考號碼", "備註"
+            "收款日期", "會計期間", "備註"
     };
 
     @org.springframework.beans.factory.annotation.Value("${app.export.max-rows:50000}")
@@ -315,12 +316,11 @@ public class ReceiptServiceImpl implements ReceiptService {
         return new String[]{
                 nz(r.getOrderNo()),
                 nz(r.getCustomerName()),
-                nz(r.getStatus()),
-                nz(r.getMethod()),
+                nz(ExportDisplayZh.recordActiveVoid(r.getStatus())),
+                nz(ExportDisplayZh.paymentMethod(r.getMethod())),
                 r.getAmount() == null ? "" : r.getAmount().toPlainString(),
                 r.getReceivedDate() == null ? "" : r.getReceivedDate().toString(),
                 nz(r.getAccountingPeriod()),
-                nz(r.getReferenceNo()),
                 nz(r.getNote())
         };
     }

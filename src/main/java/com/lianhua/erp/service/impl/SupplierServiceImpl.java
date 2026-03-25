@@ -6,6 +6,7 @@ import com.lianhua.erp.dto.supplier.SupplierResponseDto;
 import com.lianhua.erp.dto.supplier.SupplierRequestDto;
 import com.lianhua.erp.dto.supplier.SupplierSearchRequest;
 import com.lianhua.erp.mapper.SupplierMapper;
+import com.lianhua.erp.export.ExportDisplayZh;
 import com.lianhua.erp.export.ExportFilenameUtils;
 import com.lianhua.erp.export.ExportFormat;
 import com.lianhua.erp.export.ExportScope;
@@ -222,7 +223,7 @@ public class SupplierServiceImpl implements SupplierService {
                 nz(s.getName()),
                 nz(s.getContact()),
                 nz(s.getPhone()),
-                nz(s.getBillingCycle()),
+                nz(ExportDisplayZh.billingCycle(s.getBillingCycle())),
                 status,
                 nz(s.getNote())
         };

@@ -3,6 +3,7 @@ package com.lianhua.erp.service.impl;
 import com.lianhua.erp.domain.OrderCustomer;
 import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.orderCustomer.*;
+import com.lianhua.erp.export.ExportDisplayZh;
 import com.lianhua.erp.export.ExportFilenameUtils;
 import com.lianhua.erp.export.ExportFormat;
 import com.lianhua.erp.export.ExportScope;
@@ -241,7 +242,7 @@ public class OrderCustomerServiceImpl implements OrderCustomerService {
                 nz(c.getContactPerson()),
                 nz(c.getPhone()),
                 nz(c.getAddress()),
-                nz(c.getBillingCycle()),
+                nz(ExportDisplayZh.billingCycle(c.getBillingCycle())),
                 nz(c.getNote())
         };
     }

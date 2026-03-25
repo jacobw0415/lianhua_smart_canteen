@@ -3,6 +3,7 @@ package com.lianhua.erp.service.impl;
 import com.lianhua.erp.domain.Employee;
 import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.employee.*;
+import com.lianhua.erp.export.ExportDisplayZh;
 import com.lianhua.erp.export.ExportFilenameUtils;
 import com.lianhua.erp.export.ExportFormat;
 import com.lianhua.erp.export.ExportScope;
@@ -415,7 +416,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 nz(e.getPosition()),
                 e.getSalary() == null ? "" : e.getSalary().toPlainString(),
                 e.getHireDate() == null ? "" : e.getHireDate().toString(),
-                nz(e.getStatus())
+                nz(ExportDisplayZh.employeeActive(e.getStatus()))
         };
     }
 

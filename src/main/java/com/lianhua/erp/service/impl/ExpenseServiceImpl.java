@@ -3,6 +3,7 @@ package com.lianhua.erp.service.impl;
 import com.lianhua.erp.domain.*;
 import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.expense.*;
+import com.lianhua.erp.export.ExportDisplayZh;
 import com.lianhua.erp.export.ExportFilenameUtils;
 import com.lianhua.erp.export.ExportFormat;
 import com.lianhua.erp.export.ExportScope;
@@ -647,7 +648,7 @@ public class ExpenseServiceImpl implements ExpenseService {
                 nz(e.getCategoryName()),
                 e.getAmount() == null ? "" : e.getAmount().toPlainString(),
                 nz(e.getEmployeeName()),
-                e.getStatus() == null ? "" : e.getStatus().name(),
+                e.getStatus() == null ? "" : ExportDisplayZh.recordActiveVoid(e.getStatus().name()),
                 nz(e.getNote())
         };
     }

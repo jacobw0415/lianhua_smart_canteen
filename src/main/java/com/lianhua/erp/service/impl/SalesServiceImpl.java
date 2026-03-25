@@ -4,6 +4,7 @@ import com.lianhua.erp.domain.Product;
 import com.lianhua.erp.domain.Sale;
 import com.lianhua.erp.dto.export.ExportPayload;
 import com.lianhua.erp.dto.sale.*;
+import com.lianhua.erp.export.ExportDisplayZh;
 import com.lianhua.erp.export.ExportFilenameUtils;
 import com.lianhua.erp.export.ExportFormat;
 import com.lianhua.erp.export.ExportScope;
@@ -207,7 +208,7 @@ public class SalesServiceImpl implements SalesService {
                 s.getSaleDate() == null ? "" : s.getSaleDate().toString(),
                 nz(s.getProductName()),
                 s.getQty() == null ? "" : String.valueOf(s.getQty()),
-                nz(s.getPayMethod()),
+                nz(ExportDisplayZh.retailPayMethod(s.getPayMethod())),
                 s.getAmount() == null ? "" : s.getAmount().toPlainString()
         };
     }

@@ -15,6 +15,7 @@ import com.lianhua.erp.repository.SupplierRepository;
 import com.lianhua.erp.service.PurchaseService;
 import com.lianhua.erp.service.impl.spec.PurchaseSpecifications;
 import com.lianhua.erp.dto.export.ExportPayload;
+import com.lianhua.erp.export.ExportDisplayZh;
 import com.lianhua.erp.export.ExportFilenameUtils;
 import com.lianhua.erp.export.ExportFormat;
 import com.lianhua.erp.export.ExportScope;
@@ -909,7 +910,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         return new String[]{
                 nz(p.getPurchaseNo()),
                 nz(p.getSupplierName()),
-                p.getStatus() == null ? "" : p.getStatus(),
+                p.getStatus() == null ? "" : ExportDisplayZh.purchasePayment(p.getStatus()),
                 p.getTotalAmount() == null ? "" : p.getTotalAmount().toPlainString(),
                 p.getPaidAmount() == null ? "" : p.getPaidAmount().toPlainString(),
                 p.getBalance() == null ? "" : p.getBalance().toPlainString(),

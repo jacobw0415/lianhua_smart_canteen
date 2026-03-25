@@ -9,6 +9,7 @@ import com.lianhua.erp.repository.PaymentRepository;
 import com.lianhua.erp.repository.PurchaseRepository;
 import com.lianhua.erp.service.PaymentService;
 import com.lianhua.erp.service.impl.spec.PaymentSpecifications;
+import com.lianhua.erp.export.ExportDisplayZh;
 import com.lianhua.erp.export.ExportFilenameUtils;
 import com.lianhua.erp.export.ExportFormat;
 import com.lianhua.erp.export.ExportScope;
@@ -238,11 +239,11 @@ public class PaymentServiceImpl implements PaymentService {
                 nz(p.getPurchaseNo()),
                 nz(p.getSupplierName()),
                 nz(p.getItem()),
-                nz(p.getMethod()),
+                nz(ExportDisplayZh.paymentMethod(p.getMethod())),
                 p.getAmount() == null ? "" : p.getAmount().toPlainString(),
                 p.getPayDate() == null ? "" : p.getPayDate().toString(),
                 nz(p.getAccountingPeriod()),
-                nz(p.getStatus()),
+                nz(ExportDisplayZh.recordActiveVoid(p.getStatus())),
                 nz(p.getNote())
         };
     }
