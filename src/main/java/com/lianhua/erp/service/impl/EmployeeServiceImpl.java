@@ -15,6 +15,7 @@ import com.lianhua.erp.service.EmployeeService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -48,7 +49,7 @@ public class EmployeeServiceImpl implements EmployeeService {
             "狀態"
     };
 
-    @org.springframework.beans.factory.annotation.Value("${app.export.max-rows:50000}")
+    @Value("${app.export.max-rows:50000}")
     private int maxExportRows;
     
     @Override

@@ -527,9 +527,34 @@ CREATE INDEX idx_fin_audit_occurred_at ON financial_audit_logs(occurred_at);
 CREATE INDEX idx_fin_audit_operator ON financial_audit_logs(operator_id);
 CREATE INDEX idx_fin_audit_entity ON financial_audit_logs(entity_type, entity_id);
 
+-- ------------------------------------------------------------
+-- 21. 全系統活動稽核（HTTP 層自動記錄 + 可查詢）
+-- ------------------------------------------------------------
+CREATE TABLE activity_audit_logs (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  occurred_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  operator_id BIGINT NOT NULL COMMENT '操作者使用者 ID',
+  operator_username VARCHAR(60) NULL COMMENT '操作者使用者名稱快照',
+  action VARCHAR(32) NOT NULL COMMENT 'CREATE / UPDATE / DELETE / EXPORT / PATCH',
+  resource_type VARCHAR(64) NOT NULL COMMENT '依 API 路徑推斷之資源類型',
+  resource_id BIGINT NULL COMMENT '路徑中第一個數字 ID（若有）',
+  http_method VARCHAR(10) NOT NULL,
+  request_path VARCHAR(1024) NOT NULL,
+  query_string VARCHAR(512) NULL,
+  ip_address VARCHAR(45) NULL,
+  user_agent VARCHAR(512) NULL,
+  details TEXT NULL COMMENT 'JSON：補充資訊（不含密碼）',
+  INDEX idx_activity_occurred_at (occurred_at),
+  INDEX idx_activity_operator (operator_id),
+  INDEX idx_activity_operator_username (operator_username),
+  INDEX idx_activity_resource (resource_type, resource_id),
+  INDEX idx_activity_action (action)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================
 --    Schema v2.7 完成：
 --    1. 整合 v2.6 所有修正（作廢機制、費用類別更新）。
 --    2. 新增通知中心三表架構 (16. A, B)。
 --    3. 支援 JSON Payload 與 Template 解耦，為產品化做準備。
+--    4. 新增全系統活動稽核表 activity_audit_logs (21)。
 -- ============================================================
