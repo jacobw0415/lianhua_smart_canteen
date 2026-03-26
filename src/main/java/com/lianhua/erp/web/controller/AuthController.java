@@ -1,12 +1,16 @@
 package com.lianhua.erp.web.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lianhua.erp.dto.apiResponse.ApiResponseDto;
 import com.lianhua.erp.dto.auth.*;
 import com.lianhua.erp.dto.error.*;
 import com.lianhua.erp.dto.user.JwtResponse;
 import com.lianhua.erp.dto.user.UserRegisterDto;
 import com.lianhua.erp.dto.user.UserDto;
+import com.lianhua.erp.audit.ActivityAuditPathSupport;
+import com.lianhua.erp.dto.audit.ActivityAuditRecordRequest;
 import com.lianhua.erp.repository.UserRepository;
+import com.lianhua.erp.service.ActivityAuditService;
 import com.lianhua.erp.security.CustomUserDetails;
 import com.lianhua.erp.security.JwtUtils;
 import com.lianhua.erp.security.SecurityUtils;
@@ -34,9 +38,12 @@ import org.springframework.web.bind.annotation.*;
 import com.lianhua.erp.dto.user.LoginRequest;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.AuthenticationException;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 認證控制中心
@@ -57,6 +64,8 @@ public class AuthController {
     private final LoginAttemptService loginAttemptService;
     private final RefreshTokenService refreshTokenService;
     private final UserRepository userRepository;
+    private final ActivityAuditService activityAuditService;
+    private final ObjectMapper objectMapper;
 
     public AuthController(AuthenticationManager authenticationManager,
                           JwtUtils jwtUtils,
@@ -66,7 +75,9 @@ public class AuthController {
                           LoginLogService loginLogService,
                           LoginAttemptService loginAttemptService,
                           RefreshTokenService refreshTokenService,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          ActivityAuditService activityAuditService,
+                          ObjectMapper objectMapper) {
         this.authenticationManager = authenticationManager;
         this.jwtUtils = jwtUtils;
         this.userService = userService;
@@ -76,6 +87,8 @@ public class AuthController {
         this.loginAttemptService = loginAttemptService;
         this.refreshTokenService = refreshTokenService;
         this.userRepository = userRepository;
+        this.activityAuditService = activityAuditService;
+        this.objectMapper = objectMapper;
     }
 
     // ============================================================
@@ -93,7 +106,10 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponseDto<?> authenticateUser(
             @Valid @RequestBody LoginRequest loginRequest,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            HttpServletResponse response) {
+
+        long startNanos = System.nanoTime();
 
         // 基於 IP + 帳號的簡易登入頻率限制
         String clientIp = request.getRemoteAddr();
@@ -129,6 +145,57 @@ public class AuthController {
 
         // 若已啟用 MFA：不發放 JWT，回傳 pendingToken 供第二階段驗證
         var user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("User not found"));
+
+        // 寫入審計中心：登入成功（只記成功，避免 operatorId 不存在導致落庫失敗）
+        try {
+            String pathOnly = ActivityAuditPathSupport.normalizedPath(request);
+            String resourceType = ActivityAuditPathSupport.inferResourceType(pathOnly);
+            Long resourceId = ActivityAuditPathSupport.extractFirstNumericId(pathOnly);
+
+            String operatorUsername = principal.getUsername();
+            String requestId = request.getHeader("X-Request-Id");
+            if (requestId == null || requestId.isBlank()) {
+                requestId = request.getHeader("X-Correlation-Id");
+            }
+
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("event", "LOGIN");
+            details.put("handler", "AuthController.authenticateUser");
+            details.put("mfaEnabled", Boolean.TRUE.equals(user.getMfaEnabled()));
+
+            // UI 需要回應狀態與耗時：登入走 controller，不經過 ActivityAuditInterceptor，所以要補上。
+            int httpStatus = response.getStatus();
+            if (httpStatus <= 0) {
+                // Spring 成功回傳時通常是 200；若此刻尚未設置就用預設值。
+                httpStatus = 200;
+            }
+            long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
+            details.put("httpStatus", httpStatus);
+            details.put("durationMs", durationMs);
+
+            if (requestId != null && !requestId.isBlank()) {
+                details.put("requestId", truncate(requestId, 128));
+            }
+            String detailsJson = objectMapper.writeValueAsString(details);
+
+            activityAuditService.recordAsync(new ActivityAuditRecordRequest(
+                    userId,
+                    operatorUsername,
+                    "LOGIN",
+                    resourceType,
+                    resourceId,
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    truncateQuery(request.getQueryString()),
+                    clientIp(request),
+                    truncateUa(request.getHeader("User-Agent")),
+                    detailsJson
+            ));
+        } catch (Exception e) {
+            // 登入主流程不因稽核失敗而中斷
+            log.debug("Failed to record login audit: {}", e.getMessage());
+        }
+
         if (Boolean.TRUE.equals(user.getMfaEnabled())) {
             String pendingToken = refreshTokenService.createMfaPending(userId);
             MfaPendingResponse mfaPending = MfaPendingResponse.builder()
@@ -328,5 +395,34 @@ public class AuthController {
     @PostMapping("/register")
     public ApiResponseDto<UserDto> registerUser(@Valid @RequestBody UserRegisterDto registerDto) {
         return ApiResponseDto.ok(userService.registerUser(registerDto));
+    }
+
+    private static String clientIp(HttpServletRequest req) {
+        String xff = req.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            return xff.split(",")[0].trim();
+        }
+        return req.getRemoteAddr();
+    }
+
+    private static String truncateQuery(String query) {
+        if (query == null) {
+            return null;
+        }
+        return query.length() > 512 ? query.substring(0, 512) : query;
+    }
+
+    private static String truncateUa(String ua) {
+        if (ua == null) {
+            return null;
+        }
+        return ua.length() > 512 ? ua.substring(0, 512) : ua;
+    }
+
+    private static String truncate(String s, int maxLen) {
+        if (s == null) {
+            return null;
+        }
+        return s.length() <= maxLen ? s : s.substring(0, maxLen);
     }
 }

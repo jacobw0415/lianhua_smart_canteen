@@ -15,6 +15,8 @@ public record ActivityAuditLogResponseDto(
         @Schema(description = "資源類型（依 API 路徑推斷）") String resourceType,
         @Schema(description = "路徑中第一個數字 ID") Long resourceId,
         @Schema(description = "HTTP 方法") String httpMethod,
+        @Schema(description = "回應狀態（HTTP status code）") Integer responseStatus,
+        @Schema(description = "耗時（毫秒）") Long durationMs,
         @Schema(description = "請求路徑") String requestPath,
         @Schema(description = "查詢字串（截斷）") String queryString,
         @Schema(description = "來源 IP") String ipAddress,

@@ -551,10 +551,38 @@ CREATE TABLE activity_audit_logs (
   INDEX idx_activity_action (action)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ------------------------------------------------------------
+-- 22. 全系統活動稽核保留期：歸檔再刪除
+-- ------------------------------------------------------------
+-- 過期資料（目前預設保留 180 天）會被排程批次搬移到 archive 表，
+-- 再刪除主表資料，以降低 activity_audit_logs 的長期膨脹並保留可追溯紀錄。
+CREATE TABLE activity_audit_logs_archive (
+  id BIGINT PRIMARY KEY,
+  occurred_at TIMESTAMP(3) NOT NULL,
+  operator_id BIGINT NOT NULL,
+  operator_username VARCHAR(60) NULL,
+  action VARCHAR(32) NOT NULL,
+  resource_type VARCHAR(64) NOT NULL,
+  resource_id BIGINT NULL,
+  http_method VARCHAR(10) NOT NULL,
+  request_path VARCHAR(1024) NOT NULL,
+  query_string VARCHAR(512) NULL,
+  ip_address VARCHAR(45) NULL,
+  user_agent VARCHAR(512) NULL,
+  details TEXT NULL COMMENT 'JSON：補充資訊（不含密碼）',
+  archived_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  INDEX idx_activity_occurred_at (occurred_at),
+  INDEX idx_activity_operator (operator_id),
+  INDEX idx_activity_operator_username (operator_username),
+  INDEX idx_activity_resource (resource_type, resource_id),
+  INDEX idx_activity_action (action)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================
 --    Schema v2.7 完成：
 --    1. 整合 v2.6 所有修正（作廢機制、費用類別更新）。
 --    2. 新增通知中心三表架構 (16. A, B)。
 --    3. 支援 JSON Payload 與 Template 解耦，為產品化做準備。
 --    4. 新增全系統活動稽核表 activity_audit_logs (21)。
+--    5. 新增活動稽核歸檔表 activity_audit_logs_archive (22)，配合歸檔後刪除策略。
 -- ============================================================

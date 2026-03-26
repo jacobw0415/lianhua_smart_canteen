@@ -1,5 +1,7 @@
 package com.lianhua.erp.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lianhua.erp.config.AuditProperties;
 import com.lianhua.erp.domain.ActivityAuditLog;
 import com.lianhua.erp.dto.audit.ActivityAuditLogResponseDto;
@@ -62,6 +64,7 @@ public class ActivityAuditServiceImpl implements ActivityAuditService {
 
     private final ActivityAuditLogRepository repository;
     private final AuditProperties auditProperties;
+    private final ObjectMapper objectMapper;
 
     @Value("${app.export.max-rows:50000}")
     private int maxExportRows;
@@ -242,6 +245,23 @@ public class ActivityAuditServiceImpl implements ActivityAuditService {
     }
 
     private ActivityAuditLogResponseDto toDto(ActivityAuditLog e) {
+        Integer responseStatus = null;
+        Long durationMs = null;
+        String details = e.getDetails();
+        if (details != null && !details.isBlank()) {
+            try {
+                JsonNode node = objectMapper.readTree(details);
+                if (node.has("httpStatus") && !node.get("httpStatus").isNull()) {
+                    responseStatus = node.get("httpStatus").asInt();
+                }
+                if (node.has("durationMs") && !node.get("durationMs").isNull()) {
+                    durationMs = node.get("durationMs").asLong();
+                }
+            } catch (Exception ex) {
+                // details 不是固定 schema；解析失敗就維持空值，不影響清單查詢
+                log.debug("Failed to parse activity audit details JSON: {}", ex.getMessage());
+            }
+        }
         return new ActivityAuditLogResponseDto(
                 e.getId(),
                 e.getOccurredAt(),
@@ -252,11 +272,13 @@ public class ActivityAuditServiceImpl implements ActivityAuditService {
                 e.getResourceType(),
                 e.getResourceId(),
                 e.getHttpMethod(),
+                responseStatus,
+                durationMs,
                 e.getRequestPath(),
                 e.getQueryString(),
                 e.getIpAddress(),
                 e.getUserAgent(),
-                e.getDetails()
+                details
         );
     }
 
