@@ -20,4 +20,6 @@ public interface MfaPendingSessionRepository extends JpaRepository<MfaPendingSes
     @Modifying
     @Query("DELETE FROM MfaPendingSession m WHERE m.expiresAt < :before")
     int deleteByExpiresAtBefore(@Param("before") Instant before);
+
+    Optional<Object> findByUserId(Long userId);
 }

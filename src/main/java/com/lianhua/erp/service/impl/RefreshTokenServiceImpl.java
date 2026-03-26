@@ -8,6 +8,7 @@ import com.lianhua.erp.repository.MfaPendingSessionRepository;
 import com.lianhua.erp.repository.RefreshTokenRepository;
 import com.lianhua.erp.repository.UserRepository;
 import com.lianhua.erp.security.CustomUserDetails;
+import com.lianhua.erp.security.EncryptionService;
 import com.lianhua.erp.security.JwtUtils;
 import com.lianhua.erp.service.MfaService;
 import com.lianhua.erp.service.RefreshTokenService;
@@ -36,6 +37,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     private final UserRepository userRepository;
     private final JwtUtils jwtUtils;
     private final MfaService mfaService;
+    private final EncryptionService encryptionService;
 
     @Value("${lianhua.app.refreshTokenExpirationSeconds:604800}")
     private long refreshTokenExpirationSeconds;
@@ -148,15 +150,26 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional
     public String createMfaPending(Long userId) {
-        mfaPendingSessionRepository.deleteByUserId(userId);
         String token = UUID.randomUUID().toString();
         Instant expiresAt = Instant.now().plusSeconds(mfaPendingExpirationSeconds);
-        MfaPendingSession session = MfaPendingSession.builder()
-                .userId(userId)
-                .token(token)
-                .expiresAt(expiresAt)
-                .build();
-        mfaPendingSessionRepository.save(session);
+
+        // 改用這種方式，避免頻繁的刪除導致資料庫 Index 鎖定衝突
+        mfaPendingSessionRepository.findByUserId(userId).ifPresentOrElse(
+                sessionObj -> {
+                    MfaPendingSession session = (MfaPendingSession) sessionObj;
+                    session.setToken(token);
+                    session.setExpiresAt(expiresAt);
+                    mfaPendingSessionRepository.save(session);
+                },
+                () -> {
+                    MfaPendingSession session = MfaPendingSession.builder()
+                            .userId(userId)
+                            .token(token)
+                            .expiresAt(expiresAt)
+                            .build();
+                    mfaPendingSessionRepository.save(session);
+                }
+        );
         return token;
     }
 
@@ -173,7 +186,12 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             throw new IllegalStateException("該帳號尚未設定 MFA 密鑰");
         }
 
-        if (!mfaService.verifyCode(user.getMfaSecret(), code)) {
+        String decryptedSecret = encryptionService.decrypt(user.getMfaSecret());
+        if (decryptedSecret == null || decryptedSecret.isBlank()) {
+            throw new IllegalStateException("MFA 密鑰解密失敗，請重新綁定 MFA");
+        }
+
+        if (!mfaService.verifyCode(decryptedSecret, code)) {
             throw new IllegalArgumentException("MFA 驗證碼錯誤");
         }
 
